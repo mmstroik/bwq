@@ -1,44 +1,37 @@
 use crate::error::Span;
 
-/// AST node representing a complete boolean query
 #[derive(Debug, Clone, PartialEq)]
 pub struct Query {
     pub expression: Expression,
     pub span: Span,
 }
 
-/// Main expression types in Brandwatch queries
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    /// Boolean operations (AND, OR, NOT)
     BooleanOp {
         operator: BooleanOperator,
         left: Box<Expression>,
-        right: Option<Box<Expression>>, // None for NOT operator
+        right: Option<Box<Expression>>,
         span: Span,
     },
 
-    /// Grouped expression with parentheses
     Group {
         expression: Box<Expression>,
         span: Span,
     },
 
-    /// Proximity operations (~, NEAR/x, NEAR/xf)
     Proximity {
         operator: ProximityOperator,
         terms: Vec<Expression>,
         span: Span,
     },
 
-    /// Field operations (title:, site:, author:, etc.)
     Field {
         field: FieldType,
         value: Box<Expression>,
         span: Span,
     },
 
-    /// Range operations [x TO y]
     Range {
         field: Option<FieldType>,
         start: String,
@@ -46,20 +39,17 @@ pub enum Expression {
         span: Span,
     },
 
-    /// Term (word, quoted phrase, etc.)
     Term {
         term: Term,
         span: Span,
     },
 
-    /// Comment (<<<text>>>)
     Comment {
         text: String,
         span: Span,
     },
 }
 
-/// Boolean operators
 #[derive(Debug, Clone, PartialEq)]
 pub enum BooleanOperator {
     And,
@@ -86,28 +76,21 @@ impl BooleanOperator {
     }
 }
 
-/// Proximity operators
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProximityOperator {
-    /// Simple proximity ~n
     Proximity { distance: Option<u32> },
-    /// NEAR/x operator
     Near { distance: u32 },
-    /// NEAR/xf operator (forward only)
     NearForward { distance: u32 },
 }
 
-/// Field types for field:value operations
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
-    // Basic fields
     Title,
     Site,
     Url,
     Author,
     Links,
     
-    // Location fields
     Continent,
     Country,
     Region,
@@ -115,11 +98,9 @@ pub enum FieldType {
     Latitude,
     Longitude,
     
-    // Content fields
     Language,
     ChannelId,
     
-    // Advanced fields
     AuthorGender,
     AuthorVerified,
     AuthorVerifiedType,
@@ -257,23 +238,14 @@ impl FieldType {
     }
 }
 
-/// Term types
 #[derive(Debug, Clone, PartialEq)]
 pub enum Term {
-    /// Plain word
     Word { value: String },
-    /// Quoted phrase
     Phrase { value: String },
-    /// Word with wildcard
     Wildcard { value: String },
-    /// Word with replacement character
     Replacement { value: String },
-    /// Case-sensitive term {word}
     CaseSensitive { value: String },
-    /// Hashtag
     Hashtag { value: String },
-    /// @mention
     Mention { value: String },
-    /// Emoji
     Emoji { value: String },
 }

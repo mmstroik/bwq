@@ -68,10 +68,8 @@ impl Validator {
         right: Option<&Expression>,
         span: &Span,
     ) {
-        // Validate left operand
         self.validate_expression(left);
 
-        // All operators (AND, OR, NOT) should have right operand in Brandwatch
         if let Some(right_expr) = right {
             self.validate_expression(right_expr);
         } else {
@@ -81,7 +79,6 @@ impl Validator {
             });
         }
 
-        // Check for performance warnings
         self.check_boolean_performance_warnings(operator, left, right, span);
     }
 
@@ -91,10 +88,8 @@ impl Validator {
         terms: &[Expression],
         span: &Span,
     ) {
-        // Validate term count based on operator type
         match operator {
             ProximityOperator::Proximity { .. } => {
-                // Tilde operator can have 1 term (quoted phrase) or 2 terms
                 if terms.is_empty() || terms.len() > 2 {
                     self.errors.push(LintError::InvalidProximityOperator {
                         span: span.clone(),
@@ -104,7 +99,6 @@ impl Validator {
                 }
             }
             ProximityOperator::Near { .. } | ProximityOperator::NearForward { .. } => {
-                // NEAR operators require exactly 2 terms
                 if terms.len() != 2 {
                     self.errors.push(LintError::InvalidProximityOperator {
                         span: span.clone(),
@@ -115,12 +109,10 @@ impl Validator {
             }
         }
 
-        // Validate each term
         for term in terms {
             self.validate_expression(term);
         }
 
-        // Validate distance values
         match operator {
             ProximityOperator::Proximity { distance } => {
                 if let Some(dist) = distance {
@@ -150,10 +142,8 @@ impl Validator {
     }
 
     fn validate_field_op(&mut self, field: &FieldType, value: &Expression, span: &Span) {
-        // Validate the field value
         self.validate_expression(value);
 
-        // Field-specific validation
         match field {
             FieldType::AuthorFollowers => {
                 self.validate_numeric_field(value, span, "authorFollowers");
@@ -186,7 +176,6 @@ impl Validator {
                 self.validate_coordinate_field(field, value, span);
             }
             _ => {
-                // General field validation
                 self.validate_general_field(field, value, span);
             }
         }
@@ -199,7 +188,6 @@ impl Validator {
         end: &str,
         span: &Span,
     ) {
-        // Try to parse as numbers if possible
         if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
             if start_num > end_num {
                 self.errors.push(LintError::ValidationError {
@@ -209,7 +197,6 @@ impl Validator {
             }
         }
 
-        // Field-specific range validation
         if let Some(field_type) = field {
             match field_type {
                 FieldType::Rating => {

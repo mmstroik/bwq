@@ -15,48 +15,31 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Lint a query string directly
     Lint {
-        /// The query to lint
         query: String,
-        
-        /// Show warnings as well as errors
         #[arg(short, long)]
         warnings: bool,
-        
-        /// Output format (text, json)
         #[arg(short, long, default_value = "text")]
         format: String,
     },
     
-    /// Lint queries from a file
     File {
-        /// Path to file containing queries (one per line)
         path: PathBuf,
-        
-        /// Show warnings as well as errors
         #[arg(short, long)]
         warnings: bool,
-        
-        /// Output format (text, json)
         #[arg(short, long, default_value = "text")]
         format: String,
     },
     
-    /// Interactive mode - read queries from stdin
     Interactive {
-        /// Show warnings as well as errors
         #[arg(short, long)]
         warnings: bool,
     },
     
-    /// Validate a query (exit code 0 if valid, 1 if invalid)
     Validate {
-        /// The query to validate
         query: String,
     },
     
-    /// Show examples of valid query syntax
     Examples,
 }
 

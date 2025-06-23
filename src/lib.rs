@@ -9,7 +9,6 @@ use lexer::Lexer;
 use parser::{Parser, ParseResult};
 use validator::Validator;
 
-/// Main linter interface
 pub struct BrandwatchLinter {
     validator: Validator,
 }
@@ -21,7 +20,6 @@ impl BrandwatchLinter {
         }
     }
 
-    /// Lint a Brandwatch boolean query string
     pub fn lint(&mut self, query: &str) -> LintResult<LintReport> {
         // Tokenize
         let mut lexer = Lexer::new(query);
@@ -40,7 +38,6 @@ impl BrandwatchLinter {
         Ok(report)
     }
 
-    /// Quick validation - returns true if query is valid
     pub fn is_valid(&mut self, query: &str) -> bool {
         match self.lint(query) {
             Ok(report) => !report.has_errors(),
@@ -48,7 +45,6 @@ impl BrandwatchLinter {
         }
     }
 
-    /// Get detailed analysis of a query
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {
         match self.lint(query) {
             Ok(report) => AnalysisResult {
@@ -73,7 +69,6 @@ impl Default for BrandwatchLinter {
     }
 }
 
-/// Result of query analysis
 #[derive(Debug, Clone)]
 pub struct AnalysisResult {
     pub is_valid: bool,
@@ -83,12 +78,10 @@ pub struct AnalysisResult {
 }
 
 impl AnalysisResult {
-    /// Check if the query has any issues (errors or warnings)
     pub fn has_issues(&self) -> bool {
         !self.errors.is_empty() || !self.warnings.is_empty()
     }
 
-    /// Get a summary of issues
     pub fn summary(&self) -> String {
         if self.is_valid && self.warnings.is_empty() {
             "Query is valid with no issues".to_string()
@@ -107,7 +100,6 @@ impl AnalysisResult {
         }
     }
 
-    /// Format errors and warnings for display
     pub fn format_issues(&self) -> String {
         let mut output = String::new();
         
@@ -132,19 +124,16 @@ impl AnalysisResult {
     }
 }
 
-/// Convenience function to quickly lint a query
 pub fn lint_query(query: &str) -> LintResult<LintReport> {
     let mut linter = BrandwatchLinter::new();
     linter.lint(query)
 }
 
-/// Convenience function to check if a query is valid
 pub fn is_valid_query(query: &str) -> bool {
     let mut linter = BrandwatchLinter::new();
     linter.is_valid(query)
 }
 
-/// Convenience function to get detailed analysis
 pub fn analyze_query(query: &str) -> AnalysisResult {
     let mut linter = BrandwatchLinter::new();
     linter.analyze(query)

@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-/// Position information for error reporting
 #[derive(Debug, Clone, PartialEq)]
 pub struct Position {
     pub line: usize,
@@ -14,7 +13,6 @@ impl Position {
     }
 }
 
-/// Span information for error reporting
 #[derive(Debug, Clone, PartialEq)]
 pub struct Span {
     pub start: Position,
@@ -34,7 +32,6 @@ impl Span {
     }
 }
 
-/// Linting errors
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum LintError {
     #[error("Lexer error at {position:?}: {message}")]
@@ -102,7 +99,6 @@ pub enum LintError {
     },
 }
 
-/// Warning types for non-critical issues
 #[derive(Debug, Clone, PartialEq)]
 pub enum LintWarning {
     PotentialTypo { span: Span, suggestion: String },
@@ -110,10 +106,8 @@ pub enum LintWarning {
     PerformanceWarning { span: Span, message: String },
 }
 
-/// Result type for linting operations
 pub type LintResult<T> = Result<T, LintError>;
 
-/// Container for all linting results
 #[derive(Debug, Clone, PartialEq)]
 pub struct LintReport {
     pub errors: Vec<LintError>,
