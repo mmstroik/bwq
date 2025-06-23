@@ -1,0 +1,95 @@
+# Valid Brandwatch Query Examples
+
+# Basic Boolean Operators
+apple AND juice
+apple OR orange
+apple NOT bitter
+(apple OR orange) AND juice
+NOT bitter
+
+# Quoted Phrases
+"apple juice"
+"organic fruit" AND healthy
+"multi word phrase" OR simple
+
+# Proximity Operators
+"apple juice"~5
+apple NEAR/3 juice
+apple NEAR/2f juice
+((apple OR orange) NEAR/5 (smartphone OR phone))
+
+# Wildcards and Replacement
+appl*
+customi?e
+complain*
+
+# Field Operators
+title:"apple juice"
+site:twitter.com
+author:brandwatch
+language:en
+country:usa
+region:usa.ca
+city:"usa.ca.san francisco"
+
+# Range Operators
+rating:[3 TO 5]
+authorFollowers:[1000 TO 50000]
+latitude:[41 TO 44]
+longitude:[-73 TO -69]
+minuteOfDay:[1110 TO 1140]
+
+# Advanced Operators
+authorGender:F
+authorVerified:true
+authorVerifiedType:blue
+engagementType:RETWEET
+blogName:comedycentral
+tags:photography
+subreddit:nba
+
+# Case Sensitive Matching
+{BrandWatch}
+apple AND {BT}
+
+# Comments
+apple <<<This is a comment>>> AND juice
+<<<Brand monitoring>>> "brand name"
+
+# Special Characters
+#MondayMotivation
+@brandwatch
+#hashtag AND @mention
+
+# Complex Queries
+(apple OR orange) AND "fruit juice" NOT bitter AND site:twitter.com
+title:"smartphone review" AND (iPhone OR Samsung) NEAR/5 (camera OR battery)
+authorFollowers:[1000 TO 100000] AND engagementType:RETWEET AND language:en
+("brand name" OR @brandhandle) AND sentiment:positive NOT complaint*
+
+# Location Queries
+continent:europe AND "climate change"
+country:gbr AND "brexit"
+region:usa.ca AND "tech startup"
+city:"usa.ny.new york" AND "restaurant review"
+
+# Social Media Specific
+engagementType:COMMENT AND authorGender:F
+authorVerified:true AND authorVerifiedType:blue
+blogName:tumblr AND tags:art
+subreddit:technology AND "artificial intelligence"
+
+# Performance Considerations (should work but may have warnings)
+# a*
+# authorFollowers:[1 TO 2000000000]
+# apple NEAR/150 juice
+
+# Invalid Queries (commented out)
+# *invalid
+# apple AND
+# OR juice
+# rating:6
+# authorGender:X
+# engagementType:INVALID
+# NEAR/0 apple juice
+# [3 TO 1]

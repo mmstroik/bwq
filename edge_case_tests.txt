@@ -1,0 +1,172 @@
+# Edge case tests for comparison with Brandwatch API
+# Format: query_type:expected_result:query
+
+# Known invalid cases (both should reject)
+pure_negative:invalid:NOT bitter
+incomplete_and:invalid:apple AND
+incomplete_or:invalid:OR apple
+leading_wildcard:invalid:*invalid
+empty_query:invalid:
+mixed_near_and:invalid:apple AND juice NEAR/5 orange
+
+# Known valid cases (both should accept)
+simple_term:valid:apple
+basic_and:valid:apple AND juice
+basic_or:valid:apple OR orange
+valid_wildcard:valid:appl*
+near_operator:valid:apple NEAR/5 juice
+parenthesized_near:valid:(apple NEAR/5 juice) AND orange
+quoted_phrase:valid:"apple juice"
+field_operation:valid:title:"apple juice"
+proximity_tilde:valid:"apple juice"~5
+case_sensitive:valid:{BrandWatch}
+hashtag:valid:#MondayMotivation
+mention:valid:@brandwatch
+replacement_char:valid:customi?e
+
+# Complex valid cases
+complex_boolean:valid:(apple OR orange) AND juice NOT bitter
+complex_proximity:valid:((apple OR orange) NEAR/5 (smartphone OR phone))
+real_world_query:valid:competition OR competitive OR competitor* OR saturat* OR ((China OR chinese OR cheap OR "low cost" OR "low-cost") NEAR/3 (brand* OR product* OR seller))
+
+# Field validation edge cases (may differ between our linter and API)
+rating_valid:valid:rating:3
+rating_invalid:check:rating:6
+gender_valid:valid:authorGender:F
+gender_invalid:check:authorGender:X
+boolean_field_valid:valid:authorVerified:true
+boolean_field_invalid:check:authorVerified:yes
+engagement_valid:valid:engagementType:RETWEET
+engagement_invalid:check:engagementType:LIKE
+verified_type_valid:valid:authorVerifiedType:blue
+verified_type_invalid:check:authorVerifiedType:gold
+language_valid:valid:language:en
+language_warning:check:language:english
+
+# Range operations
+range_valid:valid:rating:[3 TO 5]
+range_invalid:check:[5 TO 3]
+followers_range:valid:authorFollowers:[1000 TO 50000]
+coordinate_range:valid:latitude:[41 TO 44]
+
+# Performance warning cases
+single_char:warning:a
+short_wildcard:warning:ap*
+multiple_wildcards:warning:apple* OR juice*
+large_proximity:warning:apple NEAR/150 juice
+
+# Operator precedence and grouping
+nested_groups:valid:((apple OR orange) AND (juice OR smoothie))
+not_with_groups:valid:NOT (apple AND bitter)
+multiple_not:valid:apple NOT bitter NOT sour
+
+# Special characters and escaping
+hyphenated_terms:valid:"low-cost" AND "high-quality"
+unicode_chars:valid:café AND naïve
+numbers:valid:iphone13 AND ios15
+mixed_case:valid:iPhone AND Samsung
+
+# Comment syntax
+simple_comment:valid:apple <<<brand monitoring>>> AND juice
+nested_comment:valid:(apple <<<seasonal>>> OR orange) AND juice
+
+# Field combinations
+multiple_fields:valid:site:twitter.com AND language:en AND authorGender:F
+location_hierarchy:valid:continent:europe AND country:gbr AND region:gbr.england
+
+# Additional edge cases for comprehensive API comparison
+
+# Advanced operator combinations not well tested
+mixed_operators_complex:check:(title:"product review" OR author:techexpert) AND (iPhone OR Samsung) NEAR/5 (camera OR battery) NOT (spam OR fake)
+nested_field_operations:check:site:reddit.com AND subreddit:technology AND author:moderator AND authorVerified:true
+multiple_proximity_operators:check:(apple NEAR/5 juice) AND (orange NEAR/3 smoothie) OR (berry NEAR/2 fresh)
+
+# Edge cases with special characters and unicode
+unicode_with_operators:check:café AND naïve OR résumé NOT cliché
+emoji_with_boolean:check:😀 AND happy OR 🎉 NOT sad
+mixed_case_sensitivity:check:{iPhone} AND iphone OR ANDROID NOT android
+special_chars_in_phrases:check:"don't worry" AND "it's okay" OR "we're here"
+
+# Complex nested grouping edge cases
+deep_nesting:check:((((apple OR orange) AND juice) OR smoothie) AND healthy) NOT artificial
+unbalanced_grouping_valid:check:(apple AND (juice OR (smoothie AND fresh)))
+multiple_not_with_groups:check:NOT (spam OR fake) AND NOT (advertisement OR promo) OR legitimate
+
+# Proximity operator edge cases
+proximity_with_wildcards:check:apple* NEAR/5 juice*
+proximity_with_quotes:check:"apple juice" NEAR/3 "organic fruit"
+proximity_forward_only:check:brand NEAR/2f product
+proximity_tilde_complex:check:("sustainability" AND "climate") ~ 10 ("change" OR "action")
+
+# Field operator edge cases not thoroughly tested
+author_with_spaces:check:author:"john doe"
+site_with_subdomain:check:site:news.bbc.co.uk
+url_partial_match:check:url:"reddit.com/r/technology"
+multiple_language_codes:check:language:en OR language:es OR language:fr
+coordinate_edge_values:check:latitude:[89.9 TO 90] AND longitude:[179.9 TO 180]
+
+# Range operator edge cases
+negative_ranges:check:longitude:[-180 TO -90]
+single_value_range:check:rating:[5 TO 5]
+decimal_coordinates:check:latitude:[40.7128 TO 40.7829] AND longitude:[-74.0060 TO -73.9352]
+large_follower_ranges:check:authorFollowers:[1000000 TO 50000000]
+minute_of_day_boundaries:check:minuteOfDay:[0 TO 1] OR minuteOfDay:[1438 TO 1439]
+
+# Advanced field combinations
+tumblr_specific:check:blogName:techblog AND parentBlogName:originalblog AND tags:technology
+reddit_comprehensive:check:subreddit:programming AND redditAuthorFlair:Expert AND redditPostFlair:Discussion
+twitter_verified_types:check:authorVerifiedType:blue OR authorVerifiedType:business OR authorVerifiedType:government
+engagement_combinations:check:engagementType:RETWEET AND engagingWith:brandwatch AND authorFollowers:[1000 TO 10000]
+
+# Performance edge cases that should generate warnings
+short_wildcard_multiple:warning:a* OR b* OR c*
+very_large_proximity:warning:apple NEAR/200 juice
+extremely_broad_range:warning:authorFollowers:[1 TO 999999999]
+single_character_multiple:warning:a AND b OR c
+
+# Boundary value testing
+rating_boundaries:check:rating:[1 TO 1] OR rating:[5 TO 5]
+invalid_rating_zero:invalid:rating:0
+invalid_rating_six:invalid:rating:6
+coordinate_invalid_lat:invalid:latitude:[91 TO 95]
+coordinate_invalid_long:invalid:longitude:[181 TO 190]
+minute_invalid_negative:invalid:minuteOfDay:[-1 TO 100]
+minute_invalid_over_limit:invalid:minuteOfDay:[0 TO 1440]
+
+# Case sensitivity variations
+boolean_operators_lowercase:invalid:apple and juice or orange not bitter
+mixed_case_boolean:invalid:Apple AND Juice or Orange NOT bitter
+field_case_variations:check:AuthorGender:F vs authorGender:F
+engagement_case_sensitive:invalid:engagementType:retweet
+engagement_correct_case:valid:engagementType:RETWEET
+
+# Wildcard edge cases
+wildcard_mid_word:valid:custom*ize
+wildcard_multiple_in_word:valid:custom*iz*
+replacement_multiple:valid:customi?e?
+wildcard_with_replacement:valid:custom*?e
+
+# Comment edge cases
+comment_with_nested_brackets:valid:apple <<<(brand monitoring)>>> AND juice
+comment_empty:valid:apple <<<>>> AND juice
+multiple_comments:valid:<<<start>>> apple <<<middle>>> AND <<<end>>> juice
+
+# Real-world complex queries for API comparison
+ecommerce_monitoring:check:(("black friday" OR "cyber monday") NEAR/5 (deal* OR discount* OR sale*)) AND (site:amazon.com OR site:ebay.com) NOT (fake OR scam)
+social_sentiment:check:(#MondayMotivation OR #ThankfulThursday) AND (@company OR "brand name") AND (love OR awesome OR amazing) NOT (hate OR terrible OR awful)
+crisis_monitoring:check:(("data breach" OR "security incident") NEAR/10 ("customer data" OR "personal information")) AND site:news.* NOT rumor
+influencer_tracking:check:authorFollowers:[50000 TO 1000000] AND authorVerified:true AND (review OR unboxing OR sponsored) AND (#ad OR #sponsored)
+
+# Implicit AND behavior edge cases
+implicit_and_simple:warning:apple banana cherry
+implicit_and_with_operators:warning:apple banana OR cherry date
+implicit_and_quoted:warning:"apple juice" banana smoothie
+implicit_and_fields:warning:site:twitter.com apple banana
+
+# Error recovery edge cases
+missing_closing_paren:invalid:(apple AND juice
+missing_opening_paren:invalid:apple AND juice)
+mismatched_quotes:invalid:"apple juice
+empty_parentheses:invalid:apple AND ()
+double_operators:invalid:apple AND AND juice
+trailing_operator:invalid:apple AND juice OR
