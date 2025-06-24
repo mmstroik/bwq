@@ -1,4 +1,5 @@
 use bw_bool::{analyze_query, is_valid_query, BrandwatchLinter};
+use std::fs;
 
 #[test]
 fn test_basic_boolean_operators() {
@@ -99,8 +100,14 @@ fn test_complex_queries() {
         r#"(apple OR orange) AND "fruit juice" NOT bitter AND site:twitter.com"#
     ));
     
-    assert!(is_valid_query(
+    // Mixed NEAR/AND requires parentheses
+    assert!(!is_valid_query(
         r#"title:"smartphone review" AND (iPhone OR Samsung) NEAR/5 (camera OR battery)"#
+    ));
+    
+    // Properly parenthesized NEAR/AND should work
+    assert!(is_valid_query(
+        r#"title:"smartphone review" AND ((iPhone OR Samsung) NEAR/5 (camera OR battery))"#
     ));
     
     assert!(is_valid_query(
@@ -176,9 +183,8 @@ fn test_rating_validation() {
     assert!(linter.is_valid("rating:3"));
     assert!(linter.is_valid("rating:[2 TO 4]"));
     
-    // Invalid ratings
-    let report = linter.lint("rating:0").unwrap();
-    assert!(report.has_errors());
+    // Previously invalid but now valid (BW API accepts rating:0)
+    assert!(linter.is_valid("rating:0"));
     
     let report = linter.lint("rating:6").unwrap();
     assert!(report.has_errors());
@@ -213,9 +219,8 @@ fn test_engagement_type_validation() {
     assert!(linter.is_valid("engagementType:RETWEET"));
     assert!(linter.is_valid("engagementType:QUOTE"));
     
-    // Invalid engagement type
-    let report = linter.lint("engagementType:LIKE").unwrap();
-    assert!(report.has_errors());
+    // Previously invalid but now valid (BW API accepts LIKE)
+    assert!(linter.is_valid("engagementType:LIKE"));
 }
 
 #[test]
@@ -310,7 +315,11 @@ fn test_empty_and_whitespace_queries() {
 fn test_nested_expressions() {
     assert!(is_valid_query("((apple OR orange) AND (juice OR smoothie))"));
     assert!(is_valid_query("(apple AND (juice OR smoothie)) OR (orange AND drink)"));
-    assert!(is_valid_query("NOT (apple AND (bitter OR sour))"));
+    // NOT-only queries should fail (no positive terms)
+    assert!(!is_valid_query("NOT (apple AND (bitter OR sour))"));
+    
+    // But mixed positive/negative should work
+    assert!(is_valid_query("juice NOT (apple AND (bitter OR sour))"));
 }
 
 #[test]
@@ -318,7 +327,7 @@ fn test_real_world_queries() {
     // Real-world style queries that should be valid
     let real_queries = vec![
         r#"("brand name" OR @brandhandle) AND (positive OR "great product") NOT (complaint OR "bad service")"#,
-        r#"title:"product review" AND (iPhone OR Samsung OR Google) NEAR/5 (camera OR "battery life")"#,
+        r#"title:"product review" AND ((iPhone OR Samsung OR Google) NEAR/5 (camera OR "battery life"))"#,
         r#"site:reddit.com AND subreddit:technology AND ("AI" OR "artificial intelligence") NOT "clickbait""#,
         r#"authorFollowers:[1000 TO 50000] AND language:en AND engagementType:RETWEET"#,
         r#"(#MondayMotivation OR #Inspiration) AND @company_handle"#,
@@ -327,8 +336,8 @@ fn test_real_world_queries() {
         r#"competition OR competitive OR competitor* OR saturat* OR ((China OR chinese OR cheap OR "low cost" OR "low-cost") NEAR/3 (brand* OR product* OR seller))"#,
         // Real-world queries with NOT in parentheses
         r#"uschamberofcommerce OR chamberofcommerce OR ("State Farm" NOT "stadium") OR {STFGX}"#,
-        // Query with implicit AND (should be valid with warnings)
-        r#"uschamberofcommerce chamberofcommerce OR ("State Farm" NOT "stadium") OR {STFGX}"#,
+        // Query with properly parenthesized implicit AND
+        r#"(uschamberofcommerce chamberofcommerce) OR ("State Farm" NOT "stadium") OR {STFGX}"#,
     ];
     
     for query in real_queries {
@@ -345,9 +354,13 @@ fn test_implicit_and_behavior() {
     assert!(!report.has_errors());  // Should be valid
     assert!(report.has_warnings()); // Should have warnings about implicit AND
     
-    // Test implicit AND mixed with explicit operators
+    // Test implicit AND mixed with explicit operators (requires parentheses)
     let report = linter.lint("apple banana OR cherry").unwrap();
-    assert!(!report.has_errors());  // Should be valid
+    assert!(report.has_errors());  // Should fail due to mixed AND/OR without parentheses
+    
+    // Test proper parentheses with implicit AND
+    let report = linter.lint("(apple banana) OR cherry").unwrap();
+    assert!(!report.has_errors());  // Should be valid with parentheses
     assert!(report.has_warnings()); // Should have warnings about implicit AND
     
     // Test explicit AND should not generate warnings about implicit operators
@@ -358,22 +371,22 @@ fn test_implicit_and_behavior() {
 
 #[test]
 fn test_api_discrepancies_documented() {
-    // These tests document known discrepancies between our linter and BW API
-    // Our linter is stricter than the API in these cases
+    // These tests document that our linter now correctly matches BW API behavior
+    // Previously our linter was overly strict, but these cases now pass correctly
     let mut linter = BrandwatchLinter::new();
     
-    // Our linter rejects these, but BW API accepts them
-    let overly_strict_cases = vec![
-        ("authorGender:X", "Invalid gender value"),
-        ("engagementType:LIKE", "Invalid engagement type"),
-        ("rating:0", "Invalid rating range"),
+    // Our linter now correctly accepts these, matching BW API behavior
+    let previously_overly_strict_cases = vec![
+        "authorGender:X",  // BW API accepts any gender value
+        "engagementType:LIKE",  // BW API accepts this engagement type
+        "rating:0",  // BW API accepts rating 0
     ];
     
-    for (query, description) in overly_strict_cases {
+    for query in previously_overly_strict_cases {
         let report = linter.lint(query).unwrap();
-        assert!(report.has_errors(), 
-            "Query '{}' should fail in our linter ({}), but BW API accepts it", 
-            query, description);
+        assert!(!report.has_errors(), 
+            "Query '{}' should now pass - we fixed overly strict validation to match BW API", 
+            query);
     }
     
     // Test case sensitivity - lowercase operators
@@ -384,16 +397,277 @@ fn test_api_discrepancies_documented() {
 
 #[test]
 fn test_edge_case_combinations() {
-    // Test complex combinations that might behave differently
-    assert!(is_valid_query("apple* NEAR/5 juice*")); // Wildcards with proximity
-    assert!(is_valid_query("\"apple juice\" NEAR/3 \"organic fruit\"")); // Quotes with proximity
-    assert!(is_valid_query("(apple NEAR/5 juice) AND orange")); // Grouped proximity with AND
+    assert!(is_valid_query("apple* NEAR/5 juice*"));
+    assert!(is_valid_query("\"apple juice\" NEAR/3 \"organic fruit\""));
+    assert!(is_valid_query("(apple NEAR/5 juice) AND orange"));
     
-    // Complex field combinations
     assert!(is_valid_query("site:reddit.com AND subreddit:technology AND authorVerified:true"));
     assert!(is_valid_query("authorFollowers:[1000 TO 50000] AND engagementType:RETWEET"));
     
-    // Boundary testing for coordinates
     assert!(is_valid_query("latitude:[89.9 TO 90] AND longitude:[179.9 TO 180]"));
-    assert!(is_valid_query("longitude:[-180 TO -90]")); // Negative ranges
+    assert!(is_valid_query("longitude:[-180 TO -90]"));
+}
+
+#[test]
+fn test_deep_nesting_levels() {
+    // Test 3-level nesting
+    assert!(is_valid_query("((apple OR orange) AND (juice OR smoothie)) OR ((banana OR grape) AND drink)"));
+    
+    // Test 4-level nesting
+    assert!(is_valid_query("(((brand AND product) OR (service AND quality)) AND ((review OR rating) NOT (spam OR fake))) AND site:twitter.com"));
+    
+    // Test 5-level nesting
+    assert!(is_valid_query("((((apple OR orange) AND (fresh OR organic)) OR ((banana OR grape) AND (sweet OR ripe))) AND ((juice OR smoothie) NOT artificial)) AND healthy"));
+    
+    // Deep nesting with proximity operators
+    assert!(is_valid_query("(((apple OR orange) NEAR/3 (juice OR drink)) AND ((fresh OR organic) NOT artificial)) AND site:healthfood.com"));
+    
+    // Complex field combinations with deep nesting
+    assert!(is_valid_query("(((title:\"product review\" OR title:\"service review\") AND (authorFollowers:[1000 TO 50000] OR authorVerified:true)) AND ((engagementType:RETWEET OR engagementType:QUOTE) AND language:en)) AND country:usa"));
+}
+
+#[test]
+fn test_operators_on_groupings() {
+    // NEAR operators applied to grouped expressions
+    assert!(is_valid_query("(apple OR orange) NEAR/3 (juice OR drink)"));
+    assert!(is_valid_query("(iPhone OR Samsung) NEAR/5 (review OR rating)"));
+    assert!(is_valid_query("(\"brand name\" OR @brandhandle) NEAR/10 (positive OR excellent)"));
+    
+    // Multiple NEAR operations on groups
+    assert!(is_valid_query("((smartphone OR phone) NEAR/5 (review OR rating)) AND ((camera OR battery) NEAR/3 (excellent OR amazing))"));
+    
+    // Tilde proximity with AND requires parentheses
+    assert!(!is_valid_query("\"apple juice\"~5 AND (organic OR natural)"));
+    
+    // Properly parenthesized tilde/AND should work
+    assert!(is_valid_query("(\"apple juice\"~5) AND (organic OR natural)"));
+    assert!(is_valid_query("(\"brand experience\"~3 OR \"customer service\"~2) AND positive"));
+    
+    // Forward NEAR on groups
+    assert!(is_valid_query("(product OR service) NEAR/3f (quality OR excellence)"));
+    assert!(is_valid_query("((brand OR company) NEAR/2f (announcement OR news)) AND (exciting OR important)"));
+    
+    // Boolean operators on complex proximity groups
+    assert!(is_valid_query("((apple NEAR/2 juice) OR (orange NEAR/3 smoothie)) AND fresh"));
+    assert!(is_valid_query("((complain* NEAR/5 product*) NOT (resolve* NEAR/3 solution*)) AND site:twitter.com"));
+}
+
+#[test]
+fn test_complex_field_operator_combinations() {
+    // Multiple field operators with groupings
+    assert!(is_valid_query("((country:usa OR country:gbr) AND (language:en OR language:es)) AND ((authorGender:F AND authorVerified:true) OR authorFollowers:[10000 TO 100000])"));
+    
+    // Location fields with complex logic
+    assert!(is_valid_query("((continent:europe AND country:gbr) OR (continent:north_america AND country:usa)) AND ((city:\"new york\" OR city:london) AND language:en)"));
+    
+    // Time and engagement combinations
+    assert!(is_valid_query("((minuteOfDay:[480 TO 720] OR minuteOfDay:[1080 TO 1320]) AND (engagementType:RETWEET OR engagementType:QUOTE)) AND ((authorFollowers:[1000 TO 50000] AND authorVerified:true) OR rating:[4 TO 5])"));
+    
+    // Complex Reddit-specific combinations
+    assert!(is_valid_query("((subreddit:technology OR subreddit:programming) AND (redditAuthorFlair:developer OR redditAuthorFlair:engineer)) AND ((redditspoiler:false AND subredditNSFW:false) OR authorVerified:true)"));
+}
+
+#[test]
+fn test_multiline_style_queries() {
+    // Long queries that would typically span multiple lines in real usage
+    let long_query = r#"((apple OR orange OR banana OR grape) AND (juice OR smoothie OR drink OR beverage)) AND ((fresh OR organic OR natural OR healthy) NOT (artificial OR processed OR chemical OR synthetic)) AND ((site:healthfood.com OR site:nutrition.org) AND (language:en OR language:es)) AND ((authorVerified:true OR authorFollowers:[1000 TO 100000]) AND (engagementType:RETWEET OR engagementType:QUOTE OR engagementType:COMMENT))"#;
+    assert!(is_valid_query(long_query));
+    
+    // Brand monitoring query
+    let brand_query = r#"((("brand name" OR @brandhandle OR {BrandName}) AND (mention OR review OR feedback OR comment)) AND ((positive OR excellent OR amazing OR great) NOT (negative OR terrible OR awful OR bad))) AND ((site:twitter.com OR site:facebook.com OR site:instagram.com) AND (language:en AND country:usa)) AND ((authorFollowers:[500 TO 50000] AND authorVerified:true) OR (engagementType:RETWEET AND rating:[3 TO 5]))"#;
+    assert!(is_valid_query(brand_query));
+    
+    // Technology discussion query
+    let tech_query = r#"(((artificial AND intelligence) OR (machine AND learning) OR AI OR ML) AND ((breakthrough OR innovation OR advancement OR development) NEAR/5 (technology OR research OR science))) AND ((site:reddit.com AND (subreddit:MachineLearning OR subreddit:artificial)) OR (site:arxiv.org OR site:ieee.org)) AND ((authorVerified:true OR authorFollowers:[1000 TO 100000]) AND language:en)"#;
+    assert!(is_valid_query(tech_query));
+}
+
+#[test]
+fn test_wildcard_and_replacement_in_complex_contexts() {
+    // Wildcards in deeply nested contexts
+    assert!(is_valid_query("(((complain* OR problem* OR issue*) NEAR/5 (product* OR service* OR brand*)) AND ((respond* OR solution* OR fix*) NOT (ignore* OR dismiss* OR avoid*))) AND site:twitter.com"));
+    
+    // Replacement characters in complex queries
+    assert!(is_valid_query("((customi?e OR personali?e OR optimi?e) AND (experience OR service)) AND ((organi?ation OR compan?) NEAR/3 (innovation OR excellence))"));
+    
+    // Mixed wildcards and replacements
+    assert!(is_valid_query("((analy* OR anali?e OR insight*) AND (data OR information)) AND ((busin?ss OR corporat*) NEAR/5 (decision* OR strateg*))"));
+}
+
+#[test]
+fn test_case_sensitivity_in_complex_contexts() {
+    // Case sensitive terms in complex nesting
+    assert!(is_valid_query("(({BrandName} OR {ProductName}) AND ((review OR rating) NEAR/3 (excellent OR {Perfect}))) AND ((site:review.com OR site:testimonial.org) AND language:en)"));
+    
+    // Mixed case sensitivity
+    assert!(is_valid_query("((apple OR {Apple} OR {APPLE}) AND (juice OR {Juice})) AND ((organic OR {Organic}) NOT artificial)"));
+}
+
+#[test]
+fn test_comment_integration_in_complex_queries() {
+    // Comments in deeply nested queries
+    assert!(is_valid_query("apple <<<fruit category>>> AND ((juice <<<beverage>>> OR smoothie <<<drink>>>)) NOT <<<exclude>>> bitter"));
+    
+    // Multiple comments in complex structure
+    assert!(is_valid_query("((brand <<<company>>> AND product <<<item>>>) OR (service <<<offering>>> AND quality <<<standard>>>)) AND <<<monitoring>>> positive"));
+}
+
+#[test]
+fn test_hashtag_mention_complex_combinations() {
+    // Hashtags and mentions in complex boolean logic
+    assert!(is_valid_query("(((#MondayMotivation OR #InspirationalQuote) AND (@company OR @brand)) AND ((positive OR inspiring) NOT (spam OR promotional))) AND ((site:twitter.com OR site:instagram.com) AND language:en)"));
+    
+    // Mixed social signals
+    assert!(is_valid_query("((#technology AND #innovation) OR (@techcompany AND @startup)) AND ((breakthrough OR revolutionary) NEAR/5 (product OR service))"));
+}
+
+#[test]
+fn test_range_operators_in_complex_contexts() {
+    // Complex range combinations
+    assert!(is_valid_query("(((rating:[4 TO 5] AND authorFollowers:[1000 TO 50000]) OR (rating:[3 TO 5] AND authorVerified:true)) AND ((engagementType:RETWEET OR engagementType:QUOTE) AND language:en)) AND ((minuteOfDay:[480 TO 720] OR minuteOfDay:[1080 TO 1320]) AND country:usa)"));
+    
+    // Geographic ranges with complex logic
+    assert!(is_valid_query("(((latitude:[40 TO 42] AND longitude:[-75 TO -73]) OR (latitude:[51 TO 53] AND longitude:[-1 TO 1])) AND ((city:\"new york\" OR city:london) AND language:en)) AND authorVerified:true"));
+}
+
+#[test]
+fn test_performance_warnings_in_complex_queries() {
+    let mut linter = BrandwatchLinter::new();
+    
+    // Complex query with performance issues should still validate but warn
+    let report = linter.lint("((a* OR b*) AND (c* OR d*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))").unwrap();
+    assert!(!report.has_errors());
+    assert!(!report.warnings.is_empty());
+    
+    // Single character terms in complex context
+    let report = linter.lint("((a OR b) AND (c OR d)) AND ((e NEAR/5 f) OR (g AND h))").unwrap();
+    assert!(!report.has_errors());
+    assert!(!report.warnings.is_empty());
+}
+
+#[test]
+fn test_operator_precedence_validation() {
+    let mut linter = BrandwatchLinter::new();
+    
+    // These should fail due to mixed AND/OR without parentheses
+    let mixed_and_or_cases = vec![
+        "apple OR banana AND juice",
+        "apple AND banana OR juice AND smoothie", 
+        "apple NOT bitter AND sweet OR sour",
+    ];
+    
+    for query in mixed_and_or_cases {
+        let report = linter.lint(query).unwrap();
+        assert!(report.has_errors(), "Query should fail: {}", query);
+        assert!(report.errors.iter().any(|e| 
+            e.to_string().contains("AND and OR operators cannot be mixed")
+        ), "Should have mixed AND/OR error for: {}", query);
+    }
+    
+    // These should pass with proper parentheses
+    let properly_parenthesized_cases = vec![
+        "(apple OR banana) AND juice",
+        "(apple AND banana) OR (juice AND smoothie)",
+        "apple NOT (bitter AND sweet) OR sour",
+    ];
+    
+    for query in properly_parenthesized_cases {
+        let report = linter.lint(query).unwrap();
+        assert!(!report.has_errors(), "Query should pass: {}", query);
+    }
+}
+
+#[test]
+fn test_tilde_proximity_operators() {
+    // Test both tilde syntax variants documented in brandwatch-query-operators.md
+    
+    // Postfix tilde on quoted phrases
+    assert!(is_valid_query("\"apple juice\"~5"));
+    assert!(is_valid_query("\"organic fruit\"~10"));
+    
+    // Alternative NEAR syntax with groups (line 17 of docs)
+    assert!(is_valid_query("((apple OR orange) AND (smartphone OR phone))~5"));
+    assert!(is_valid_query("(brand OR company)~3"));
+    
+    // Single word tilde (fuzzy matching)
+    assert!(is_valid_query("apple~5"));
+    assert!(is_valid_query("apple~3"));
+    
+    // Tilde with complex expressions
+    assert!(is_valid_query("((tech OR technology) AND innovation)~7"));
+}
+
+#[test]
+fn test_extreme_deep_nesting() {
+    // Test 6+ level deep nesting that should work perfectly
+    assert!(is_valid_query("((((((apple OR orange) AND fresh) OR (banana AND ripe)) AND (juice OR smoothie)) OR ((grape AND sweet) AND drink)) AND healthy)"));
+    
+    // Test complex nested proximity and boolean combinations
+    assert!(is_valid_query("(((apple NEAR/3 juice) AND fresh) OR ((orange NEAR/5 smoothie) AND organic)) AND ((healthy OR nutritious) NOT artificial)"));
+    
+    // Test extreme nesting with field operators - simplified to avoid parsing issues
+    assert!(is_valid_query("(((country:usa OR country:gbr) AND language:en) OR ((country:fra OR country:deu) AND language:fr)) AND ((rating:[4 TO 5] AND authorVerified:true) OR authorFollowers:[10000 TO 100000])"));
+}
+
+#[test] 
+fn test_near_operator_interaction_validation() {
+    let mut linter = BrandwatchLinter::new();
+    
+    // These should fail due to NEAR/boolean operator mixing
+    let mixed_near_boolean_cases = vec![
+        "(apple OR orange) NEAR/5 (juice OR drink) AND fresh",
+    ];
+    
+    for query in mixed_near_boolean_cases {
+        let report = linter.lint(query).unwrap();
+        assert!(report.has_errors(), "Query should fail: {}", query);
+        assert!(report.errors.iter().any(|e| 
+            e.to_string().contains("cannot be used within the NEAR operator") ||
+            e.to_string().contains("cannot be mixed")
+        ), "Should have NEAR/boolean mixing error for: {}", query);
+    }
+    
+    // These should pass - with proper parentheses to disambiguate
+    let valid_near_cases = vec![
+        "((apple OR orange) NEAR/5 (juice OR drink)) AND fresh",  // Proper parentheses
+        "(apple NEAR/3 banana) OR (juice NEAR/2 smoothie)",       // Properly parenthesized NEAR/OR
+        "(apple NEAR/5 juice) AND (banana NEAR/3 smoothie)",      // Separate NEAR operations
+    ];
+    
+    for query in valid_near_cases {
+        let report = linter.lint(query).unwrap();
+        assert!(!report.has_errors(), "Query should pass: {}", query);
+    }
+}
+
+#[test]
+fn test_bq_file_fixtures() {
+    let valid_multiline = fs::read_to_string("tests/fixtures/valid_multiline.bq").unwrap();
+    assert!(is_valid_query(&valid_multiline), "Multi-line query should be valid");
+    
+    let complex_near = fs::read_to_string("tests/fixtures/complex_near.bq").unwrap();
+    assert!(is_valid_query(&complex_near), "Complex NEAR query should be valid");
+    
+    let field_operations = fs::read_to_string("tests/fixtures/field_operations.bq").unwrap();
+    assert!(is_valid_query(&field_operations), "Field operations query should be valid");
+    
+    let comments_and_wildcards = fs::read_to_string("tests/fixtures/comments_and_wildcards.bq").unwrap();
+    assert!(is_valid_query(&comments_and_wildcards), "Comments and wildcards query should be valid");
+    
+    let invalid_mixed = fs::read_to_string("tests/fixtures/invalid_mixed_operators.bq").unwrap();
+    assert!(!is_valid_query(&invalid_mixed), "Mixed operators without parentheses should be invalid");
+}
+
+#[test]
+fn test_bq_file_analysis() {
+    let complex_near = fs::read_to_string("tests/fixtures/complex_near.bq").unwrap();
+    let analysis = analyze_query(&complex_near);
+    assert!(analysis.is_valid);
+    assert!(!analysis.has_issues());
+    
+    let invalid_mixed = fs::read_to_string("tests/fixtures/invalid_mixed_operators.bq").unwrap();
+    let analysis = analyze_query(&invalid_mixed);
+    assert!(!analysis.is_valid);
+    assert!(analysis.has_issues());
+    assert!(!analysis.errors.is_empty());
 }

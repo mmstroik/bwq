@@ -1,7 +1,7 @@
 use bw_bool::{analyze_query, BrandwatchLinter};
 use clap::{Parser, Subcommand};
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -31,6 +31,17 @@ enum Commands {
         format: String,
     },
     
+    Dir {
+        #[arg(short, long, default_value = ".")]
+        path: PathBuf,
+        #[arg(short, long)]
+        warnings: bool,
+        #[arg(short, long, default_value = "text")]
+        format: String,
+        #[arg(long, default_value = "*.bq")]
+        pattern: String,
+    },
+    
     Interactive {
         #[arg(short, long)]
         warnings: bool,
@@ -52,6 +63,9 @@ fn main() {
         }
         Commands::File { path, warnings, format } => {
             lint_file(&path, warnings, &format);
+        }
+        Commands::Dir { path, warnings, format, pattern } => {
+            lint_directory(&path, warnings, &format, &pattern);
         }
         Commands::Interactive { warnings } => {
             interactive_mode(warnings);
@@ -91,52 +105,137 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
             std::process::exit(1);
         }
     };
+    let query = content.trim();
+    if query.is_empty() {
+        eprintln!("File {} is empty", path.display());
+        std::process::exit(1);
+    }
     
-    let mut has_errors = false;
-    let mut total_queries = 0;
-    let mut valid_queries = 0;
+    let analysis = analyze_query(query);
     
-    for (line_num, line) in content.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
+    match format {
+        "json" => {
+            let json_analysis = serde_json::json!({
+                "file": path.display().to_string(),
+                "valid": analysis.is_valid,
+                "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
+                "warnings": analysis.warnings.iter().map(|w| format!("{:?}", w)).collect::<Vec<_>>(),
+                "query": query
+            });
+            println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
         }
-        
-        total_queries += 1;
-        let analysis = analyze_query(line);
-        
-        if analysis.is_valid {
-            valid_queries += 1;
-        } else {
-            has_errors = true;
+        "text" | _ => {
+            println!("File: {}", path.display());
+            output_text(&analysis, show_warnings);
+            println!();
         }
-        
-        match format {
-            "json" => {
-                let mut json_analysis = serde_json::json!({
-                    "line": line_num + 1,
-                    "query": line,
+    }
+    
+    if !analysis.is_valid {
+        std::process::exit(1);
+    }
+}
+
+fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &str) {
+    let search_pattern = if path.display().to_string() == "." {
+        pattern.to_string()
+    } else {
+        format!("{}/{}", path.display(), pattern)
+    };
+    
+    let entries = match glob::glob(&search_pattern) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("Error parsing glob pattern '{}': {}", search_pattern, e);
+            std::process::exit(1);
+        }
+    };
+    
+    let mut total_files = 0;
+    let mut valid_files = 0;
+    let mut any_errors = false;
+    let mut results = Vec::new();
+    
+    for entry in entries {
+        match entry {
+            Ok(file_path) => {
+                if file_path.is_file() {
+                    total_files += 1;
+                    
+                    let content = match fs::read_to_string(&file_path) {
+                        Ok(content) => content,
+                        Err(e) => {
+                            eprintln!("Error reading file {}: {}", file_path.display(), e);
+                            any_errors = true;
+                            continue;
+                        }
+                    };
+                    
+                    let query = content.trim();
+                    if query.is_empty() {
+                        eprintln!("Skipping empty file: {}", file_path.display());
+                        continue;
+                    }
+                    
+                    let analysis = analyze_query(query);
+                    
+                    if analysis.is_valid {
+                        valid_files += 1;
+                    } else {
+                        any_errors = true;
+                    }
+                    
+                    results.push((file_path, analysis, query.to_string()));
+                }
+            }
+            Err(e) => {
+                eprintln!("Error processing path: {}", e);
+                any_errors = true;
+            }
+        }
+    }
+    
+    if total_files == 0 {
+        eprintln!("No files found matching pattern '{}' in directory '{}'", pattern, path.display());
+        std::process::exit(1);
+    }
+    match format {
+        "json" => {
+            let json_results: Vec<serde_json::Value> = results.into_iter().map(|(file_path, analysis, query)| {
+                serde_json::json!({
+                    "file": file_path.display().to_string(),
                     "valid": analysis.is_valid,
                     "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
                     "warnings": analysis.warnings.iter().map(|w| format!("{:?}", w)).collect::<Vec<_>>(),
-                });
-                println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
-            }
-            "text" | _ => {
+                    "query": query
+                })
+            }).collect();
+            
+            let summary = serde_json::json!({
+                "summary": {
+                    "total_files": total_files,
+                    "valid_files": valid_files,
+                    "invalid_files": total_files - valid_files
+                },
+                "results": json_results
+            });
+            
+            println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+        }
+        "text" | _ => {
+            for (file_path, analysis, _) in results {
                 if !analysis.is_valid || (show_warnings && !analysis.warnings.is_empty()) {
-                    println!("Line {}: {}", line_num + 1, line);
+                    println!("File: {}", file_path.display());
                     output_text(&analysis, show_warnings);
                     println!();
                 }
             }
+            
+            println!("Summary: {}/{} files valid", valid_files, total_files);
         }
     }
     
-    if format == "text" {
-        println!("Summary: {}/{} queries valid", valid_queries, total_queries);
-    }
-    
-    if has_errors {
+    if any_errors {
         std::process::exit(1);
     }
 }
@@ -315,15 +414,12 @@ mod tests {
     #[test]
     fn test_file_processing() {
         let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "apple AND juice").unwrap();
-        writeln!(temp_file, "# This is a comment").unwrap();
-        writeln!(temp_file, "*invalid wildcard").unwrap();
-        writeln!(temp_file, "").unwrap();
-        writeln!(temp_file, "valid query").unwrap();
-        
-        // The actual file testing would require running the CLI
-        // For now, just test that we can read the file
+        writeln!(temp_file, "(apple AND juice)").unwrap();
+        writeln!(temp_file, "OR").unwrap();
+        writeln!(temp_file, "(orange NOT bitter)").unwrap();
         let content = fs::read_to_string(temp_file.path()).unwrap();
         assert!(content.contains("apple AND juice"));
+        let analysis = analyze_query(content.trim());
+        assert!(analysis.is_valid);
     }
 }

@@ -1,0 +1,4 @@
+complain* <<<customer feedback>>> AND
+product* NEAR/5 (
+    quality OR "customer service"
+) NOT spam*

@@ -6,7 +6,7 @@ pub mod validator;
 
 use error::{LintError, LintReport, LintResult};
 use lexer::Lexer;
-use parser::{Parser, ParseResult};
+use parser::Parser;
 use validator::Validator;
 
 pub struct BrandwatchLinter {
@@ -21,18 +21,13 @@ impl BrandwatchLinter {
     }
 
     pub fn lint(&mut self, query: &str) -> LintResult<LintReport> {
-        // Tokenize
         let mut lexer = Lexer::new(query);
         let tokens = lexer.tokenize()?;
 
-        // Parse
         let mut parser = Parser::new(tokens);
         let parse_result = parser.parse()?;
 
-        // Validate
         let mut report = self.validator.validate(&parse_result.query);
-
-        // Add parser warnings to the report
         report.warnings.extend(parse_result.warnings);
 
         Ok(report)
@@ -153,8 +148,7 @@ mod tests {
     #[test]
     fn test_invalid_query() {
         let mut linter = BrandwatchLinter::new();
-        // Test a query that parses but has validation errors
-        let report = linter.lint("rating:0").unwrap();
+        let report = linter.lint("rating:6").unwrap();
         assert!(report.has_errors());
     }
 
@@ -188,12 +182,10 @@ mod tests {
     fn test_proximity_query() {
         let mut linter = BrandwatchLinter::new();
         
-        // Test NEAR operator
         let query1 = r#"apple NEAR/3 juice"#;
         let report1 = linter.lint(query1).unwrap();
         assert!(!report1.has_errors());
         
-        // Test tilde proximity operator (now fixed!)
         let query2 = r#""apple juice"~5"#;
         let report2 = linter.lint(query2).unwrap();
         assert!(!report2.has_errors());

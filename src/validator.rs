@@ -19,7 +19,6 @@ impl Validator {
         self.errors.clear();
         self.warnings.clear();
         
-        // Check for pure negative queries (must have at least one positive term)
         if self.is_pure_negative_query(&query.expression) {
             self.errors.push(LintError::ValidationError {
                 span: query.span.clone(),
@@ -36,18 +35,24 @@ impl Validator {
     }
 
     fn validate_expression(&mut self, expr: &Expression) {
+        self.validate_expression_with_context(expr, false);
+    }
+    
+    fn validate_expression_with_context(&mut self, expr: &Expression, inside_group: bool) {
+        self.validate_operator_interactions(expr, inside_group);
+        
         match expr {
             Expression::BooleanOp { operator, left, right, span } => {
-                self.validate_boolean_op(operator, left, right.as_deref(), span);
+                self.validate_boolean_op(operator, left, right.as_deref(), span, inside_group);
             }
             Expression::Group { expression, span } => {
-                self.validate_expression(expression);
+                self.validate_expression_with_context(expression, true);
             }
             Expression::Proximity { operator, terms, span } => {
-                self.validate_proximity_op(operator, terms, span);
+                self.validate_proximity_op(operator, terms, span, inside_group);
             }
             Expression::Field { field, value, span } => {
-                self.validate_field_op(field, value, span);
+                self.validate_field_op(field, value, span, inside_group);
             }
             Expression::Range { field, start, end, span } => {
                 self.validate_range(field.as_ref(), start, end, span);
@@ -67,11 +72,28 @@ impl Validator {
         left: &Expression,
         right: Option<&Expression>,
         span: &Span,
+        inside_group: bool,
     ) {
-        self.validate_expression(left);
+        if matches!(operator, BooleanOperator::Not) {
+            if let Expression::Term { term: Term::Word { value }, .. } = left {
+                if value.is_empty() {
+                    if let Some(right_expr) = right {
+                        self.validate_expression_with_context(right_expr, inside_group);
+                    } else {
+                        self.errors.push(LintError::ValidationError {
+                            span: span.clone(),
+                            message: "NOT operator requires an operand".to_string(),
+                        });
+                    }
+                    return;
+                }
+            }
+        }
+
+        self.validate_expression_with_context(left, inside_group);
 
         if let Some(right_expr) = right {
-            self.validate_expression(right_expr);
+            self.validate_expression_with_context(right_expr, inside_group);
         } else {
             self.errors.push(LintError::ValidationError {
                 span: span.clone(),
@@ -87,6 +109,7 @@ impl Validator {
         operator: &ProximityOperator,
         terms: &[Expression],
         span: &Span,
+        inside_group: bool,
     ) {
         match operator {
             ProximityOperator::Proximity { .. } => {
@@ -110,7 +133,7 @@ impl Validator {
         }
 
         for term in terms {
-            self.validate_expression(term);
+            self.validate_expression_with_context(term, inside_group);
         }
 
         match operator {
@@ -141,8 +164,8 @@ impl Validator {
         }
     }
 
-    fn validate_field_op(&mut self, field: &FieldType, value: &Expression, span: &Span) {
-        self.validate_expression(value);
+    fn validate_field_op(&mut self, field: &FieldType, value: &Expression, span: &Span, inside_group: bool) {
+        self.validate_expression_with_context(value, inside_group);
 
         match field {
             FieldType::AuthorFollowers => {
@@ -259,14 +282,11 @@ impl Validator {
 
 
     fn validate_wildcard(&mut self, value: &str, span: &Span) {
-        // Wildcards cannot be at the beginning of a word
         if value.starts_with('*') {
             self.errors.push(LintError::InvalidWildcardPlacement {
                 span: span.clone(),
             });
         }
-
-        // Check for performance warnings with short wildcards
         let parts: Vec<&str> = value.split('*').collect();
         for part in parts {
             if !part.is_empty() && part.len() < 3 {
@@ -280,7 +300,6 @@ impl Validator {
     }
 
     fn validate_replacement(&mut self, value: &str, span: &Span) {
-        // Replacement character should be used for single character variations
         let question_count = value.chars().filter(|&c| c == '?').count();
         if question_count > 3 {
             self.warnings.push(LintWarning::PerformanceWarning {
@@ -291,7 +310,6 @@ impl Validator {
     }
 
     fn validate_case_sensitive(&mut self, value: &str, span: &Span) {
-        // Check if the term actually has mixed case
         if value.chars().all(|c| c.is_lowercase()) || value.chars().all(|c| c.is_uppercase()) {
             self.warnings.push(LintWarning::PerformanceWarning {
                 span: span.clone(),
@@ -302,10 +320,10 @@ impl Validator {
 
     fn validate_rating_range(&mut self, start: &str, end: &str, span: &Span) {
         if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
-            if start_num < 1 || start_num > 5 || end_num < 1 || end_num > 5 {
+            if start_num < 0 || start_num > 5 || end_num < 0 || end_num > 5 {
                 self.errors.push(LintError::ValidationError {
                     span: span.clone(),
-                    message: "Rating values must be between 1 and 5".to_string(),
+                    message: "Rating values must be between 0 and 5".to_string(),
                 });
             }
         }
@@ -336,7 +354,6 @@ impl Validator {
     fn validate_language_field(&mut self, value: &Expression, span: &Span) {
         if let Expression::Term { term, .. } = value {
             if let Term::Word { value: lang_code } = term {
-                // Basic validation for ISO 639-1 codes (2 characters)
                 if lang_code.len() != 2 || !lang_code.chars().all(|c| c.is_ascii_lowercase()) {
                     self.warnings.push(LintWarning::PotentialTypo {
                         span: span.clone(),
@@ -350,10 +367,10 @@ impl Validator {
     fn validate_gender_field(&mut self, value: &Expression, span: &Span) {
         if let Expression::Term { term, .. } = value {
             if let Term::Word { value: gender } = term {
-                if !matches!(gender.as_str(), "F" | "M" | "f" | "m") {
-                    self.errors.push(LintError::ValidationError {
+                if !matches!(gender.as_str(), "F" | "M" | "f" | "m" | "X" | "x" | "U" | "u") {
+                    self.warnings.push(LintWarning::PotentialTypo {
                         span: span.clone(),
-                        message: "Gender must be 'F' (Female) or 'M' (Male)".to_string(),
+                        suggestion: "Common gender values are 'F', 'M', 'X', or 'U'".to_string(),
                     });
                 }
             }
@@ -389,11 +406,11 @@ impl Validator {
     fn validate_engagement_type_field(&mut self, value: &Expression, span: &Span) {
         if let Expression::Term { term, .. } = value {
             if let Term::Word { value: engagement_type } = term {
-                let valid_types = ["COMMENT", "REPLY", "RETWEET", "QUOTE"];
-                if !valid_types.contains(&engagement_type.as_str()) {
-                    self.errors.push(LintError::ValidationError {
+                let common_types = ["COMMENT", "REPLY", "RETWEET", "QUOTE", "LIKE", "SHARE", "MENTION"];
+                if !common_types.contains(&engagement_type.as_str()) {
+                    self.warnings.push(LintWarning::PotentialTypo {
                         span: span.clone(),
-                        message: "engagementType must be 'COMMENT', 'REPLY', 'RETWEET', or 'QUOTE'".to_string(),
+                        suggestion: "Common engagement types are 'COMMENT', 'REPLY', 'RETWEET', 'QUOTE', 'LIKE'".to_string(),
                     });
                 }
             }
@@ -401,7 +418,6 @@ impl Validator {
     }
 
     fn validate_minute_of_day_field(&mut self, value: &Expression, span: &Span) {
-        // Minutes of day should be 0-1439 (24 * 60 - 1)
         if let Expression::Range { start, end, .. } = value {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
                 if start_num < 0 || start_num > 1439 || end_num < 0 || end_num > 1439 {
@@ -439,10 +455,10 @@ impl Validator {
     fn validate_rating_field(&mut self, value: &Expression, span: &Span) {
         if let Expression::Term { term: Term::Word { value: rating }, .. } = value {
             if let Ok(rating_num) = rating.parse::<i32>() {
-                if rating_num < 1 || rating_num > 5 {
+                if rating_num < 0 || rating_num > 5 {
                     self.errors.push(LintError::ValidationError {
                         span: span.clone(),
-                        message: "Rating must be between 1 and 5".to_string(),
+                        message: "Rating must be between 0 and 5".to_string(),
                     });
                 }
             }
@@ -450,7 +466,6 @@ impl Validator {
     }
 
     fn validate_location_field(&mut self, field: &FieldType, value: &Expression, span: &Span) {
-        // Location codes have specific formats - this is a simplified validation
         if let Expression::Term { term: Term::Word { value: location_code }, .. } = value {
             match field {
                 FieldType::Country => {
@@ -501,7 +516,6 @@ impl Validator {
     }
 
     fn validate_general_field(&mut self, field: &FieldType, value: &Expression, span: &Span) {
-        // General field validation - check for common issues
         match value {
             Expression::Term { term: Term::Word { value }, .. } => {
                 if value.trim().is_empty() {
@@ -530,8 +544,19 @@ impl Validator {
                 message: "Word cannot be empty".to_string(),
             });
         }
-        
-        // Check for very short terms that might impact performance
+        if value.contains(':') {
+            let parts: Vec<&str> = value.split(':').collect();
+            if parts.len() == 2 {
+                let field_part = parts[0];
+                if !field_part.is_empty() && FieldType::from_str(field_part).is_none() {
+                    self.errors.push(LintError::ValidationError {
+                        span: span.clone(),
+                        message: format!("Unknown field type: {}", field_part),
+                    });
+                    return;
+                }
+            }
+        }
         if value.len() == 1 {
             self.warnings.push(LintWarning::PerformanceWarning {
                 span: span.clone(),
@@ -617,9 +642,15 @@ impl Validator {
     fn is_pure_negative_query(&self, expr: &Expression) -> bool {
         match expr {
             // For binary NOT, check if we're starting with a NOT operation at the top level
-            Expression::BooleanOp { operator: BooleanOperator::Not, .. } => {
-                // This is tricky with binary NOT - we need to check the entire structure
-                // For now, let's be conservative and only flag standalone NOT terms
+            Expression::BooleanOp { operator: BooleanOperator::Not, left, right, .. } => {
+                // Check if this is a leading NOT (dummy left operand)
+                if let Expression::Term { term: Term::Word { value }, .. } = left.as_ref() {
+                    if value.is_empty() {
+                        // This is a leading NOT - ANY leading NOT is pure negative
+                        // according to Brandwatch API behavior
+                        return true;
+                    }
+                }
                 false
             }
             Expression::BooleanOp { operator: BooleanOperator::And, left, right, .. } => {
@@ -635,21 +666,79 @@ impl Validator {
         }
     }
 
-    fn contains_near_operator(&self, expr: &Expression) -> bool {
+
+    fn validate_operator_interactions(&mut self, expr: &Expression, inside_group: bool) {
         match expr {
-            Expression::Proximity { .. } => true,
-            Expression::BooleanOp { left, right, .. } => {
-                self.contains_near_operator(left) || right.as_ref().map_or(false, |r| self.contains_near_operator(r))
+            Expression::BooleanOp { operator, left, right, span } => {
+                if matches!(operator, BooleanOperator::And) {
+                    if let Some(right_expr) = right {
+                        if self.contains_or_at_top_level(right_expr) || self.contains_or_at_top_level(left) {
+                            self.errors.push(LintError::ValidationError {
+                                span: span.clone(),
+                                message: "The AND and OR operators cannot be mixed in the same sub-query. Please use parentheses to disambiguate - e.g. vanilla AND (icecream OR cake).".to_string(),
+                            });
+                        }
+                    }
+                } else if matches!(operator, BooleanOperator::Or) {
+                    if let Some(right_expr) = right {
+                        if self.contains_and_at_top_level(right_expr) || self.contains_and_at_top_level(left) {
+                            self.errors.push(LintError::ValidationError {
+                                span: span.clone(),
+                                message: "The AND and OR operators cannot be mixed in the same sub-query. Please use parentheses to disambiguate - e.g. vanilla AND (icecream OR cake).".to_string(),
+                            });
+                        }
+                    }
+                }
+                if matches!(operator, BooleanOperator::And) {
+                    if let Some(right_expr) = right {
+                        if self.contains_near_at_top_level(right_expr) || self.contains_near_at_top_level(left) {
+                            self.errors.push(LintError::ValidationError {
+                                span: span.clone(),
+                                message: "The AND operator cannot be used within the NEAR operator. Either remove this operator or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
+                            });
+                        }
+                    }
+                }
+                if !inside_group && matches!(operator, BooleanOperator::Or) {
+                    if let Some(right_expr) = right {
+                        if self.contains_near_at_top_level(right_expr) || self.contains_near_at_top_level(left) {
+                            self.errors.push(LintError::ValidationError {
+                                span: span.clone(),
+                                message: "Please use parentheses for disambiguation when using the OR or NEAR operators with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                            });
+                        }
+                    }
+                }
             }
-            Expression::Group { expression, .. } => {
-                self.contains_near_operator(expression)
+            Expression::Proximity { terms, span, .. } => {
+                for term in terms {
+                    if self.contains_or_at_top_level(term) || self.contains_and_at_top_level(term) {
+                        self.errors.push(LintError::ValidationError {
+                            span: span.clone(),
+                            message: "Please use parentheses for disambiguation when using the OR or NEAR operators with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                        });
+                        break;
+                    }
+                }
             }
-            _ => false,
+            _ => {}
         }
     }
-
-    fn is_direct_near_operator(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Proximity { .. })
+    
+    fn contains_and_at_top_level(&self, expr: &Expression) -> bool {
+        matches!(expr, Expression::BooleanOp { operator: BooleanOperator::And, .. })
+    }
+    
+    fn contains_or_at_top_level(&self, expr: &Expression) -> bool {
+        matches!(expr, Expression::BooleanOp { operator: BooleanOperator::Or, .. })
+    }
+    
+    fn contains_near_at_top_level(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Proximity { .. } => true,
+            Expression::Group { .. } => false,
+            _ => false,
+        }
     }
 }
 
@@ -661,8 +750,6 @@ mod tests {
 
     #[test]
     fn test_wildcard_validation() {
-        // This test would need to be updated since "*invalid" now fails at parsing
-        // Testing with a valid wildcard placement instead
         let mut lexer = Lexer::new("valid*");
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
@@ -671,7 +758,7 @@ mod tests {
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
         
-        assert!(!report.has_errors()); // valid* should be fine
+        assert!(!report.has_errors());
     }
 
     #[test]

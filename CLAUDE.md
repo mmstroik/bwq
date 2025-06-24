@@ -23,6 +23,12 @@ just validate "query"     # Validate query (exit code 0/1)
 just compare "query"      # Compare linter vs Brandwatch API
 ```
 
+**Shell Escaping Issues:** If encountering shell parsing issues with special characters (like `~`, quotes, etc.), create a `.bq` file with the query content and test using:
+```bash
+bw-bool lint "$(cat query.bq)"     # Test from file
+bw-bool lint *.bq                  # Test multiple .bq files
+```
+
 Installation and usage:
 ```bash
 just install              # Install globally via cargo
@@ -80,3 +86,11 @@ The validator implements strict Brandwatch-specific rules:
 ## Notes for Future Development
 
 When modifying the parser, remember that NOT is binary, not unary. When adding new operators, follow the existing pattern in `ast.rs` for type definitions and `lexer.rs` for tokenization. The validator should include both error conditions (malformed syntax) and warnings (performance concerns, style suggestions).
+
+## Claude Guidance
+
+- It is very very very important that you use `just compare "query"` often rather than making assumptions
+
+## Memories
+
+- Reference/read `./brandwatch-query-operators.md` often for guidance on list of operators and general syntax

@@ -232,24 +232,6 @@ impl Lexer {
                     ":".to_string(),
                 )))
             }
-            '?' => {
-                self.advance();
-                self.column += 1;
-                Ok(Some(Token::new(
-                    TokenType::Question,
-                    Span::new(start_pos, self.current_position()),
-                    "?".to_string(),
-                )))
-            }
-            '*' => {
-                self.advance();
-                self.column += 1;
-                Ok(Some(Token::new(
-                    TokenType::Asterisk,
-                    Span::new(start_pos, self.current_position()),
-                    "*".to_string(),
-                )))
-            }
 
             '<' if self.peek_ahead(2) == "<<" => {
                 self.read_comment_start()
@@ -263,8 +245,8 @@ impl Lexer {
 
             '@' => self.read_mention(),
 
-            _ if ch.is_ascii_digit() => self.read_number(),
-            _ if ch.is_alphabetic() || ch == '_' => self.read_word_or_operator(),
+            _ if ch.is_ascii_digit() || ch == '-' => self.read_number(),
+            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' => self.read_word_or_operator(),
 
             _ => {
                 self.advance();
@@ -375,6 +357,12 @@ impl Lexer {
     fn read_number(&mut self) -> LintResult<Option<Token>> {
         let start_pos = self.current_position();
         let mut value = String::new();
+
+        if self.current_char() == '-' {
+            value.push(self.current_char());
+            self.advance();
+            self.column += 1;
+        }
 
         while !self.is_at_end() && (self.current_char().is_ascii_digit() || self.current_char() == '.') {
             value.push(self.current_char());
@@ -489,8 +477,8 @@ impl Lexer {
     fn peek_ahead(&self, n: usize) -> String {
         let mut result = String::new();
         for i in 0..n {
-            if self.position + i < self.input.len() {
-                result.push(self.input[self.position + i]);
+            if self.position + i + 1 < self.input.len() {
+                result.push(self.input[self.position + i + 1]);
             } else {
                 break;
             }

@@ -1,0 +1,2 @@
+((apple OR orange) NEAR/5 (smartphone OR phone)) AND
+"fruit juice"~3 NOT artificial

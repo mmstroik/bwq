@@ -55,7 +55,11 @@ impl Parser {
     fn parse_expression(&mut self) -> LintResult<Expression> {
         let mut left = self.parse_and_expression()?;
 
-        while self.match_token(&TokenType::Or) {
+        while {
+            // Skip any comments between expressions
+            self.skip_comments();
+            self.match_token(&TokenType::Or)
+        } {
             let operator = BooleanOperator::Or;
             let operator_span = self.previous().span.clone();
             let right = self.parse_and_expression()?;
@@ -76,6 +80,9 @@ impl Parser {
         let mut left = self.parse_not_expression()?;
 
         loop {
+            // Skip any comments between expressions
+            self.skip_comments();
+            
             if self.match_token(&TokenType::And) {
                 // Explicit AND
                 let operator = BooleanOperator::And;
@@ -112,9 +119,31 @@ impl Parser {
     }
 
     fn parse_not_expression(&mut self) -> LintResult<Expression> {
+        // Handle leading NOT operator
+        if self.match_token(&TokenType::Not) {
+            let operator_span = self.previous().span.clone();
+            let dummy_left = Expression::Term {
+                term: Term::Word { value: "".to_string() },
+                span: operator_span.clone(),
+            };
+            let right = self.parse_proximity_expression()?;
+            
+            let span = Span::new(operator_span.start.clone(), right.span().end.clone());
+            return Ok(Expression::BooleanOp {
+                operator: BooleanOperator::Not,
+                left: Box::new(dummy_left),
+                right: Some(Box::new(right)),
+                span,
+            });
+        }
+
         let mut left = self.parse_proximity_expression()?;
 
-        while self.match_token(&TokenType::Not) {
+        while {
+            // Skip any comments between expressions
+            self.skip_comments();
+            self.match_token(&TokenType::Not)
+        } {
             let operator = BooleanOperator::Not;
             let operator_span = self.previous().span.clone();
             let right = self.parse_proximity_expression()?;
@@ -278,19 +307,44 @@ impl Parser {
                 self.advance(); // consume field name
                 self.advance(); // consume colon
                 
+                // Always parse field operations, even for unknown fields
+                // Let validation catch unknown fields later
+                let value = Box::new(self.parse_primary()?);
+                
+                // If the value is a range, associate the field with it
+                let value = if let Expression::Range { start, end, span: range_span, .. } = value.as_ref() {
+                    if let Some(field_type) = FieldType::from_str(&word) {
+                        Box::new(Expression::Range {
+                            field: Some(field_type),
+                            start: start.clone(),
+                            end: end.clone(),
+                            span: range_span.clone(),
+                        })
+                    } else {
+                        value
+                    }
+                } else {
+                    value
+                };
+                
+                let span = Span::new(word_span.start, value.span().end.clone());
+                
+                // Create expression with known or unknown field
                 if let Some(field_type) = FieldType::from_str(&word) {
-                    let value = Box::new(self.parse_primary()?);
-                    let span = Span::new(word_span.start, value.span().end.clone());
-                    
                     return Ok(Expression::Field {
                         field: field_type,
                         value,
                         span,
                     });
                 } else {
-                    return Err(LintError::ValidationError {
-                        span: word_span,
-                        message: format!("Unknown field type: {}", word),
+                    // For unknown fields, create a generic term and let validator handle it
+                    return Ok(Expression::Term {
+                        term: Term::Word { value: format!("{}:{}", word, match value.as_ref() {
+                            Expression::Term { term: Term::Word { value }, .. } => value.clone(),
+                            Expression::Term { term: Term::Phrase { value }, .. } => format!("\"{}\"", value),
+                            _ => "unknown".to_string(),
+                        })},
+                        span,
                     });
                 }
             }
@@ -526,6 +580,18 @@ impl Parser {
             
             // NEAR operators and other special cases
             _ => false,
+        }
+    }
+
+    /// Skip any comments at the current position
+    fn skip_comments(&mut self) {
+        while self.match_token(&TokenType::CommentStart) {
+            // Consume comment text until we find the end
+            while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {
+                self.advance();
+            }
+            // Consume the closing >>>
+            self.match_token(&TokenType::CommentEnd);
         }
     }
 }
