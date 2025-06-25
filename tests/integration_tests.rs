@@ -151,11 +151,10 @@ fn test_invalid_queries() {
 fn test_validation_warnings() {
     let mut linter = BrandwatchLinter::new();
 
-    // Test performance warnings
-    let report = linter.lint("a*").unwrap(); // Short wildcard
+    let report = linter.lint("ab*").unwrap();
     assert!(!report.warnings.is_empty());
 
-    let report = linter.lint("authorFollowers:[1 TO 2000000000]").unwrap(); // Very large range
+    let report = linter.lint("authorFollowers:[1 TO 2000000000]").unwrap();
     assert!(!report.warnings.is_empty());
 
     let report = linter.lint("languag:e").unwrap(); // Potential typo in field name
@@ -300,9 +299,8 @@ fn test_performance_edge_cases() {
     let report = linter.lint("apple* OR juice*").unwrap();
     assert!(!report.warnings.is_empty());
 
-    // Single character terms should generate performance warning
     let report = linter.lint("a").unwrap();
-    assert!(!report.warnings.is_empty());
+    assert!(report.warnings.is_empty());
 }
 
 #[test]
@@ -582,17 +580,18 @@ fn test_performance_warnings_in_complex_queries() {
 
     // Complex query with performance issues should still validate but warn
     let report = linter
-        .lint("((a* OR b*) AND (c* OR d*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))")
+        .lint("((ab* OR bc*) AND (cd* OR de*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))")
         .unwrap();
     assert!(!report.has_errors());
     assert!(!report.warnings.is_empty());
 
-    // Single character terms in complex context
+    // Single character terms in complex context (should not warn)
     let report = linter
         .lint("((a OR b) AND (c OR d)) AND ((e NEAR/5 f) OR (g AND h))")
         .unwrap();
     assert!(!report.has_errors());
-    assert!(!report.warnings.is_empty());
+    // Single character terms without wildcards should not generate warnings
+    assert!(report.warnings.is_empty());
 }
 
 #[test]

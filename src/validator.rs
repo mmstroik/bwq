@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_performance_warnings() {
-        let mut lexer = Lexer::new("a*");
+        let mut lexer = Lexer::new("ab*");
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();

@@ -24,16 +24,23 @@ impl ValidationRule for WildcardPerformanceRule {
                                 .push(LintError::InvalidWildcardPlacement { span: span.clone() });
                         }
 
-                        // Check for short wildcard terms
                         let parts: Vec<&str> = value.split('*').collect();
                         for part in parts {
-                            if !part.is_empty() && part.len() < 3 {
-                                result.warnings.push(LintWarning::PerformanceWarning {
-                                    span: span.clone(),
-                                    message: "Short wildcard terms may impact performance"
-                                        .to_string(),
-                                });
-                                break;
+                            if !part.is_empty() {
+                                if part.len() == 1 {
+                                    result.errors.push(LintError::ValidationError {
+                                        span: span.clone(),
+                                        message: "This wildcard matches too many unique terms. Please make it more specific.".to_string(),
+                                    });
+                                    break;
+                                } else if part.len() == 2 {
+                                    result.warnings.push(LintWarning::PerformanceWarning {
+                                        span: span.clone(),
+                                        message: "Short wildcard terms may impact performance"
+                                            .to_string(),
+                                    });
+                                    break;
+                                }
                             }
                         }
 
@@ -171,16 +178,6 @@ impl ValidationRule for ShortTermRule {
                             });
                         }
 
-                        // Check for single character terms
-                        if value.len() == 1 {
-                            result.warnings.push(LintWarning::PerformanceWarning {
-                                span: span.clone(),
-                                message: "Single character terms may impact performance"
-                                    .to_string(),
-                            });
-                        }
-
-                        // Check for potential field syntax errors
                         if value.contains(':') {
                             let parts: Vec<&str> = value.split(':').collect();
                             if parts.len() == 2 {
@@ -228,20 +225,7 @@ impl ValidationRule for ShortTermRule {
                             ValidationResult::new()
                         }
                     }
-                    Term::CaseSensitive { value } => {
-                        if value.chars().all(|c| c.is_lowercase())
-                            || value.chars().all(|c| c.is_uppercase())
-                        {
-                            ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                                span: span.clone(),
-                                message:
-                                    "Case-sensitive matching is unnecessary for single-case terms"
-                                        .to_string(),
-                            })
-                        } else {
-                            ValidationResult::new()
-                        }
-                    }
+                    Term::CaseSensitive { .. } => ValidationResult::new(),
                     _ => ValidationResult::new(),
                 }
             }
