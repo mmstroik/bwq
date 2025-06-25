@@ -109,7 +109,7 @@ fn main() {
             if let Some(input) = cli.input {
                 auto_detect_and_process(&input, cli.warnings, &cli.format, &cli.pattern);
             } else {
-                interactive_mode(cli.warnings);
+                lint_directory(&PathBuf::from("."), cli.warnings, &cli.format, &cli.pattern);
             }
         }
     }
@@ -193,9 +193,9 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
 
 fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &str) {
     let search_pattern = if path.display().to_string() == "." {
-        pattern.to_string()
+        format!("**/{}", pattern)
     } else {
-        format!("{}/{}", path.display(), pattern)
+        format!("{}/**/{}", path.display(), pattern)
     };
 
     let entries = match glob::glob(&search_pattern) {

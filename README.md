@@ -5,7 +5,10 @@ brandwatch query linter written in rust.
 ## install
 
 ```bash
-cargo install --path .
+cargo install bwq-lint
+
+# or just run it ephemerally with uvx
+uvx bwq-lint my-dir
 ```
 
 ## usage
@@ -16,11 +19,6 @@ bwq-lint "apple AND juice"     # query string
 bwq-lint query.bwq             # file
 bwq-lint tests/fixtures        # directory
 bwq-lint "*.bwq"               # glob pattern
-
-# explicit commands still work
-bwq-lint validate "apple AND juice"
-bwq-lint interactive
-bwq-lint examples
 ```
 
 ## operators
