@@ -14,11 +14,17 @@ uvx bwq-lint my-dir
 ## usage
 
 ```bash
-# auto-detects input type (file, dir, string)
+# lints current directory (recursively) by default
+bwq-lint
+
+# auto-detects input type (string, file, dir, glob)
 bwq-lint "apple AND juice"     # query string
 bwq-lint query.bwq             # file
-bwq-lint tests/fixtures        # directory
+bwq-lint tests/fixtures        # directory (recursive)
 bwq-lint "*.bwq"               # glob pattern
+
+# warnings shown by default, use --no-warnings to suppress
+bwq-lint --no-warnings
 ```
 
 ## operators

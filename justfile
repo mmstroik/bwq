@@ -8,9 +8,13 @@ build:
 test:
 	cargo test
 
+# Lint current directory recursively (default behavior)
+lint-dir:
+	cargo run --
+
 # Run the linter on a query, file, or directory (auto-detects input type)
 lint query-or-file:
-	cargo run -- "{{query-or-file}}" --warnings
+	cargo run -- "{{query-or-file}}"
 
 # Validate a query (returns exit code 0 if valid, 1 if invalid)
 validate query:
@@ -18,7 +22,7 @@ validate query:
 
 # Run the linter in interactive mode
 interactive:
-	cargo run -- interactive --warnings
+	cargo run -- interactive
 
 # Show query examples
 examples:
@@ -27,7 +31,7 @@ examples:
 # Compare our linter with Brandwatch API validation (auto-detects input type)
 compare query-or-file:
 	@echo "=== Our Linter ==="
-	@cargo run -- "{{query-or-file}}" --warnings || true
+	@cargo run -- "{{query-or-file}}" || true
 	@echo ""
 	@echo "=== Brandwatch API ==="
 	@just compare-bw "{{query-or-file}}" || true
@@ -54,8 +58,8 @@ test-all:
 	@just build
 	@echo "Running unit tests..."
 	@just test
-	@echo "Testing example queries..."
-	@just lint-file
+	@echo "Testing fixtures..."
+	@cargo run -- tests/fixtures
 	@echo "All tests completed!"
 
 # Format code

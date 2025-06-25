@@ -12,8 +12,8 @@ struct Cli {
     /// Input to analyze - can be a query string, file path, directory, or glob pattern
     input: Option<String>,
 
-    #[arg(short, long)]
-    warnings: bool,
+    #[arg(long)]
+    no_warnings: bool,
 
     #[arg(short, long, default_value = "text")]
     format: String,
@@ -29,8 +29,8 @@ struct Cli {
 enum Commands {
     /// Run in interactive mode
     Interactive {
-        #[arg(short, long)]
-        warnings: bool,
+        #[arg(long)]
+        no_warnings: bool,
     },
 
     /// Validate a query (returns exit code 0/1)
@@ -42,8 +42,8 @@ enum Commands {
     /// Lint a specific query string (explicit)
     Lint {
         query: String,
-        #[arg(short, long)]
-        warnings: bool,
+        #[arg(long)]
+        no_warnings: bool,
         #[arg(short, long, default_value = "text")]
         format: String,
     },
@@ -51,8 +51,8 @@ enum Commands {
     /// Lint a specific file (explicit)
     File {
         path: PathBuf,
-        #[arg(short, long)]
-        warnings: bool,
+        #[arg(long)]
+        no_warnings: bool,
         #[arg(short, long, default_value = "text")]
         format: String,
     },
@@ -61,8 +61,8 @@ enum Commands {
     Dir {
         #[arg(short, long, default_value = ".")]
         path: PathBuf,
-        #[arg(short, long)]
-        warnings: bool,
+        #[arg(long)]
+        no_warnings: bool,
         #[arg(short, long, default_value = "text")]
         format: String,
         #[arg(long, default_value = "*.bwq")]
@@ -74,8 +74,8 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Interactive { warnings }) => {
-            interactive_mode(warnings);
+        Some(Commands::Interactive { no_warnings }) => {
+            interactive_mode(!no_warnings);
         }
         Some(Commands::Validate { query }) => {
             validate_query(&query);
@@ -85,31 +85,31 @@ fn main() {
         }
         Some(Commands::Lint {
             query,
-            warnings,
+            no_warnings,
             format,
         }) => {
-            lint_single_query(&query, warnings, &format);
+            lint_single_query(&query, !no_warnings, &format);
         }
         Some(Commands::File {
             path,
-            warnings,
+            no_warnings,
             format,
         }) => {
-            lint_file(&path, warnings, &format);
+            lint_file(&path, !no_warnings, &format);
         }
         Some(Commands::Dir {
             path,
-            warnings,
+            no_warnings,
             format,
             pattern,
         }) => {
-            lint_directory(&path, warnings, &format, &pattern);
+            lint_directory(&path, !no_warnings, &format, &pattern);
         }
         None => {
             if let Some(input) = cli.input {
-                auto_detect_and_process(&input, cli.warnings, &cli.format, &cli.pattern);
+                auto_detect_and_process(&input, !cli.no_warnings, &cli.format, &cli.pattern);
             } else {
-                lint_directory(&PathBuf::from("."), cli.warnings, &cli.format, &cli.pattern);
+                lint_directory(&PathBuf::from("."), !cli.no_warnings, &cli.format, &cli.pattern);
             }
         }
     }
