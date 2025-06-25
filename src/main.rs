@@ -106,11 +106,9 @@ fn main() {
             lint_directory(&path, warnings, &format, &pattern);
         }
         None => {
-            // Auto-detection mode
             if let Some(input) = cli.input {
                 auto_detect_and_process(&input, cli.warnings, &cli.format, &cli.pattern);
             } else {
-                // No input provided, show help or run interactive mode
                 interactive_mode(cli.warnings);
             }
         }
@@ -122,17 +120,13 @@ fn auto_detect_and_process(input: &str, show_warnings: bool, format: &str, patte
 
     if path.exists() {
         if path.is_file() {
-            // Input is an existing file
             lint_file(&path.to_path_buf(), show_warnings, format);
         } else if path.is_dir() {
-            // Input is an existing directory
             lint_directory(&path.to_path_buf(), show_warnings, format, pattern);
         }
     } else if contains_glob_pattern(input) {
-        // Input contains glob patterns, treat as pattern in current directory
         lint_directory(&PathBuf::from("."), show_warnings, format, input);
     } else {
-        // Input is a query string
         lint_single_query(input, show_warnings, format);
     }
 }
@@ -153,7 +147,6 @@ fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
         }
     }
 
-    // Exit with error code if there are errors
     if !analysis.is_valid {
         std::process::exit(1);
     }

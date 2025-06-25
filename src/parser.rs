@@ -61,7 +61,7 @@ impl Parser {
             self.match_token(&TokenType::Or)
         } {
             let operator = BooleanOperator::Or;
-            let operator_span = self.previous().span.clone();
+            let _operator_span = self.previous().span.clone();
             let right = self.parse_and_expression()?;
 
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
@@ -86,7 +86,7 @@ impl Parser {
             if self.match_token(&TokenType::And) {
                 // Explicit AND
                 let operator = BooleanOperator::And;
-                let operator_span = self.previous().span.clone();
+                let _operator_span = self.previous().span.clone();
                 let right = self.parse_not_expression()?;
 
                 let span = Span::new(left.span().start.clone(), right.span().end.clone());
@@ -147,7 +147,7 @@ impl Parser {
             self.match_token(&TokenType::Not)
         } {
             let operator = BooleanOperator::Not;
-            let operator_span = self.previous().span.clone();
+            let _operator_span = self.previous().span.clone();
             let right = self.parse_proximity_expression()?;
 
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
@@ -163,7 +163,7 @@ impl Parser {
     }
 
     fn parse_proximity_expression(&mut self) -> LintResult<Expression> {
-        let mut left = self.parse_primary()?;
+        let left = self.parse_primary()?;
 
         // Handle proximity operators
         if self.match_token(&TokenType::Tilde) {
@@ -176,13 +176,9 @@ impl Parser {
                 self.advance();
             }
 
-            // For tilde operator, we can have either:
-            // 1. "quoted phrase"~5 (single term with proximity)
-            // 2. term1 ~ term2 (two terms with proximity)
             let mut terms = vec![left];
             let mut end_span = tilde_span.end.clone();
 
-            // Check if there's a right-hand side term (not EOF or other operator)
             if !self.is_at_end()
                 && !matches!(
                     self.peek().token_type,
@@ -212,7 +208,7 @@ impl Parser {
         if let TokenType::Near(distance) = &self.peek().token_type {
             let distance = *distance;
             self.advance();
-            let operator_span = self.previous().span.clone();
+            let _operator_span = self.previous().span.clone();
             let right = self.parse_primary()?;
 
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
@@ -226,7 +222,7 @@ impl Parser {
         if let TokenType::NearForward(distance) = &self.peek().token_type {
             let distance = *distance;
             self.advance();
-            let operator_span = self.previous().span.clone();
+            let _operator_span = self.previous().span.clone();
             let right = self.parse_primary()?;
 
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
@@ -270,7 +266,7 @@ impl Parser {
             if let TokenType::Word(word) = &self.peek().token_type {
                 let word = word.clone();
                 self.advance();
-                let word_span = self.previous().span.clone();
+                let _word_span = self.previous().span.clone();
 
                 if !self.match_token(&TokenType::RightBrace) {
                     return Err(LintError::ExpectedToken {
@@ -316,11 +312,8 @@ impl Parser {
                 self.advance(); // consume field name
                 self.advance(); // consume colon
 
-                // Always parse field operations, even for unknown fields
-                // Let validation catch unknown fields later
                 let value = Box::new(self.parse_primary()?);
 
-                // If the value is a range, associate the field with it
                 let value = if let Expression::Range {
                     start,
                     end,
@@ -344,7 +337,6 @@ impl Parser {
 
                 let span = Span::new(word_span.start, value.span().end.clone());
 
-                // Create expression with known or unknown field
                 if let Some(field_type) = FieldType::from_str(&word) {
                     return Ok(Expression::Field {
                         field: field_type,
@@ -352,7 +344,6 @@ impl Parser {
                         span,
                     });
                 } else {
-                    // For unknown fields, create a generic term and let validator handle it
                     return Ok(Expression::Term {
                         term: Term::Word {
                             value: format!(
@@ -377,14 +368,12 @@ impl Parser {
             }
         }
 
-        // Handle regular terms
         self.parse_term()
     }
 
     fn parse_range(&mut self) -> LintResult<Expression> {
-        let start_span = self.previous().span.clone(); // [
+        let start_span = self.previous().span.clone();
 
-        // Parse start value
         let start_value = match &self.peek().token_type {
             TokenType::Word(w) | TokenType::Number(w) => {
                 let val = w.clone();
@@ -400,7 +389,6 @@ impl Parser {
             }
         };
 
-        // Expect TO
         if !self.match_token(&TokenType::To) {
             return Err(LintError::ExpectedToken {
                 span: self.peek().span.clone(),
@@ -409,7 +397,6 @@ impl Parser {
             });
         }
 
-        // Parse end value
         let end_value = match &self.peek().token_type {
             TokenType::Word(w) | TokenType::Number(w) => {
                 let val = w.clone();
@@ -425,7 +412,6 @@ impl Parser {
             }
         };
 
-        // Expect ]
         if !self.match_token(&TokenType::RightBracket) {
             return Err(LintError::ExpectedToken {
                 span: self.peek().span.clone(),
@@ -438,7 +424,7 @@ impl Parser {
         let span = Span::new(start_span.start, end_span.end);
 
         Ok(Expression::Range {
-            field: None, // Will be handled by field parsing if needed
+            field: None,
             start: start_value,
             end: end_value,
             span,
@@ -446,10 +432,9 @@ impl Parser {
     }
 
     fn parse_comment(&mut self) -> LintResult<Expression> {
-        let start_span = self.previous().span.clone(); // <<<
+        let start_span = self.previous().span.clone();
         let mut comment_text = String::new();
 
-        // Collect all text until >>>
         while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {
             match &self.peek().token_type {
                 TokenType::Word(w) => comment_text.push_str(w),
@@ -596,10 +581,7 @@ impl Parser {
             return false;
         }
 
-        // Check if current token could start a new term/expression
-        // but exclude operators that would end the current expression
         match &self.peek().token_type {
-            // These tokens can start new terms (implicit AND candidates)
             TokenType::Word(_)
             | TokenType::QuotedString(_)
             | TokenType::Number(_)
@@ -608,17 +590,14 @@ impl Parser {
             | TokenType::LeftParen
             | TokenType::LeftBrace => true,
 
-            // These tokens end the current expression level
             TokenType::Or
             | TokenType::RightParen
             | TokenType::RightBracket
             | TokenType::RightBrace
             | TokenType::Eof => false,
 
-            // AND and NOT are handled explicitly in their respective parsing methods
             TokenType::And | TokenType::Not => false,
 
-            // NEAR operators and other special cases
             _ => false,
         }
     }
@@ -626,11 +605,9 @@ impl Parser {
     /// Skip any comments at the current position
     fn skip_comments(&mut self) {
         while self.match_token(&TokenType::CommentStart) {
-            // Consume comment text until we find the end
             while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {
                 self.advance();
             }
-            // Consume the closing >>>
             self.match_token(&TokenType::CommentEnd);
         }
     }
@@ -710,7 +687,6 @@ mod tests {
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
 
-        // Should parse as implicit AND
         match result.query.expression {
             Expression::BooleanOp { operator, .. } => {
                 assert_eq!(operator, BooleanOperator::And);
@@ -718,7 +694,6 @@ mod tests {
             _ => panic!("Expected BooleanOp with implicit AND"),
         }
 
-        // Should have warning about implicit AND
         assert!(!result.warnings.is_empty());
     }
 }
