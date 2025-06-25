@@ -6,9 +6,6 @@ brandwatch query linter written in rust.
 
 ```bash
 cargo install bwq-lint
-
-# or just run it ephemerally with uvx
-uvx bwq-lint my-dir
 ```
 
 ## usage
