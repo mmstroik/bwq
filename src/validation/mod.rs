@@ -1,8 +1,8 @@
 use crate::ast::*;
 use crate::error::{LintError, LintWarning};
 
-pub mod rules;
 pub mod engine;
+pub mod rules;
 
 pub use engine::ValidationEngine;
 
@@ -39,21 +39,21 @@ impl ValidationResult {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn with_error(error: LintError) -> Self {
         Self {
             errors: vec![error],
             warnings: vec![],
         }
     }
-    
+
     pub fn with_warning(warning: LintWarning) -> Self {
         Self {
             errors: vec![],
             warnings: vec![warning],
         }
     }
-    
+
     pub fn extend(&mut self, other: ValidationResult) {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);

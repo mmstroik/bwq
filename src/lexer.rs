@@ -6,7 +6,7 @@ pub enum TokenType {
     Word(String),
     QuotedString(String),
     Number(String),
-    
+
     And,
     Or,
     Not,
@@ -16,27 +16,27 @@ pub enum TokenType {
     RightBracket,
     LeftBrace,
     RightBrace,
-    
+
     Tilde,
     Colon,
     Question,
     Asterisk,
     To,
-    
+
     Near(u32),
     NearForward(u32),
-    
+
     CommentStart,
     CommentEnd,
     CommentText(String),
-    
+
     Field(String),
-    
+
     Hashtag(String),
     Mention(String),
-    
+
     Whitespace,
-    
+
     Eof,
 }
 
@@ -84,7 +84,11 @@ pub struct Token {
 
 impl Token {
     pub fn new(token_type: TokenType, span: Span, raw: String) -> Self {
-        Self { token_type, span, raw }
+        Self {
+            token_type,
+            span,
+            raw,
+        }
     }
 }
 
@@ -108,7 +112,7 @@ impl Lexer {
 
     pub fn tokenize(&mut self) -> LintResult<Vec<Token>> {
         let mut tokens = Vec::new();
-        
+
         while !self.is_at_end() {
             match self.next_token()? {
                 Some(token) => {
@@ -120,7 +124,7 @@ impl Lexer {
                 None => break,
             }
         }
-        
+
         // Add EOF token
         let eof_pos = self.current_position();
         tokens.push(Token::new(
@@ -128,7 +132,7 @@ impl Lexer {
             Span::single(eof_pos),
             String::new(),
         ));
-        
+
         Ok(tokens)
     }
 
@@ -233,20 +237,18 @@ impl Lexer {
                 )))
             }
 
-            '<' if self.peek_ahead(2) == "<<" => {
-                self.read_comment_start()
-            }
+            '<' if self.peek_ahead(2) == "<<" => self.read_comment_start(),
 
-            '>' if self.peek_ahead(2) == ">>" => {
-                self.read_comment_end()
-            }
+            '>' if self.peek_ahead(2) == ">>" => self.read_comment_end(),
 
             '#' => self.read_hashtag(),
 
             '@' => self.read_mention(),
 
             _ if ch.is_ascii_digit() || ch == '-' => self.read_number(),
-            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' => self.read_word_or_operator(),
+            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' => {
+                self.read_word_or_operator()
+            }
 
             _ => {
                 self.advance();
@@ -263,7 +265,7 @@ impl Lexer {
         let start_pos = self.current_position();
         let mut value = String::new();
         let mut raw = String::new();
-        
+
         raw.push(self.current_char());
         self.advance();
         self.column += 1;
@@ -272,14 +274,14 @@ impl Lexer {
             let ch = self.current_char();
             value.push(ch);
             raw.push(ch);
-            
+
             if ch == '\n' {
                 self.line += 1;
                 self.column = 1;
             } else {
                 self.column += 1;
             }
-            
+
             self.advance();
         }
 
@@ -306,13 +308,15 @@ impl Lexer {
         let start_pos = self.current_position();
         let mut value = String::new();
 
-        while !self.is_at_end() && (self.current_char().is_alphanumeric() || 
-                                   self.current_char() == '_' || 
-                                   self.current_char() == '.' ||
-                                   self.current_char() == '-' ||
-                                   self.current_char() == '/' ||
-                                   self.current_char() == '*' ||
-                                   self.current_char() == '?') {
+        while !self.is_at_end()
+            && (self.current_char().is_alphanumeric()
+                || self.current_char() == '_'
+                || self.current_char() == '.'
+                || self.current_char() == '-'
+                || self.current_char() == '/'
+                || self.current_char() == '*'
+                || self.current_char() == '?')
+        {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -329,7 +333,7 @@ impl Lexer {
             _ => {
                 if value.starts_with("NEAR/") {
                     if value.ends_with('f') && value.len() > 6 {
-                        let distance_str = &value[5..value.len()-1];
+                        let distance_str = &value[5..value.len() - 1];
                         if let Ok(distance) = distance_str.parse::<u32>() {
                             TokenType::NearForward(distance)
                         } else {
@@ -364,7 +368,9 @@ impl Lexer {
             self.column += 1;
         }
 
-        while !self.is_at_end() && (self.current_char().is_ascii_digit() || self.current_char() == '.') {
+        while !self.is_at_end()
+            && (self.current_char().is_ascii_digit() || self.current_char() == '.')
+        {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -381,11 +387,13 @@ impl Lexer {
     fn read_hashtag(&mut self) -> LintResult<Option<Token>> {
         let start_pos = self.current_position();
         let mut value = String::new();
-        
+
         self.advance();
         self.column += 1;
 
-        while !self.is_at_end() && (self.current_char().is_alphanumeric() || self.current_char() == '_') {
+        while !self.is_at_end()
+            && (self.current_char().is_alphanumeric() || self.current_char() == '_')
+        {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -402,11 +410,13 @@ impl Lexer {
     fn read_mention(&mut self) -> LintResult<Option<Token>> {
         let start_pos = self.current_position();
         let mut value = String::new();
-        
+
         self.advance();
         self.column += 1;
 
-        while !self.is_at_end() && (self.current_char().is_alphanumeric() || self.current_char() == '_') {
+        while !self.is_at_end()
+            && (self.current_char().is_alphanumeric() || self.current_char() == '_')
+        {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -422,7 +432,7 @@ impl Lexer {
 
     fn read_comment_start(&mut self) -> LintResult<Option<Token>> {
         let start_pos = self.current_position();
-        
+
         self.advance();
         self.advance();
         self.advance();
@@ -438,7 +448,7 @@ impl Lexer {
 
     fn read_comment_end(&mut self) -> LintResult<Option<Token>> {
         let start_pos = self.current_position();
-        
+
         self.advance();
         self.advance();
         self.advance();
@@ -495,7 +505,7 @@ mod tests {
     fn test_basic_tokenization() {
         let mut lexer = Lexer::new("apple AND juice");
         let tokens = lexer.tokenize().unwrap();
-        
+
         assert_eq!(tokens.len(), 4); // apple, AND, juice, EOF
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "apple"));
         assert!(matches!(tokens[1].token_type, TokenType::And));
@@ -507,16 +517,18 @@ mod tests {
     fn test_quoted_string() {
         let mut lexer = Lexer::new("\"apple juice\"");
         let tokens = lexer.tokenize().unwrap();
-        
+
         assert_eq!(tokens.len(), 2); // quoted string, EOF
-        assert!(matches!(tokens[0].token_type, TokenType::QuotedString(ref s) if s == "apple juice"));
+        assert!(
+            matches!(tokens[0].token_type, TokenType::QuotedString(ref s) if s == "apple juice")
+        );
     }
 
     #[test]
     fn test_proximity_operators() {
         let mut lexer = Lexer::new("NEAR/5 NEAR/3f");
         let tokens = lexer.tokenize().unwrap();
-        
+
         assert_eq!(tokens.len(), 3); // NEAR/5, NEAR/3f, EOF
         assert!(matches!(tokens[0].token_type, TokenType::Near(5)));
         assert!(matches!(tokens[1].token_type, TokenType::NearForward(3)));

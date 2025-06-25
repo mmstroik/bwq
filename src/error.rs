@@ -9,7 +9,11 @@ pub struct Position {
 
 impl Position {
     pub fn new(line: usize, column: usize, offset: usize) -> Self {
-        Self { line, column, offset }
+        Self {
+            line,
+            column,
+            offset,
+        }
     }
 }
 
@@ -35,67 +39,42 @@ impl Span {
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum LintError {
     #[error("Lexer error at {position:?}: {message}")]
-    LexerError { 
-        position: Position,
-        message: String 
-    },
+    LexerError { position: Position, message: String },
 
     #[error("Parser error at {span:?}: {message}")]
-    ParserError { 
-        span: Span,
-        message: String 
-    },
+    ParserError { span: Span, message: String },
 
     #[error("Validation error at {span:?}: {message}")]
-    ValidationError { 
-        span: Span,
-        message: String 
-    },
+    ValidationError { span: Span, message: String },
 
     #[error("Boolean operator '{operator}' must be capitalized at {span:?}")]
-    InvalidBooleanCase { 
-        span: Span,
-        operator: String 
-    },
+    InvalidBooleanCase { span: Span, operator: String },
 
     #[error("Unbalanced parentheses at {span:?}")]
-    UnbalancedParentheses { 
-        span: Span 
-    },
+    UnbalancedParentheses { span: Span },
 
-    #[error("Invalid wildcard placement at {span:?}: wildcards cannot be at the beginning of a word")]
-    InvalidWildcardPlacement { 
-        span: Span 
-    },
+    #[error(
+        "Invalid wildcard placement at {span:?}: wildcards cannot be at the beginning of a word"
+    )]
+    InvalidWildcardPlacement { span: Span },
 
     #[error("Invalid proximity operator syntax at {span:?}: {message}")]
-    InvalidProximityOperator { 
-        span: Span,
-        message: String 
-    },
+    InvalidProximityOperator { span: Span, message: String },
 
     #[error("Invalid field operator syntax at {span:?}: {message}")]
-    InvalidFieldOperator { 
-        span: Span,
-        message: String 
-    },
+    InvalidFieldOperator { span: Span, message: String },
 
     #[error("Invalid range syntax at {span:?}: expected '[value TO value]'")]
-    InvalidRangeSyntax { 
-        span: Span 
-    },
+    InvalidRangeSyntax { span: Span },
 
     #[error("Unexpected token '{token}' at {span:?}")]
-    UnexpectedToken { 
-        span: Span,
-        token: String 
-    },
+    UnexpectedToken { span: Span, token: String },
 
     #[error("Expected '{expected}' but found '{found}' at {span:?}")]
-    ExpectedToken { 
+    ExpectedToken {
         span: Span,
         expected: String,
-        found: String 
+        found: String,
     },
 }
 

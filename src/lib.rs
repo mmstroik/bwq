@@ -2,8 +2,8 @@ pub mod ast;
 pub mod error;
 pub mod lexer;
 pub mod parser;
-pub mod validator;
 pub mod validation;
+pub mod validator;
 
 use error::{LintError, LintReport, LintResult};
 use lexer::Lexer;
@@ -84,28 +84,36 @@ impl AnalysisResult {
         } else {
             let error_count = self.errors.len();
             let warning_count = self.warnings.len();
-            
+
             match (error_count, warning_count) {
                 (0, 0) => "Query is valid with no issues".to_string(),
-                (0, w) => format!("Query is valid with {} warning{}", w, if w == 1 { "" } else { "s" }),
+                (0, w) => format!(
+                    "Query is valid with {} warning{}",
+                    w,
+                    if w == 1 { "" } else { "s" }
+                ),
                 (e, 0) => format!("Query has {} error{}", e, if e == 1 { "" } else { "s" }),
-                (e, w) => format!("Query has {} error{} and {} warning{}", 
-                                e, if e == 1 { "" } else { "s" },
-                                w, if w == 1 { "" } else { "s" }),
+                (e, w) => format!(
+                    "Query has {} error{} and {} warning{}",
+                    e,
+                    if e == 1 { "" } else { "s" },
+                    w,
+                    if w == 1 { "" } else { "s" }
+                ),
             }
         }
     }
 
     pub fn format_issues(&self) -> String {
         let mut output = String::new();
-        
+
         if !self.errors.is_empty() {
             output.push_str("Errors:\n");
             for (i, error) in self.errors.iter().enumerate() {
                 output.push_str(&format!("  {}. {}\n", i + 1, error));
             }
         }
-        
+
         if !self.warnings.is_empty() {
             if !output.is_empty() {
                 output.push('\n');
@@ -115,7 +123,7 @@ impl AnalysisResult {
                 output.push_str(&format!("  {}. {:?}\n", i + 1, warning));
             }
         }
-        
+
         output
     }
 }
@@ -157,7 +165,7 @@ mod tests {
     fn test_convenience_functions() {
         assert!(is_valid_query("apple AND juice"));
         assert!(!is_valid_query("*invalid"));
-        
+
         let analysis = analyze_query("apple AND juice");
         assert!(analysis.is_valid);
         assert!(!analysis.has_issues());
@@ -182,11 +190,11 @@ mod tests {
     #[test]
     fn test_proximity_query() {
         let mut linter = BrandwatchLinter::new();
-        
+
         let query1 = r#"apple NEAR/3 juice"#;
         let report1 = linter.lint(query1).unwrap();
         assert!(!report1.has_errors());
-        
+
         let query2 = r#""apple juice"~5"#;
         let report2 = linter.lint(query2).unwrap();
         assert!(!report2.has_errors());
@@ -196,7 +204,7 @@ mod tests {
     fn test_analysis_result_summary() {
         let analysis = analyze_query("apple AND juice");
         assert_eq!(analysis.summary(), "Query is valid with no issues");
-        
+
         let analysis = analyze_query("*invalid");
         assert!(analysis.summary().contains("error"));
     }

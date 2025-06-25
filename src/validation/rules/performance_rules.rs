@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{LintError, LintWarning};
-use crate::validation::{ValidationRule, ValidationContext, ValidationResult};
+use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
 // Wildcard performance validation rule
 pub struct WildcardPerformanceRule;
@@ -16,26 +16,27 @@ impl ValidationRule for WildcardPerformanceRule {
                 match term {
                     Term::Wildcard { value } => {
                         let mut result = ValidationResult::new();
-                        
+
                         // Check for wildcards at the beginning
                         if value.starts_with('*') {
-                            result.errors.push(LintError::InvalidWildcardPlacement {
-                                span: span.clone(),
-                            });
+                            result
+                                .errors
+                                .push(LintError::InvalidWildcardPlacement { span: span.clone() });
                         }
-                        
+
                         // Check for short wildcard terms
                         let parts: Vec<&str> = value.split('*').collect();
                         for part in parts {
                             if !part.is_empty() && part.len() < 3 {
                                 result.warnings.push(LintWarning::PerformanceWarning {
                                     span: span.clone(),
-                                    message: "Short wildcard terms may impact performance".to_string(),
+                                    message: "Short wildcard terms may impact performance"
+                                        .to_string(),
                                 });
                                 break;
                             }
                         }
-                        
+
                         result
                     }
                     Term::Replacement { value } => {
@@ -43,7 +44,8 @@ impl ValidationRule for WildcardPerformanceRule {
                         if question_count > 3 {
                             ValidationResult::with_warning(LintWarning::PerformanceWarning {
                                 span: span.clone(),
-                                message: "Multiple replacement characters may impact performance".to_string(),
+                                message: "Multiple replacement characters may impact performance"
+                                    .to_string(),
                             })
                         } else {
                             ValidationResult::new()
@@ -52,10 +54,26 @@ impl ValidationRule for WildcardPerformanceRule {
                     _ => ValidationResult::new(),
                 }
             }
-            Expression::BooleanOp { operator: BooleanOperator::Or, left, right, span } => {
+            Expression::BooleanOp {
+                operator: BooleanOperator::Or,
+                left,
+                right,
+                span,
+            } => {
                 // Warn about multiple wildcards in OR operations
-                if let (Expression::Term { term: Term::Wildcard { .. }, .. }, Some(right_expr)) = (left.as_ref(), right.as_ref()) {
-                    if let Expression::Term { term: Term::Wildcard { .. }, .. } = right_expr.as_ref() {
+                if let (
+                    Expression::Term {
+                        term: Term::Wildcard { .. },
+                        ..
+                    },
+                    Some(right_expr),
+                ) = (left.as_ref(), right.as_ref())
+                {
+                    if let Expression::Term {
+                        term: Term::Wildcard { .. },
+                        ..
+                    } = right_expr.as_ref()
+                    {
                         return ValidationResult::with_warning(LintWarning::PerformanceWarning {
                             span: span.clone(),
                             message: "Multiple wildcards in OR operations may significantly impact performance".to_string(),
@@ -70,8 +88,13 @@ impl ValidationRule for WildcardPerformanceRule {
 
     fn can_validate(&self, expr: &Expression) -> bool {
         match expr {
-            Expression::Term { term, .. } => matches!(term, Term::Wildcard { .. } | Term::Replacement { .. }),
-            Expression::BooleanOp { operator: BooleanOperator::Or, .. } => true,
+            Expression::Term { term, .. } => {
+                matches!(term, Term::Wildcard { .. } | Term::Replacement { .. })
+            }
+            Expression::BooleanOp {
+                operator: BooleanOperator::Or,
+                ..
+            } => true,
             _ => false,
         }
     }
@@ -88,21 +111,26 @@ impl ValidationRule for ProximityDistanceRule {
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         if let Expression::Proximity { operator, span, .. } = expr {
             match operator {
-                ProximityOperator::Near { distance } | ProximityOperator::NearForward { distance } => {
+                ProximityOperator::Near { distance }
+                | ProximityOperator::NearForward { distance } => {
                     if *distance > 100 {
                         ValidationResult::with_warning(LintWarning::PerformanceWarning {
                             span: span.clone(),
-                            message: "Very large proximity distances may impact performance".to_string(),
+                            message: "Very large proximity distances may impact performance"
+                                .to_string(),
                         })
                     } else {
                         ValidationResult::new()
                     }
                 }
-                ProximityOperator::Proximity { distance: Some(distance) } => {
+                ProximityOperator::Proximity {
+                    distance: Some(distance),
+                } => {
                     if *distance > 100 {
                         ValidationResult::with_warning(LintWarning::PerformanceWarning {
                             span: span.clone(),
-                            message: "Very large proximity distances may impact performance".to_string(),
+                            message: "Very large proximity distances may impact performance"
+                                .to_string(),
                         })
                     } else {
                         ValidationResult::new()
@@ -134,7 +162,7 @@ impl ValidationRule for ShortTermRule {
                 match term {
                     Term::Word { value } => {
                         let mut result = ValidationResult::new();
-                        
+
                         // Check for empty terms
                         if value.trim().is_empty() {
                             result.errors.push(LintError::ValidationError {
@@ -142,21 +170,24 @@ impl ValidationRule for ShortTermRule {
                                 message: "Word cannot be empty".to_string(),
                             });
                         }
-                        
+
                         // Check for single character terms
                         if value.len() == 1 {
                             result.warnings.push(LintWarning::PerformanceWarning {
                                 span: span.clone(),
-                                message: "Single character terms may impact performance".to_string(),
+                                message: "Single character terms may impact performance"
+                                    .to_string(),
                             });
                         }
-                        
+
                         // Check for potential field syntax errors
                         if value.contains(':') {
                             let parts: Vec<&str> = value.split(':').collect();
                             if parts.len() == 2 {
                                 let field_part = parts[0];
-                                if !field_part.is_empty() && FieldType::from_str(field_part).is_none() {
+                                if !field_part.is_empty()
+                                    && FieldType::from_str(field_part).is_none()
+                                {
                                     result.errors.push(LintError::ValidationError {
                                         span: span.clone(),
                                         message: format!("Unknown field type: {}", field_part),
@@ -164,7 +195,7 @@ impl ValidationRule for ShortTermRule {
                                 }
                             }
                         }
-                        
+
                         result
                     }
                     Term::Phrase { value } => {
@@ -198,10 +229,14 @@ impl ValidationRule for ShortTermRule {
                         }
                     }
                     Term::CaseSensitive { value } => {
-                        if value.chars().all(|c| c.is_lowercase()) || value.chars().all(|c| c.is_uppercase()) {
+                        if value.chars().all(|c| c.is_lowercase())
+                            || value.chars().all(|c| c.is_uppercase())
+                        {
                             ValidationResult::with_warning(LintWarning::PerformanceWarning {
                                 span: span.clone(),
-                                message: "Case-sensitive matching is unnecessary for single-case terms".to_string(),
+                                message:
+                                    "Case-sensitive matching is unnecessary for single-case terms"
+                                        .to_string(),
                             })
                         } else {
                             ValidationResult::new()
@@ -238,24 +273,30 @@ impl ValidationRule for RangePerformanceRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Range { field: Some(FieldType::AuthorFollowers), start, end, span } = expr {
+        if let Expression::Range {
+            field: Some(FieldType::AuthorFollowers),
+            start,
+            end,
+            span,
+        } = expr
+        {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<i64>(), end.parse::<i64>()) {
                 let mut result = ValidationResult::new();
-                
+
                 if start_num < 0 || end_num < 0 {
                     result.errors.push(LintError::ValidationError {
                         span: span.clone(),
                         message: "Follower counts cannot be negative".to_string(),
                     });
                 }
-                
+
                 if end_num > 1_000_000_000 {
                     result.warnings.push(LintWarning::PerformanceWarning {
                         span: span.clone(),
                         message: "Very large follower counts may not match any results".to_string(),
                     });
                 }
-                
+
                 result
             } else {
                 ValidationResult::new()
@@ -266,6 +307,12 @@ impl ValidationRule for RangePerformanceRule {
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Range { field: Some(FieldType::AuthorFollowers), .. })
+        matches!(
+            expr,
+            Expression::Range {
+                field: Some(FieldType::AuthorFollowers),
+                ..
+            }
+        )
     }
 }

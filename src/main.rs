@@ -11,16 +11,16 @@ use std::path::{Path, PathBuf};
 struct Cli {
     /// Input to analyze - can be a query string, file path, directory, or glob pattern
     input: Option<String>,
-    
+
     #[arg(short, long)]
     warnings: bool,
-    
+
     #[arg(short, long, default_value = "text")]
     format: String,
-    
+
     #[arg(long, default_value = "*.bwq")]
     pattern: String,
-    
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -32,15 +32,13 @@ enum Commands {
         #[arg(short, long)]
         warnings: bool,
     },
-    
+
     /// Validate a query (returns exit code 0/1)
-    Validate {
-        query: String,
-    },
-    
+    Validate { query: String },
+
     /// Show example queries
     Examples,
-    
+
     /// Lint a specific query string (explicit)
     Lint {
         query: String,
@@ -49,7 +47,7 @@ enum Commands {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
-    
+
     /// Lint a specific file (explicit)
     File {
         path: PathBuf,
@@ -58,7 +56,7 @@ enum Commands {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
-    
+
     /// Lint a directory (explicit)
     Dir {
         #[arg(short, long, default_value = ".")]
@@ -74,7 +72,7 @@ enum Commands {
 
 fn main() {
     let cli = Cli::parse();
-    
+
     match cli.command {
         Some(Commands::Interactive { warnings }) => {
             interactive_mode(warnings);
@@ -85,13 +83,26 @@ fn main() {
         Some(Commands::Examples) => {
             show_examples();
         }
-        Some(Commands::Lint { query, warnings, format }) => {
+        Some(Commands::Lint {
+            query,
+            warnings,
+            format,
+        }) => {
             lint_single_query(&query, warnings, &format);
         }
-        Some(Commands::File { path, warnings, format }) => {
+        Some(Commands::File {
+            path,
+            warnings,
+            format,
+        }) => {
             lint_file(&path, warnings, &format);
         }
-        Some(Commands::Dir { path, warnings, format, pattern }) => {
+        Some(Commands::Dir {
+            path,
+            warnings,
+            format,
+            pattern,
+        }) => {
             lint_directory(&path, warnings, &format, &pattern);
         }
         None => {
@@ -108,7 +119,7 @@ fn main() {
 
 fn auto_detect_and_process(input: &str, show_warnings: bool, format: &str, pattern: &str) {
     let path = Path::new(input);
-    
+
     if path.exists() {
         if path.is_file() {
             // Input is an existing file
@@ -132,7 +143,7 @@ fn contains_glob_pattern(input: &str) -> bool {
 
 fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
     let analysis = analyze_query(query);
-    
+
     match format {
         "json" => {
             output_json(&analysis);
@@ -141,7 +152,7 @@ fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
             output_text(&analysis, show_warnings);
         }
     }
-    
+
     // Exit with error code if there are errors
     if !analysis.is_valid {
         std::process::exit(1);
@@ -161,9 +172,9 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
         eprintln!("File {} is empty", path.display());
         std::process::exit(1);
     }
-    
+
     let analysis = analyze_query(query);
-    
+
     match format {
         "json" => {
             let json_analysis = serde_json::json!({
@@ -181,7 +192,7 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
             println!();
         }
     }
-    
+
     if !analysis.is_valid {
         std::process::exit(1);
     }
@@ -193,7 +204,7 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
     } else {
         format!("{}/{}", path.display(), pattern)
     };
-    
+
     let entries = match glob::glob(&search_pattern) {
         Ok(entries) => entries,
         Err(e) => {
@@ -201,18 +212,18 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
             std::process::exit(1);
         }
     };
-    
+
     let mut total_files = 0;
     let mut valid_files = 0;
     let mut any_errors = false;
     let mut results = Vec::new();
-    
+
     for entry in entries {
         match entry {
             Ok(file_path) => {
                 if file_path.is_file() {
                     total_files += 1;
-                    
+
                     let content = match fs::read_to_string(&file_path) {
                         Ok(content) => content,
                         Err(e) => {
@@ -221,21 +232,21 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
                             continue;
                         }
                     };
-                    
+
                     let query = content.trim();
                     if query.is_empty() {
                         eprintln!("Skipping empty file: {}", file_path.display());
                         continue;
                     }
-                    
+
                     let analysis = analyze_query(query);
-                    
+
                     if analysis.is_valid {
                         valid_files += 1;
                     } else {
                         any_errors = true;
                     }
-                    
+
                     results.push((file_path, analysis, query.to_string()));
                 }
             }
@@ -245,9 +256,13 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
             }
         }
     }
-    
+
     if total_files == 0 {
-        eprintln!("No files found matching pattern '{}' in directory '{}'", pattern, path.display());
+        eprintln!(
+            "No files found matching pattern '{}' in directory '{}'",
+            pattern,
+            path.display()
+        );
         std::process::exit(1);
     }
     match format {
@@ -261,7 +276,7 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
                     "query": query
                 })
             }).collect();
-            
+
             let summary = serde_json::json!({
                 "summary": {
                     "total_files": total_files,
@@ -270,7 +285,7 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
                 },
                 "results": json_results
             });
-            
+
             println!("{}", serde_json::to_string_pretty(&summary).unwrap());
         }
         "text" | _ => {
@@ -281,11 +296,11 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
                     println!();
                 }
             }
-            
+
             println!("Summary: {}/{} files valid", valid_files, total_files);
         }
     }
-    
+
     if any_errors {
         std::process::exit(1);
     }
@@ -295,14 +310,14 @@ fn interactive_mode(show_warnings: bool) {
     println!("Brandwatch Query Linter - Interactive Mode");
     println!("Enter queries to lint (Ctrl+C to exit):");
     println!();
-    
+
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    
+
     loop {
         print!("bwq-lint> ");
         stdout.flush().unwrap();
-        
+
         let mut line = String::new();
         match stdin.read_line(&mut line) {
             Ok(0) => break, // EOF
@@ -311,21 +326,21 @@ fn interactive_mode(show_warnings: bool) {
                 if query.is_empty() {
                     continue;
                 }
-                
+
                 if query == "exit" || query == "quit" {
                     break;
                 }
-                
+
                 if query == "help" {
                     show_interactive_help();
                     continue;
                 }
-                
+
                 if query == "examples" {
                     show_examples();
                     continue;
                 }
-                
+
                 let analysis = analyze_query(query);
                 output_text(&analysis, show_warnings);
                 println!();
@@ -341,7 +356,7 @@ fn interactive_mode(show_warnings: bool) {
 fn validate_query(query: &str) {
     let mut linter = BrandwatchLinter::new();
     let is_valid = linter.is_valid(query);
-    
+
     if is_valid {
         println!("Query is valid");
         std::process::exit(0);
@@ -353,14 +368,14 @@ fn validate_query(query: &str) {
 
 fn output_text(analysis: &bwq_lint::AnalysisResult, show_warnings: bool) {
     println!("{}", analysis.summary());
-    
+
     if !analysis.errors.is_empty() {
         println!("\nErrors:");
         for (i, error) in analysis.errors.iter().enumerate() {
             println!("  {}. {}", i + 1, error);
         }
     }
-    
+
     if show_warnings && !analysis.warnings.is_empty() {
         println!("\nWarnings:");
         for (i, warning) in analysis.warnings.iter().enumerate() {
@@ -377,7 +392,7 @@ fn output_json(analysis: &bwq_lint::AnalysisResult) {
         "warnings": analysis.warnings.iter().map(|w| format!("{:?}", w)).collect::<Vec<_>>(),
         "query": analysis.query
     });
-    
+
     println!("{}", serde_json::to_string_pretty(&json_output).unwrap());
 }
 
@@ -393,30 +408,30 @@ fn show_interactive_help() {
 fn show_examples() {
     println!("Brandwatch Query Examples:");
     println!();
-    
+
     println!("Basic Boolean Operators:");
     println!("  apple AND juice");
     println!("  apple OR orange");
     println!("  apple NOT bitter");
     println!("  (apple OR orange) AND juice");
     println!();
-    
+
     println!("Quoted Phrases:");
     println!("  \"apple juice\"");
     println!("  \"organic fruit\" AND healthy");
     println!();
-    
+
     println!("Proximity Operators:");
     println!("  \"apple juice\"~5");
     println!("  apple NEAR/3 juice");
     println!("  apple NEAR/2f juice");
     println!();
-    
+
     println!("Wildcards and Replacement:");
     println!("  appl*");
     println!("  customi?e");
     println!();
-    
+
     println!("Field Operators:");
     println!("  title:\"apple juice\"");
     println!("  site:twitter.com");
@@ -424,24 +439,24 @@ fn show_examples() {
     println!("  language:en");
     println!("  rating:[3 TO 5]");
     println!();
-    
+
     println!("Location Operators:");
     println!("  country:usa");
     println!("  region:usa.ca");
     println!("  city:\"usa.ca.san francisco\"");
     println!();
-    
+
     println!("Advanced Operators:");
     println!("  authorFollowers:[1000 TO 50000]");
     println!("  engagementType:RETWEET");
     println!("  authorGender:F");
     println!("  {{BrandWatch}}  (case-sensitive)");
     println!();
-    
+
     println!("Comments:");
     println!("  apple <<<This is a comment>>> AND juice");
     println!();
-    
+
     println!("Special Characters:");
     println!("  #MondayMotivation");
     println!("  @brandwatch");
@@ -454,14 +469,14 @@ mod tests {
     use std::fs;
     use std::io::Write;
     use tempfile::NamedTempFile;
-    
+
     #[test]
     fn test_lint_single_query() {
         // This is more of an integration test
         let analysis = analyze_query("apple AND juice");
         assert!(analysis.is_valid);
     }
-    
+
     #[test]
     fn test_file_processing() {
         let mut temp_file = NamedTempFile::new().unwrap();

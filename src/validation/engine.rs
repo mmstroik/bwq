@@ -1,7 +1,7 @@
+use super::rules::*;
+use super::{ValidationContext, ValidationRule};
 use crate::ast::*;
 use crate::error::{LintError, LintReport, LintWarning};
-use super::{ValidationRule, ValidationContext};
-use super::rules::*;
 
 pub struct ValidationEngine {
     rules: Vec<Box<dyn ValidationRule>>,
@@ -13,7 +13,7 @@ impl ValidationEngine {
             rules: vec![
                 // Field validation rules
                 Box::new(RatingFieldRule),
-                Box::new(CoordinateFieldRule), 
+                Box::new(CoordinateFieldRule),
                 Box::new(LanguageFieldRule),
                 Box::new(AuthorGenderFieldRule),
                 Box::new(BooleanFieldRule),
@@ -21,13 +21,11 @@ impl ValidationEngine {
                 Box::new(VerifiedTypeFieldRule),
                 Box::new(MinuteOfDayFieldRule),
                 Box::new(RangeFieldRule),
-                
                 // Operator validation rules
                 Box::new(MixedAndOrRule),
                 Box::new(MixedNearRule),
                 Box::new(PureNegativeRule),
                 Box::new(BinaryOperatorRule),
-                
                 // Performance validation rules
                 Box::new(WildcardPerformanceRule),
                 Box::new(ProximityDistanceRule),
@@ -36,20 +34,20 @@ impl ValidationEngine {
             ],
         }
     }
-    
+
     pub fn validate(&self, query: &Query) -> LintReport {
         let mut all_errors = Vec::new();
         let mut all_warnings = Vec::new();
-        
+
         let ctx = ValidationContext::default();
         self.walk_expression(&query.expression, &ctx, &mut all_errors, &mut all_warnings);
-        
+
         LintReport {
             errors: all_errors,
             warnings: all_warnings,
         }
     }
-    
+
     fn walk_expression(
         &self,
         expr: &Expression,
@@ -65,13 +63,18 @@ impl ValidationEngine {
                 warnings.extend(result.warnings);
             }
         }
-        
+
         // Recursively validate child expressions with updated context
         match expr {
-            Expression::BooleanOp { operator, left, right, .. } => {
+            Expression::BooleanOp {
+                operator,
+                left,
+                right,
+                ..
+            } => {
                 let mut child_ctx = ctx.clone();
                 child_ctx.parent_operator = Some(operator.clone());
-                
+
                 self.walk_expression(left, &child_ctx, errors, warnings);
                 if let Some(right_expr) = right {
                     self.walk_expression(right_expr, &child_ctx, errors, warnings);
@@ -92,9 +95,7 @@ impl ValidationEngine {
                 field_ctx.field_context = Some(field.clone());
                 self.walk_expression(value, &field_ctx, errors, warnings);
             }
-            Expression::Range { .. } |
-            Expression::Term { .. } |
-            Expression::Comment { .. } => {
+            Expression::Range { .. } | Expression::Term { .. } | Expression::Comment { .. } => {
                 // Terminal nodes - no recursion needed
             }
         }

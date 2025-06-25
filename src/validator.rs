@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{LintError, LintReport};
-use crate::validation::{ValidationEngine, rules::PureNegativeRule};
+use crate::validation::{rules::PureNegativeRule, ValidationEngine};
 
 /// Validator for Brandwatch boolean queries
 /// Now uses a plugin-based validation system for better maintainability
@@ -19,15 +19,18 @@ impl Validator {
 
     pub fn validate(&mut self, query: &Query) -> LintReport {
         let mut report = self.engine.validate(query);
-        
+
         // Handle pure negative query check at the query level
-        if self.pure_negative_rule.is_pure_negative_query(&query.expression) {
+        if self
+            .pure_negative_rule
+            .is_pure_negative_query(&query.expression)
+        {
             report.errors.push(LintError::ValidationError {
                 span: query.span.clone(),
                 message: "Queries must contain at least one non-excluded term".to_string(),
             });
         }
-        
+
         report
     }
 }
@@ -50,10 +53,10 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(!report.has_errors());
     }
 
@@ -63,10 +66,10 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.has_errors());
     }
 
@@ -76,10 +79,10 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.is_clean());
     }
 
@@ -89,12 +92,14 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.to_string().contains("AND and OR operators cannot be mixed")));
+        assert!(report.errors.iter().any(|e| e
+            .to_string()
+            .contains("AND and OR operators cannot be mixed")));
     }
 
     #[test]
@@ -103,12 +108,14 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.to_string().contains("must contain at least one non-excluded term")));
+        assert!(report.errors.iter().any(|e| e
+            .to_string()
+            .contains("must contain at least one non-excluded term")));
     }
 
     #[test]
@@ -117,12 +124,14 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.to_string().contains("Latitude must be between -90 and 90")));
+        assert!(report.errors.iter().any(|e| e
+            .to_string()
+            .contains("Latitude must be between -90 and 90")));
     }
 
     #[test]
@@ -131,12 +140,15 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.to_string().contains("must be 'true' or 'false'")));
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.to_string().contains("must be 'true' or 'false'")));
     }
 
     #[test]
@@ -145,12 +157,14 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.to_string().contains("wildcards cannot be at the beginning")));
+        assert!(report.errors.iter().any(|e| e
+            .to_string()
+            .contains("wildcards cannot be at the beginning")));
     }
 
     #[test]
@@ -159,11 +173,14 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-        
+
         assert!(!report.warnings.is_empty());
-        assert!(report.warnings.iter().any(|w| format!("{:?}", w).contains("performance")));
+        assert!(report
+            .warnings
+            .iter()
+            .any(|w| format!("{:?}", w).contains("performance")));
     }
 }

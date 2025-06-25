@@ -17,9 +17,9 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { 
-            tokens, 
-            current: 0, 
+        Self {
+            tokens,
+            current: 0,
             implicit_and_spans: Vec::new(),
         }
     }
@@ -28,7 +28,7 @@ impl Parser {
     pub fn parse(&mut self) -> LintResult<ParseResult> {
         let expression = self.parse_expression()?;
         let span = expression.span().clone();
-        
+
         // Ensure we've consumed all tokens except EOF
         if !self.is_at_end() && !matches!(self.peek().token_type, TokenType::Eof) {
             return Err(LintError::UnexpectedToken {
@@ -63,7 +63,7 @@ impl Parser {
             let operator = BooleanOperator::Or;
             let operator_span = self.previous().span.clone();
             let right = self.parse_and_expression()?;
-            
+
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
             left = Expression::BooleanOp {
                 operator,
@@ -82,13 +82,13 @@ impl Parser {
         loop {
             // Skip any comments between expressions
             self.skip_comments();
-            
+
             if self.match_token(&TokenType::And) {
                 // Explicit AND
                 let operator = BooleanOperator::And;
                 let operator_span = self.previous().span.clone();
                 let right = self.parse_not_expression()?;
-                
+
                 let span = Span::new(left.span().start.clone(), right.span().end.clone());
                 left = Expression::BooleanOp {
                     operator,
@@ -99,7 +99,7 @@ impl Parser {
             } else if self.is_implicit_and_candidate() {
                 // Implicit AND (space-separated terms)
                 let right = self.parse_not_expression()?;
-                
+
                 let span = Span::new(left.span().start.clone(), right.span().end.clone());
                 left = Expression::BooleanOp {
                     operator: BooleanOperator::And,
@@ -107,7 +107,7 @@ impl Parser {
                     right: Some(Box::new(right)),
                     span: span.clone(),
                 };
-                
+
                 // Mark this for warning generation
                 self.implicit_and_spans.push(span);
             } else {
@@ -123,11 +123,13 @@ impl Parser {
         if self.match_token(&TokenType::Not) {
             let operator_span = self.previous().span.clone();
             let dummy_left = Expression::Term {
-                term: Term::Word { value: "".to_string() },
+                term: Term::Word {
+                    value: "".to_string(),
+                },
                 span: operator_span.clone(),
             };
             let right = self.parse_proximity_expression()?;
-            
+
             let span = Span::new(operator_span.start.clone(), right.span().end.clone());
             return Ok(Expression::BooleanOp {
                 operator: BooleanOperator::Not,
@@ -147,7 +149,7 @@ impl Parser {
             let operator = BooleanOperator::Not;
             let operator_span = self.previous().span.clone();
             let right = self.parse_proximity_expression()?;
-            
+
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
             left = Expression::BooleanOp {
                 operator,
@@ -167,31 +169,38 @@ impl Parser {
         if self.match_token(&TokenType::Tilde) {
             let tilde_span = self.previous().span.clone();
             let mut distance = None;
-            
+
             // Check for optional distance number
             if let TokenType::Number(num_str) = &self.peek().token_type {
                 distance = num_str.parse::<u32>().ok();
                 self.advance();
             }
-            
+
             // For tilde operator, we can have either:
             // 1. "quoted phrase"~5 (single term with proximity)
             // 2. term1 ~ term2 (two terms with proximity)
             let mut terms = vec![left];
             let mut end_span = tilde_span.end.clone();
-            
+
             // Check if there's a right-hand side term (not EOF or other operator)
-            if !self.is_at_end() && 
-               !matches!(self.peek().token_type, TokenType::And | TokenType::Or | TokenType::Not | 
-                        TokenType::RightParen | TokenType::LeftParen) {
+            if !self.is_at_end()
+                && !matches!(
+                    self.peek().token_type,
+                    TokenType::And
+                        | TokenType::Or
+                        | TokenType::Not
+                        | TokenType::RightParen
+                        | TokenType::LeftParen
+                )
+            {
                 if let Ok(right) = self.parse_primary() {
                     end_span = right.span().end.clone();
                     terms.push(right);
                 }
             }
-            
+
             let span = Span::new(terms[0].span().start.clone(), end_span);
-            
+
             return Ok(Expression::Proximity {
                 operator: ProximityOperator::Proximity { distance },
                 terms,
@@ -205,7 +214,7 @@ impl Parser {
             self.advance();
             let operator_span = self.previous().span.clone();
             let right = self.parse_primary()?;
-            
+
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
             return Ok(Expression::Proximity {
                 operator: ProximityOperator::Near { distance },
@@ -219,7 +228,7 @@ impl Parser {
             self.advance();
             let operator_span = self.previous().span.clone();
             let right = self.parse_primary()?;
-            
+
             let span = Span::new(left.span().start.clone(), right.span().end.clone());
             return Ok(Expression::Proximity {
                 operator: ProximityOperator::NearForward { distance },
@@ -236,7 +245,7 @@ impl Parser {
         if self.match_token(&TokenType::LeftParen) {
             let start_span = self.previous().span.clone();
             let expr = self.parse_expression()?;
-            
+
             if !self.match_token(&TokenType::RightParen) {
                 return Err(LintError::ExpectedToken {
                     span: self.peek().span.clone(),
@@ -244,10 +253,10 @@ impl Parser {
                     found: self.peek().token_type.to_string(),
                 });
             }
-            
+
             let end_span = self.previous().span.clone();
             let span = Span::new(start_span.start, end_span.end);
-            
+
             return Ok(Expression::Group {
                 expression: Box::new(expr),
                 span,
@@ -257,12 +266,12 @@ impl Parser {
         // Handle case-sensitive terms {word}
         if self.match_token(&TokenType::LeftBrace) {
             let start_span = self.previous().span.clone();
-            
+
             if let TokenType::Word(word) = &self.peek().token_type {
                 let word = word.clone();
                 self.advance();
                 let word_span = self.previous().span.clone();
-                
+
                 if !self.match_token(&TokenType::RightBrace) {
                     return Err(LintError::ExpectedToken {
                         span: self.peek().span.clone(),
@@ -270,10 +279,10 @@ impl Parser {
                         found: self.peek().token_type.to_string(),
                     });
                 }
-                
+
                 let end_span = self.previous().span.clone();
                 let span = Span::new(start_span.start, end_span.end);
-                
+
                 return Ok(Expression::Term {
                     term: Term::CaseSensitive { value: word },
                     span,
@@ -301,18 +310,24 @@ impl Parser {
         if let TokenType::Word(word) = &self.peek().token_type {
             let word = word.clone();
             let word_span = self.peek().span.clone();
-            
+
             // Look ahead for colon to determine if this is a field operation
             if self.peek_ahead(1).map(|t| &t.token_type) == Some(&TokenType::Colon) {
                 self.advance(); // consume field name
                 self.advance(); // consume colon
-                
+
                 // Always parse field operations, even for unknown fields
                 // Let validation catch unknown fields later
                 let value = Box::new(self.parse_primary()?);
-                
+
                 // If the value is a range, associate the field with it
-                let value = if let Expression::Range { start, end, span: range_span, .. } = value.as_ref() {
+                let value = if let Expression::Range {
+                    start,
+                    end,
+                    span: range_span,
+                    ..
+                } = value.as_ref()
+                {
                     if let Some(field_type) = FieldType::from_str(&word) {
                         Box::new(Expression::Range {
                             field: Some(field_type),
@@ -326,9 +341,9 @@ impl Parser {
                 } else {
                     value
                 };
-                
+
                 let span = Span::new(word_span.start, value.span().end.clone());
-                
+
                 // Create expression with known or unknown field
                 if let Some(field_type) = FieldType::from_str(&word) {
                     return Ok(Expression::Field {
@@ -339,11 +354,23 @@ impl Parser {
                 } else {
                     // For unknown fields, create a generic term and let validator handle it
                     return Ok(Expression::Term {
-                        term: Term::Word { value: format!("{}:{}", word, match value.as_ref() {
-                            Expression::Term { term: Term::Word { value }, .. } => value.clone(),
-                            Expression::Term { term: Term::Phrase { value }, .. } => format!("\"{}\"", value),
-                            _ => "unknown".to_string(),
-                        })},
+                        term: Term::Word {
+                            value: format!(
+                                "{}:{}",
+                                word,
+                                match value.as_ref() {
+                                    Expression::Term {
+                                        term: Term::Word { value },
+                                        ..
+                                    } => value.clone(),
+                                    Expression::Term {
+                                        term: Term::Phrase { value },
+                                        ..
+                                    } => format!("\"{}\"", value),
+                                    _ => "unknown".to_string(),
+                                }
+                            ),
+                        },
                         span,
                     });
                 }
@@ -356,7 +383,7 @@ impl Parser {
 
     fn parse_range(&mut self) -> LintResult<Expression> {
         let start_span = self.previous().span.clone(); // [
-        
+
         // Parse start value
         let start_value = match &self.peek().token_type {
             TokenType::Word(w) | TokenType::Number(w) => {
@@ -453,18 +480,24 @@ impl Parser {
 
     fn parse_term(&mut self) -> LintResult<Expression> {
         let token = self.peek().clone();
-        
+
         match &token.token_type {
             TokenType::Word(word) => {
                 self.advance();
                 let term = if word.contains('*') {
-                    Term::Wildcard { value: word.clone() }
+                    Term::Wildcard {
+                        value: word.clone(),
+                    }
                 } else if word.contains('?') {
-                    Term::Replacement { value: word.clone() }
+                    Term::Replacement {
+                        value: word.clone(),
+                    }
                 } else {
-                    Term::Word { value: word.clone() }
+                    Term::Word {
+                        value: word.clone(),
+                    }
                 };
-                
+
                 Ok(Expression::Term {
                     term,
                     span: token.span,
@@ -473,28 +506,36 @@ impl Parser {
             TokenType::QuotedString(string) => {
                 self.advance();
                 Ok(Expression::Term {
-                    term: Term::Phrase { value: string.clone() },
+                    term: Term::Phrase {
+                        value: string.clone(),
+                    },
                     span: token.span,
                 })
             }
             TokenType::Number(number) => {
                 self.advance();
                 Ok(Expression::Term {
-                    term: Term::Word { value: number.clone() },
+                    term: Term::Word {
+                        value: number.clone(),
+                    },
                     span: token.span,
                 })
             }
             TokenType::Hashtag(hashtag) => {
                 self.advance();
                 Ok(Expression::Term {
-                    term: Term::Hashtag { value: hashtag.clone() },
+                    term: Term::Hashtag {
+                        value: hashtag.clone(),
+                    },
                     span: token.span,
                 })
             }
             TokenType::Mention(mention) => {
                 self.advance();
                 Ok(Expression::Term {
-                    term: Term::Mention { value: mention.clone() },
+                    term: Term::Mention {
+                        value: mention.clone(),
+                    },
                     span: token.span,
                 })
             }
@@ -559,25 +600,24 @@ impl Parser {
         // but exclude operators that would end the current expression
         match &self.peek().token_type {
             // These tokens can start new terms (implicit AND candidates)
-            TokenType::Word(_) |
-            TokenType::QuotedString(_) |
-            TokenType::Number(_) |
-            TokenType::Hashtag(_) |
-            TokenType::Mention(_) |
-            TokenType::LeftParen |
-            TokenType::LeftBrace => true,
-            
+            TokenType::Word(_)
+            | TokenType::QuotedString(_)
+            | TokenType::Number(_)
+            | TokenType::Hashtag(_)
+            | TokenType::Mention(_)
+            | TokenType::LeftParen
+            | TokenType::LeftBrace => true,
+
             // These tokens end the current expression level
-            TokenType::Or |
-            TokenType::RightParen |
-            TokenType::RightBracket |
-            TokenType::RightBrace |
-            TokenType::Eof => false,
-            
+            TokenType::Or
+            | TokenType::RightParen
+            | TokenType::RightBracket
+            | TokenType::RightBrace
+            | TokenType::Eof => false,
+
             // AND and NOT are handled explicitly in their respective parsing methods
-            TokenType::And |
-            TokenType::Not => false,
-            
+            TokenType::And | TokenType::Not => false,
+
             // NEAR operators and other special cases
             _ => false,
         }
@@ -621,7 +661,7 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         match result.query.expression {
             Expression::BooleanOp { operator, .. } => {
                 assert_eq!(operator, BooleanOperator::And);
@@ -636,9 +676,12 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         match result.query.expression {
-            Expression::Term { term: Term::Phrase { value }, .. } => {
+            Expression::Term {
+                term: Term::Phrase { value },
+                ..
+            } => {
                 assert_eq!(value, "apple juice");
             }
             _ => panic!("Expected Term with Phrase"),
@@ -651,7 +694,7 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         match result.query.expression {
             Expression::Field { field, .. } => {
                 assert_eq!(field, FieldType::Title);
@@ -666,7 +709,7 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
-        
+
         // Should parse as implicit AND
         match result.query.expression {
             Expression::BooleanOp { operator, .. } => {
@@ -674,7 +717,7 @@ mod tests {
             }
             _ => panic!("Expected BooleanOp with implicit AND"),
         }
-        
+
         // Should have warning about implicit AND
         assert!(!result.warnings.is_empty());
     }

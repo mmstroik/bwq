@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{LintError, LintWarning};
-use crate::validation::{ValidationRule, ValidationContext, ValidationResult};
+use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
 // Rating field validation rule
 pub struct RatingFieldRule;
@@ -12,8 +12,16 @@ impl ValidationRule for RatingFieldRule {
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         match expr {
-            Expression::Field { field: FieldType::Rating, value, span } => {
-                if let Expression::Term { term: Term::Word { value: rating }, .. } = value.as_ref() {
+            Expression::Field {
+                field: FieldType::Rating,
+                value,
+                span,
+            } => {
+                if let Expression::Term {
+                    term: Term::Word { value: rating },
+                    ..
+                } = value.as_ref()
+                {
                     if let Ok(rating_num) = rating.parse::<i32>() {
                         if rating_num < 0 || rating_num > 5 {
                             return ValidationResult::with_error(LintError::ValidationError {
@@ -25,7 +33,12 @@ impl ValidationRule for RatingFieldRule {
                 }
                 ValidationResult::new()
             }
-            Expression::Range { field: Some(FieldType::Rating), start, end, span } => {
+            Expression::Range {
+                field: Some(FieldType::Rating),
+                start,
+                end,
+                span,
+            } => {
                 if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
                     if start_num < 0 || start_num > 5 || end_num < 0 || end_num > 5 {
                         return ValidationResult::with_error(LintError::ValidationError {
@@ -43,8 +56,13 @@ impl ValidationRule for RatingFieldRule {
     fn can_validate(&self, expr: &Expression) -> bool {
         matches!(
             expr,
-            Expression::Field { field: FieldType::Rating, .. } |
-            Expression::Range { field: Some(FieldType::Rating), .. }
+            Expression::Field {
+                field: FieldType::Rating,
+                ..
+            } | Expression::Range {
+                field: Some(FieldType::Rating),
+                ..
+            }
         )
     }
 }
@@ -60,23 +78,33 @@ impl ValidationRule for CoordinateFieldRule {
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         match expr {
             Expression::Field { field, value, span } => {
-                if let Expression::Term { term: Term::Word { value: coord }, .. } = value.as_ref() {
+                if let Expression::Term {
+                    term: Term::Word { value: coord },
+                    ..
+                } = value.as_ref()
+                {
                     if let Ok(coord_num) = coord.parse::<f64>() {
                         match field {
                             FieldType::Latitude => {
                                 if coord_num < -90.0 || coord_num > 90.0 {
-                                    return ValidationResult::with_error(LintError::ValidationError {
-                                        span: span.clone(),
-                                        message: "Latitude must be between -90 and 90".to_string(),
-                                    });
+                                    return ValidationResult::with_error(
+                                        LintError::ValidationError {
+                                            span: span.clone(),
+                                            message: "Latitude must be between -90 and 90"
+                                                .to_string(),
+                                        },
+                                    );
                                 }
                             }
                             FieldType::Longitude => {
                                 if coord_num < -180.0 || coord_num > 180.0 {
-                                    return ValidationResult::with_error(LintError::ValidationError {
-                                        span: span.clone(),
-                                        message: "Longitude must be between -180 and 180".to_string(),
-                                    });
+                                    return ValidationResult::with_error(
+                                        LintError::ValidationError {
+                                            span: span.clone(),
+                                            message: "Longitude must be between -180 and 180"
+                                                .to_string(),
+                                        },
+                                    );
                                 }
                             }
                             _ => {}
@@ -85,22 +113,37 @@ impl ValidationRule for CoordinateFieldRule {
                 }
                 ValidationResult::new()
             }
-            Expression::Range { field: Some(field), start, end, span } => {
+            Expression::Range {
+                field: Some(field),
+                start,
+                end,
+                span,
+            } => {
                 if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
                     match field {
                         FieldType::Latitude => {
-                            if start_num < -90.0 || start_num > 90.0 || end_num < -90.0 || end_num > 90.0 {
+                            if start_num < -90.0
+                                || start_num > 90.0
+                                || end_num < -90.0
+                                || end_num > 90.0
+                            {
                                 return ValidationResult::with_error(LintError::ValidationError {
                                     span: span.clone(),
-                                    message: "Latitude values must be between -90 and 90".to_string(),
+                                    message: "Latitude values must be between -90 and 90"
+                                        .to_string(),
                                 });
                             }
                         }
                         FieldType::Longitude => {
-                            if start_num < -180.0 || start_num > 180.0 || end_num < -180.0 || end_num > 180.0 {
+                            if start_num < -180.0
+                                || start_num > 180.0
+                                || end_num < -180.0
+                                || end_num > 180.0
+                            {
                                 return ValidationResult::with_error(LintError::ValidationError {
                                     span: span.clone(),
-                                    message: "Longitude values must be between -180 and 180".to_string(),
+                                    message: "Longitude values must be between -180 and 180"
+                                        .to_string(),
                                 });
                             }
                         }
@@ -116,8 +159,13 @@ impl ValidationRule for CoordinateFieldRule {
     fn can_validate(&self, expr: &Expression) -> bool {
         matches!(
             expr,
-            Expression::Field { field: FieldType::Latitude | FieldType::Longitude, .. } |
-            Expression::Range { field: Some(FieldType::Latitude | FieldType::Longitude), .. }
+            Expression::Field {
+                field: FieldType::Latitude | FieldType::Longitude,
+                ..
+            } | Expression::Range {
+                field: Some(FieldType::Latitude | FieldType::Longitude),
+                ..
+            }
         )
     }
 }
@@ -131,8 +179,17 @@ impl ValidationRule for LanguageFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Field { field: FieldType::Language, value, span } = expr {
-            if let Expression::Term { term: Term::Word { value: lang_code }, .. } = value.as_ref() {
+        if let Expression::Field {
+            field: FieldType::Language,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word { value: lang_code },
+                ..
+            } = value.as_ref()
+            {
                 if lang_code.len() != 2 || !lang_code.chars().all(|c| c.is_ascii_lowercase()) {
                     return ValidationResult::with_warning(LintWarning::PotentialTypo {
                         span: span.clone(),
@@ -145,7 +202,13 @@ impl ValidationRule for LanguageFieldRule {
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Field { field: FieldType::Language, .. })
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::Language,
+                ..
+            }
+        )
     }
 }
 
@@ -158,9 +221,21 @@ impl ValidationRule for AuthorGenderFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Field { field: FieldType::AuthorGender, value, span } = expr {
-            if let Expression::Term { term: Term::Word { value: gender }, .. } = value.as_ref() {
-                if !matches!(gender.as_str(), "F" | "M" | "f" | "m" | "X" | "x" | "U" | "u") {
+        if let Expression::Field {
+            field: FieldType::AuthorGender,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word { value: gender },
+                ..
+            } = value.as_ref()
+            {
+                if !matches!(
+                    gender.as_str(),
+                    "F" | "M" | "f" | "m" | "X" | "x" | "U" | "u"
+                ) {
                     return ValidationResult::with_warning(LintWarning::PotentialTypo {
                         span: span.clone(),
                         suggestion: "Common gender values are 'F', 'M', 'X', or 'U'".to_string(),
@@ -172,7 +247,13 @@ impl ValidationRule for AuthorGenderFieldRule {
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Field { field: FieldType::AuthorGender, .. })
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::AuthorGender,
+                ..
+            }
+        )
     }
 }
 
@@ -188,11 +269,18 @@ impl ValidationRule for BooleanFieldRule {
         if let Expression::Field { field, value, span } = expr {
             let is_boolean_field = matches!(
                 field,
-                FieldType::AuthorVerified | FieldType::RedditSpoiler | FieldType::SubredditNSFW | FieldType::SensitiveContent
+                FieldType::AuthorVerified
+                    | FieldType::RedditSpoiler
+                    | FieldType::SubredditNSFW
+                    | FieldType::SensitiveContent
             );
-            
+
             if is_boolean_field {
-                if let Expression::Term { term: Term::Word { value: bool_val }, .. } = value.as_ref() {
+                if let Expression::Term {
+                    term: Term::Word { value: bool_val },
+                    ..
+                } = value.as_ref()
+                {
                     if !matches!(bool_val.as_str(), "true" | "false") {
                         let field_name = field.as_str();
                         return ValidationResult::with_error(LintError::ValidationError {
@@ -210,7 +298,10 @@ impl ValidationRule for BooleanFieldRule {
         if let Expression::Field { field, .. } = expr {
             matches!(
                 field,
-                FieldType::AuthorVerified | FieldType::RedditSpoiler | FieldType::SubredditNSFW | FieldType::SensitiveContent
+                FieldType::AuthorVerified
+                    | FieldType::RedditSpoiler
+                    | FieldType::SubredditNSFW
+                    | FieldType::SensitiveContent
             )
         } else {
             false
@@ -227,9 +318,22 @@ impl ValidationRule for EngagementTypeFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Field { field: FieldType::EngagementType, value, span } = expr {
-            if let Expression::Term { term: Term::Word { value: engagement_type }, .. } = value.as_ref() {
-                let common_types = ["COMMENT", "REPLY", "RETWEET", "QUOTE", "LIKE", "SHARE", "MENTION"];
+        if let Expression::Field {
+            field: FieldType::EngagementType,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word {
+                    value: engagement_type,
+                },
+                ..
+            } = value.as_ref()
+            {
+                let common_types = [
+                    "COMMENT", "REPLY", "RETWEET", "QUOTE", "LIKE", "SHARE", "MENTION",
+                ];
                 if !common_types.contains(&engagement_type.as_str()) {
                     return ValidationResult::with_warning(LintWarning::PotentialTypo {
                         span: span.clone(),
@@ -242,7 +346,13 @@ impl ValidationRule for EngagementTypeFieldRule {
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Field { field: FieldType::EngagementType, .. })
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::EngagementType,
+                ..
+            }
+        )
     }
 }
 
@@ -255,12 +365,24 @@ impl ValidationRule for VerifiedTypeFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Field { field: FieldType::AuthorVerifiedType, value, span } = expr {
-            if let Expression::Term { term: Term::Word { value: verified_type }, .. } = value.as_ref() {
+        if let Expression::Field {
+            field: FieldType::AuthorVerifiedType,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word {
+                    value: verified_type,
+                },
+                ..
+            } = value.as_ref()
+            {
                 if !matches!(verified_type.as_str(), "blue" | "business" | "government") {
                     return ValidationResult::with_error(LintError::ValidationError {
                         span: span.clone(),
-                        message: "authorVerifiedType must be 'blue', 'business', or 'government'".to_string(),
+                        message: "authorVerifiedType must be 'blue', 'business', or 'government'"
+                            .to_string(),
                     });
                 }
             }
@@ -269,7 +391,13 @@ impl ValidationRule for VerifiedTypeFieldRule {
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Field { field: FieldType::AuthorVerifiedType, .. })
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::AuthorVerifiedType,
+                ..
+            }
+        )
     }
 }
 
@@ -282,7 +410,13 @@ impl ValidationRule for MinuteOfDayFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Range { field: Some(FieldType::MinuteOfDay), start, end, span } = expr {
+        if let Expression::Range {
+            field: Some(FieldType::MinuteOfDay),
+            start,
+            end,
+            span,
+        } = expr
+        {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
                 if start_num < 0 || start_num > 1439 || end_num < 0 || end_num > 1439 {
                     return ValidationResult::with_error(LintError::ValidationError {
@@ -296,7 +430,13 @@ impl ValidationRule for MinuteOfDayFieldRule {
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Range { field: Some(FieldType::MinuteOfDay), .. })
+        matches!(
+            expr,
+            Expression::Range {
+                field: Some(FieldType::MinuteOfDay),
+                ..
+            }
+        )
     }
 }
 
@@ -309,7 +449,10 @@ impl ValidationRule for RangeFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Range { start, end, span, .. } = expr {
+        if let Expression::Range {
+            start, end, span, ..
+        } = expr
+        {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
                 if start_num > end_num {
                     return ValidationResult::with_error(LintError::ValidationError {
