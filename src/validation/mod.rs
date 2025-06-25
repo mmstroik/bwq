@@ -6,21 +6,11 @@ pub mod rules;
 
 pub use engine::ValidationEngine;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ValidationContext {
     pub inside_group: bool,
     pub parent_operator: Option<BooleanOperator>,
     pub field_context: Option<FieldType>,
-}
-
-impl Default for ValidationContext {
-    fn default() -> Self {
-        Self {
-            inside_group: false,
-            parent_operator: None,
-            field_context: None,
-        }
-    }
 }
 
 pub trait ValidationRule {

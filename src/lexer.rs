@@ -329,17 +329,16 @@ impl Lexer {
             "NOT" => TokenType::Not,
             "TO" => TokenType::To,
             _ => {
-                if value.starts_with("NEAR/") {
+                if let Some(stripped) = value.strip_prefix("NEAR/") {
                     if value.ends_with('f') && value.len() > 6 {
-                        let distance_str = &value[5..value.len() - 1];
+                        let distance_str = &stripped[..stripped.len() - 1];
                         if let Ok(distance) = distance_str.parse::<u32>() {
                             TokenType::NearForward(distance)
                         } else {
                             TokenType::Word(value.clone())
                         }
                     } else if value.len() > 5 {
-                        let distance_str = &value[5..];
-                        if let Ok(distance) = distance_str.parse::<u32>() {
+                        if let Ok(distance) = stripped.parse::<u32>() {
                             TokenType::Near(distance)
                         } else {
                             TokenType::Word(value.clone())

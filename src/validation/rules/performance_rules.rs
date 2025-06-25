@@ -147,7 +147,7 @@ impl ValidationRule for ShortTermRule {
                             if parts.len() == 2 {
                                 let field_part = parts[0];
                                 if !field_part.is_empty()
-                                    && FieldType::from_str(field_part).is_none()
+                                    && FieldType::parse(field_part).is_none()
                                 {
                                     result.errors.push(LintError::ValidationError {
                                         span: span.clone(),

@@ -23,7 +23,7 @@ impl ValidationRule for RatingFieldRule {
                 } = value.as_ref()
                 {
                     if let Ok(rating_num) = rating.parse::<i32>() {
-                        if rating_num < 0 || rating_num > 5 {
+                        if !(0..=5).contains(&rating_num) {
                             return ValidationResult::with_error(LintError::ValidationError {
                                 span: span.clone(),
                                 message: "Rating must be between 0 and 5".to_string(),
@@ -40,7 +40,7 @@ impl ValidationRule for RatingFieldRule {
                 span,
             } => {
                 if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
-                    if start_num < 0 || start_num > 5 || end_num < 0 || end_num > 5 {
+                    if !(0..=5).contains(&start_num) || !(0..=5).contains(&end_num) {
                         return ValidationResult::with_error(LintError::ValidationError {
                             span: span.clone(),
                             message: "Rating values must be between 0 and 5".to_string(),
@@ -86,7 +86,7 @@ impl ValidationRule for CoordinateFieldRule {
                     if let Ok(coord_num) = coord.parse::<f64>() {
                         match field {
                             FieldType::Latitude => {
-                                if coord_num < -90.0 || coord_num > 90.0 {
+                                if !(-90.0..=90.0).contains(&coord_num) {
                                     return ValidationResult::with_error(
                                         LintError::ValidationError {
                                             span: span.clone(),
@@ -97,7 +97,7 @@ impl ValidationRule for CoordinateFieldRule {
                                 }
                             }
                             FieldType::Longitude => {
-                                if coord_num < -180.0 || coord_num > 180.0 {
+                                if !(-180.0..=180.0).contains(&coord_num) {
                                     return ValidationResult::with_error(
                                         LintError::ValidationError {
                                             span: span.clone(),
@@ -122,10 +122,8 @@ impl ValidationRule for CoordinateFieldRule {
                 if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
                     match field {
                         FieldType::Latitude => {
-                            if start_num < -90.0
-                                || start_num > 90.0
-                                || end_num < -90.0
-                                || end_num > 90.0
+                            if !(-90.0..=90.0).contains(&start_num)
+                                || !(-90.0..=90.0).contains(&end_num)
                             {
                                 return ValidationResult::with_error(LintError::ValidationError {
                                     span: span.clone(),
@@ -135,10 +133,8 @@ impl ValidationRule for CoordinateFieldRule {
                             }
                         }
                         FieldType::Longitude => {
-                            if start_num < -180.0
-                                || start_num > 180.0
-                                || end_num < -180.0
-                                || end_num > 180.0
+                            if !(-180.0..=180.0).contains(&start_num)
+                                || !(-180.0..=180.0).contains(&end_num)
                             {
                                 return ValidationResult::with_error(LintError::ValidationError {
                                     span: span.clone(),
@@ -418,7 +414,7 @@ impl ValidationRule for MinuteOfDayFieldRule {
         } = expr
         {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
-                if start_num < 0 || start_num > 1439 || end_num < 0 || end_num > 1439 {
+                if !(0..=1439).contains(&start_num) || !(0..=1439).contains(&end_num) {
                     return ValidationResult::with_error(LintError::ValidationError {
                         span: span.clone(),
                         message: "minuteOfDay values must be between 0 and 1439".to_string(),

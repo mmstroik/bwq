@@ -357,7 +357,7 @@ impl Parser {
                     ..
                 } = value.as_ref()
                 {
-                    if let Some(field_type) = FieldType::from_str(&word) {
+                    if let Some(field_type) = FieldType::parse(&word) {
                         Box::new(Expression::Range {
                             field: Some(field_type),
                             start: start.clone(),
@@ -373,7 +373,7 @@ impl Parser {
 
                 let span = Span::new(word_span.start, value.span().end.clone());
 
-                if let Some(field_type) = FieldType::from_str(&word) {
+                if let Some(field_type) = FieldType::parse(&word) {
                     return Ok(Expression::Field {
                         field: field_type,
                         value,

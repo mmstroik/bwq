@@ -198,6 +198,7 @@ impl ValidationRule for PureNegativeRule {
 }
 
 impl PureNegativeRule {
+    #[allow(clippy::only_used_in_recursion)]
     pub fn is_pure_negative_query(&self, expr: &Expression) -> bool {
         match expr {
             // For binary NOT, check if we're starting with a NOT operation at the top level
@@ -230,7 +231,7 @@ impl PureNegativeRule {
                 self.is_pure_negative_query(left)
                     && right
                         .as_ref()
-                        .map_or(true, |r| self.is_pure_negative_query(r))
+                        .is_none_or(|r| self.is_pure_negative_query(r))
             }
             Expression::BooleanOp {
                 operator: BooleanOperator::Or,
@@ -241,7 +242,7 @@ impl PureNegativeRule {
                 self.is_pure_negative_query(left)
                     && right
                         .as_ref()
-                        .map_or(true, |r| self.is_pure_negative_query(r))
+                        .is_none_or(|r| self.is_pure_negative_query(r))
             }
             Expression::Group { expression, .. } => self.is_pure_negative_query(expression),
             _ => false,
