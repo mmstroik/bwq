@@ -1,11 +1,19 @@
 [package]
 name = "bwq-lint"
-version = "0.1.0"
-edition = "2021"
+version = "0.1.1"
 authors = ["Milo Stroik <mmstroik@gmail.com>"]
+edition = "2021"
 description = "A linter and parser for Brandwatch query files (.bwq)"
-license = "MIT"
 repository = "https://github.com/mmstroik/bwq-lint"
+license = "MIT"
+
+[lib]
+name = "bwq_lint"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bwq-lint"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
@@ -16,16 +24,7 @@ thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["full"] }
 tower-lsp = "0.20.0"
 
-
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 tempfile = "3.20.0"
 
-
-[[bin]]
-name = "bwq-lint"
-path = "src/main.rs"
-
-[lib]
-name = "bwq_lint"
-path = "src/lib.rs"
