@@ -20,7 +20,6 @@ impl Validator {
     pub fn validate(&mut self, query: &Query) -> LintReport {
         let mut report = self.engine.validate(query);
 
-        // Handle pure negative query check at the query level
         if self
             .pure_negative_rule
             .is_pure_negative_query(&query.expression)

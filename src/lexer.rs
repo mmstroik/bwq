@@ -116,7 +116,6 @@ impl Lexer {
         while !self.is_at_end() {
             match self.next_token()? {
                 Some(token) => {
-                    // Skip whitespace tokens for now
                     if !matches!(token.token_type, TokenType::Whitespace) {
                         tokens.push(token);
                     }
@@ -125,7 +124,6 @@ impl Lexer {
             }
         }
 
-        // Add EOF token
         let eof_pos = self.current_position();
         tokens.push(Token::new(
             TokenType::Eof,
@@ -392,7 +390,10 @@ impl Lexer {
         self.column += 1;
 
         while !self.is_at_end()
-            && (self.current_char().is_alphanumeric() || self.current_char() == '_')
+            && (self.current_char().is_alphanumeric()
+                || self.current_char() == '_'
+                || self.current_char() == '*'
+                || self.current_char() == '?')
         {
             value.push(self.current_char());
             self.advance();
@@ -415,7 +416,10 @@ impl Lexer {
         self.column += 1;
 
         while !self.is_at_end()
-            && (self.current_char().is_alphanumeric() || self.current_char() == '_')
+            && (self.current_char().is_alphanumeric()
+                || self.current_char() == '_'
+                || self.current_char() == '*'
+                || self.current_char() == '?')
         {
             value.push(self.current_char());
             self.advance();
@@ -506,7 +510,7 @@ mod tests {
         let mut lexer = Lexer::new("apple AND juice");
         let tokens = lexer.tokenize().unwrap();
 
-        assert_eq!(tokens.len(), 4); // apple, AND, juice, EOF
+        assert_eq!(tokens.len(), 4);
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "apple"));
         assert!(matches!(tokens[1].token_type, TokenType::And));
         assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "juice"));
@@ -518,7 +522,7 @@ mod tests {
         let mut lexer = Lexer::new("\"apple juice\"");
         let tokens = lexer.tokenize().unwrap();
 
-        assert_eq!(tokens.len(), 2); // quoted string, EOF
+        assert_eq!(tokens.len(), 2);
         assert!(
             matches!(tokens[0].token_type, TokenType::QuotedString(ref s) if s == "apple juice")
         );
@@ -529,7 +533,7 @@ mod tests {
         let mut lexer = Lexer::new("NEAR/5 NEAR/3f");
         let tokens = lexer.tokenize().unwrap();
 
-        assert_eq!(tokens.len(), 3); // NEAR/5, NEAR/3f, EOF
+        assert_eq!(tokens.len(), 3);
         assert!(matches!(tokens[0].token_type, TokenType::Near(5)));
         assert!(matches!(tokens[1].token_type, TokenType::NearForward(3)));
     }

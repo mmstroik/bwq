@@ -157,8 +157,7 @@ fn test_validation_warnings() {
     let report = linter.lint("authorFollowers:[1 TO 2000000000]").unwrap();
     assert!(!report.warnings.is_empty());
 
-    let report = linter.lint("languag:e").unwrap(); // Potential typo in field name
-                                                    // This should generate an error for unknown field
+    let report = linter.lint("languag:e").unwrap();
     assert!(report.has_errors());
 }
 
@@ -291,11 +290,9 @@ fn test_analysis_result_formatting() {
 fn test_performance_edge_cases() {
     let mut linter = BrandwatchLinter::new();
 
-    // Very long proximity distances should generate warnings
     let report = linter.lint("apple NEAR/150 juice").unwrap();
-    assert!(!report.warnings.is_empty());
+    assert!(report.warnings.is_empty());
 
-    // Multiple wildcards in OR should generate performance warning
     let report = linter.lint("apple* OR juice*").unwrap();
     assert!(!report.warnings.is_empty());
 
@@ -304,10 +301,26 @@ fn test_performance_edge_cases() {
 }
 
 #[test]
+fn test_wildcard_position_validation() {
+    let mut linter = BrandwatchLinter::new();
+
+    let report = linter.lint("tes*t").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.warnings.is_empty());
+
+    let report = linter.lint("#test*").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.warnings.is_empty());
+
+    let report = linter.lint("#*test").unwrap();
+    assert!(!report.has_errors());
+    assert!(!report.warnings.is_empty());
+}
+
+#[test]
 fn test_empty_and_whitespace_queries() {
     let mut linter = BrandwatchLinter::new();
 
-    // These should fail at the parsing level
     assert!(!linter.is_valid(""));
     assert!(!linter.is_valid("   "));
     assert!(!linter.is_valid("\n\t"));
@@ -570,7 +583,6 @@ fn test_range_operators_in_complex_contexts() {
     // Complex range combinations
     assert!(is_valid_query("(((rating:[4 TO 5] AND authorFollowers:[1000 TO 50000]) OR (rating:[3 TO 5] AND authorVerified:true)) AND ((engagementType:RETWEET OR engagementType:QUOTE) AND language:en)) AND ((minuteOfDay:[480 TO 720] OR minuteOfDay:[1080 TO 1320]) AND country:usa)"));
 
-    // Geographic ranges with complex logic
     assert!(is_valid_query("(((latitude:[40 TO 42] AND longitude:[-75 TO -73]) OR (latitude:[51 TO 53] AND longitude:[-1 TO 1])) AND ((city:\"new york\" OR city:london) AND language:en)) AND authorVerified:true"));
 }
 
@@ -578,19 +590,16 @@ fn test_range_operators_in_complex_contexts() {
 fn test_performance_warnings_in_complex_queries() {
     let mut linter = BrandwatchLinter::new();
 
-    // Complex query with performance issues should still validate but warn
     let report = linter
         .lint("((ab* OR bc*) AND (cd* OR de*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))")
         .unwrap();
     assert!(!report.has_errors());
     assert!(!report.warnings.is_empty());
 
-    // Single character terms in complex context (should not warn)
     let report = linter
         .lint("((a OR b) AND (c OR d)) AND ((e NEAR/5 f) OR (g AND h))")
         .unwrap();
     assert!(!report.has_errors());
-    // Single character terms without wildcards should not generate warnings
     assert!(report.warnings.is_empty());
 }
 

@@ -12,55 +12,50 @@ impl ValidationRule for WildcardPerformanceRule {
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         match expr {
-            Expression::Term { term, span } => {
-                match term {
-                    Term::Wildcard { value } => {
-                        let mut result = ValidationResult::new();
+            Expression::Term { term, span } => match term {
+                Term::Wildcard { value } => {
+                    let mut result = ValidationResult::new();
 
-                        // Check for wildcards at the beginning
-                        if value.starts_with('*') {
-                            result
-                                .errors
-                                .push(LintError::InvalidWildcardPlacement { span: span.clone() });
-                        }
+                    if value.starts_with('*') {
+                        result
+                            .errors
+                            .push(LintError::InvalidWildcardPlacement { span: span.clone() });
+                    }
 
-                        let parts: Vec<&str> = value.split('*').collect();
-                        for part in parts {
-                            if !part.is_empty() {
-                                if part.len() == 1 {
-                                    result.errors.push(LintError::ValidationError {
+                    let parts: Vec<&str> = value.split('*').collect();
+                    if let Some(first_part) = parts.first() {
+                        if !first_part.is_empty() {
+                            if first_part.len() == 1 {
+                                result.errors.push(LintError::ValidationError {
                                         span: span.clone(),
                                         message: "This wildcard matches too many unique terms. Please make it more specific.".to_string(),
                                     });
-                                    break;
-                                } else if part.len() == 2 {
-                                    result.warnings.push(LintWarning::PerformanceWarning {
-                                        span: span.clone(),
-                                        message: "Short wildcard terms may impact performance"
-                                            .to_string(),
-                                    });
-                                    break;
-                                }
+                            } else if first_part.len() == 2 {
+                                result.warnings.push(LintWarning::PerformanceWarning {
+                                    span: span.clone(),
+                                    message: "Short wildcard terms may impact performance"
+                                        .to_string(),
+                                });
                             }
                         }
+                    }
 
-                        result
-                    }
-                    Term::Replacement { value } => {
-                        let question_count = value.chars().filter(|&c| c == '?').count();
-                        if question_count > 3 {
-                            ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                                span: span.clone(),
-                                message: "Multiple replacement characters may impact performance"
-                                    .to_string(),
-                            })
-                        } else {
-                            ValidationResult::new()
-                        }
-                    }
-                    _ => ValidationResult::new(),
+                    result
                 }
-            }
+                Term::Replacement { value } => {
+                    let question_count = value.chars().filter(|&c| c == '?').count();
+                    if question_count > 3 {
+                        ValidationResult::with_warning(LintWarning::PerformanceWarning {
+                            span: span.clone(),
+                            message: "Multiple replacement characters may impact performance"
+                                .to_string(),
+                        })
+                    } else {
+                        ValidationResult::new()
+                    }
+                }
+                _ => ValidationResult::new(),
+            },
             Expression::BooleanOp {
                 operator: BooleanOperator::Or,
                 left,
@@ -115,39 +110,8 @@ impl ValidationRule for ProximityDistanceRule {
         "proximity-distance"
     }
 
-    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Proximity { operator, span, .. } = expr {
-            match operator {
-                ProximityOperator::Near { distance }
-                | ProximityOperator::NearForward { distance } => {
-                    if *distance > 100 {
-                        ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                            span: span.clone(),
-                            message: "Very large proximity distances may impact performance"
-                                .to_string(),
-                        })
-                    } else {
-                        ValidationResult::new()
-                    }
-                }
-                ProximityOperator::Proximity {
-                    distance: Some(distance),
-                } => {
-                    if *distance > 100 {
-                        ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                            span: span.clone(),
-                            message: "Very large proximity distances may impact performance"
-                                .to_string(),
-                        })
-                    } else {
-                        ValidationResult::new()
-                    }
-                }
-                _ => ValidationResult::new(),
-            }
-        } else {
-            ValidationResult::new()
-        }
+    fn validate(&self, _expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        ValidationResult::new()
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
@@ -211,6 +175,11 @@ impl ValidationRule for ShortTermRule {
                                 span: span.clone(),
                                 message: "Hashtag cannot be empty".to_string(),
                             })
+                        } else if value.starts_with('*') || value.starts_with('?') {
+                            ValidationResult::with_warning(LintWarning::PerformanceWarning {
+                                span: span.clone(),
+                                message: "Wildcard usage after '#' is discouraged and may lead to unexpected results".to_string(),
+                            })
                         } else {
                             ValidationResult::new()
                         }
@@ -220,6 +189,11 @@ impl ValidationRule for ShortTermRule {
                             ValidationResult::with_error(LintError::ValidationError {
                                 span: span.clone(),
                                 message: "Mention cannot be empty".to_string(),
+                            })
+                        } else if value.starts_with('*') || value.starts_with('?') {
+                            ValidationResult::with_warning(LintWarning::PerformanceWarning {
+                                span: span.clone(),
+                                message: "Wildcard usage after '@' is discouraged and may lead to unexpected results".to_string(),
                             })
                         } else {
                             ValidationResult::new()

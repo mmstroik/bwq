@@ -162,7 +162,7 @@
     "case-sensitive": {
       "patterns": [
         {
-          "name": "comment.line.case-sensitive.bwq",
+          "name": "markup.italic.case-sensitive.bwq",
           "begin": "\\{",
           "end": "\\}",
           "captures": {
