@@ -176,25 +176,48 @@ impl Parser {
                 self.advance();
             }
 
-            let mut terms = vec![left];
-            let mut end_span = tilde_span.end.clone();
+            // Validate tilde usage according to Brandwatch rules
+            // Tilde is only valid:
+            // 1. After quoted phrases for proximity: "apple juice"~5
+            // 2. After grouped expressions for proximity: ((apple OR orange) AND (smartphone OR phone))~5
+            // 3. After single terms for fuzzy matching: apple~5 (but NOT apple ~5 juice)
 
-            if !self.is_at_end()
-                && !matches!(
-                    self.peek().token_type,
-                    TokenType::And
-                        | TokenType::Or
-                        | TokenType::Not
-                        | TokenType::RightParen
-                        | TokenType::LeftParen
-                )
-            {
-                if let Ok(right) = self.parse_primary() {
-                    end_span = right.span().end.clone();
-                    terms.push(right);
+            let is_valid_tilde_context = match &left {
+                // Valid: quoted phrases
+                Expression::Term {
+                    term: Term::Phrase { .. },
+                    ..
+                } => true,
+                // Valid: grouped expressions
+                Expression::Group { .. } => true,
+                // Valid: single terms for fuzzy matching (no additional terms after tilde)
+                Expression::Term { .. } => {
+                    // Check if there are additional terms after the tilde
+                    // If so, this is invalid syntax like "apple ~5 juice"
+                    self.is_at_end()
+                        || matches!(
+                            self.peek().token_type,
+                            TokenType::And
+                                | TokenType::Or
+                                | TokenType::Not
+                                | TokenType::RightParen
+                                | TokenType::LeftParen
+                                | TokenType::Eof
+                        )
                 }
+                _ => false,
+            };
+
+            if !is_valid_tilde_context {
+                // This handles the invalid case like "apple ~5 juice"
+                return Err(LintError::ValidationError {
+                    span: tilde_span,
+                    message: "The ~ character should be used after a search term or quoted phrase (to specify fuzzy matching), or after a sub-query (to specify proximity matching). If this should be part of a search term, it must be quoted (or escaped using the \\ character).".to_string(),
+                });
             }
 
+            let terms = vec![left];
+            let end_span = tilde_span.end.clone();
             let span = Span::new(terms[0].span().start.clone(), end_span);
 
             return Ok(Expression::Proximity {
@@ -321,7 +344,7 @@ impl Parser {
                     ..
                 } = value.as_ref()
                 {
-                    if let Some(field_type) = FieldType::from_str(&word) {
+                    if let Some(field_type) = FieldType::parse(&word) {
                         Box::new(Expression::Range {
                             field: Some(field_type),
                             start: start.clone(),
@@ -337,7 +360,7 @@ impl Parser {
 
                 let span = Span::new(word_span.start, value.span().end.clone());
 
-                if let Some(field_type) = FieldType::from_str(&word) {
+                if let Some(field_type) = FieldType::parse(&word) {
                     return Ok(Expression::Field {
                         field: field_type,
                         value,

@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod error;
 pub mod lexer;
+pub mod lsp;
 pub mod parser;
 pub mod validation;
 pub mod validator;
@@ -9,6 +10,8 @@ use error::{LintError, LintReport, LintResult};
 use lexer::Lexer;
 use parser::Parser;
 use validator::Validator;
+
+pub use lsp::LspServer;
 
 pub struct BrandwatchLinter {
     validator: Validator,
@@ -42,6 +45,15 @@ impl BrandwatchLinter {
     }
 
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {
+        if query.trim().is_empty() {
+            return AnalysisResult {
+                is_valid: true,
+                errors: Vec::new(),
+                warnings: Vec::new(),
+                query: Some(query.to_string()),
+            };
+        }
+
         match self.lint(query) {
             Ok(report) => AnalysisResult {
                 is_valid: !report.has_errors(),

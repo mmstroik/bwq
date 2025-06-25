@@ -68,6 +68,9 @@ enum Commands {
         #[arg(long, default_value = "*.bwq")]
         pattern: String,
     },
+
+    /// Start LSP server
+    Lsp,
 }
 
 fn main() {
@@ -105,11 +108,22 @@ fn main() {
         }) => {
             lint_directory(&path, !no_warnings, &format, &pattern);
         }
+        Some(Commands::Lsp) => {
+            if let Err(e) = bwq_lint::lsp::LspServer::run() {
+                eprintln!("LSP server error: {}", e);
+                std::process::exit(1);
+            }
+        }
         None => {
             if let Some(input) = cli.input {
                 auto_detect_and_process(&input, !cli.no_warnings, &cli.format, &cli.pattern);
             } else {
-                lint_directory(&PathBuf::from("."), !cli.no_warnings, &cli.format, &cli.pattern);
+                lint_directory(
+                    &PathBuf::from("."),
+                    !cli.no_warnings,
+                    &cli.format,
+                    &cli.pattern,
+                );
             }
         }
     }
@@ -122,7 +136,7 @@ fn auto_detect_and_process(input: &str, show_warnings: bool, format: &str, patte
         if path.is_file() {
             lint_file(&path.to_path_buf(), show_warnings, format);
         } else if path.is_dir() {
-            lint_directory(&path.to_path_buf(), show_warnings, format, pattern);
+            lint_directory(path, show_warnings, format, pattern);
         }
     } else if contains_glob_pattern(input) {
         lint_directory(&PathBuf::from("."), show_warnings, format, input);
@@ -142,7 +156,7 @@ fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
         "json" => {
             output_json(&analysis);
         }
-        "text" | _ => {
+        _ => {
             output_text(&analysis, show_warnings);
         }
     }
@@ -179,7 +193,7 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
             });
             println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
         }
-        "text" | _ => {
+        _ => {
             println!("File: {}", path.display());
             output_text(&analysis, show_warnings);
             println!();
@@ -191,7 +205,7 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
     }
 }
 
-fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &str) {
+fn lint_directory(path: &Path, show_warnings: bool, format: &str, pattern: &str) {
     let search_pattern = if path.display().to_string() == "." {
         format!("**/{}", pattern)
     } else {
@@ -281,7 +295,7 @@ fn lint_directory(path: &PathBuf, show_warnings: bool, format: &str, pattern: &s
 
             println!("{}", serde_json::to_string_pretty(&summary).unwrap());
         }
-        "text" | _ => {
+        _ => {
             for (file_path, analysis, _) in results {
                 if !analysis.is_valid || (show_warnings && !analysis.warnings.is_empty()) {
                     println!("File: {}", file_path.display());

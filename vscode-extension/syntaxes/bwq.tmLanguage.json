@@ -1,0 +1,201 @@
+{
+  "name": "Brandwatch Query Language",
+  "scopeName": "source.bwq",
+  "fileTypes": ["bwq"],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#field-operators"
+    },
+    {
+      "include": "#proximity-operators"
+    },
+    {
+      "include": "#brackets"
+    },
+    {
+      "include": "#wildcards"
+    },
+    {
+      "include": "#case-sensitive"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#hashtags"
+    },
+    {
+      "include": "#mentions"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.bwq",
+          "begin": "<<<",
+          "end": ">>>",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.bwq"
+            }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.bwq",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.bwq",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.logical.bwq",
+          "match": "\\b(AND|OR|NOT)\\b"
+        },
+        {
+          "name": "keyword.operator.proximity.bwq",
+          "match": "\\bNEAR/\\d+f?\\b"
+        },
+        {
+          "name": "keyword.operator.range.bwq",
+          "match": "\\bTO\\b"
+        }
+      ]
+    },
+    "field-operators": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.field.location.bwq",
+          "match": "\\b(continent|country|region|city|latitude|longitude):"
+        },
+        {
+          "name": "entity.name.tag.field.content.bwq",
+          "match": "\\b(title|site|url|channelId|author|links):"
+        },
+        {
+          "name": "entity.name.tag.field.metadata.bwq",
+          "match": "\\b(language|rating|minuteOfDay|pubType|publication):"
+        },
+        {
+          "name": "entity.name.tag.field.social.bwq",
+          "match": "\\b(authorGender|authorVerified|authorVerifiedType|authorFollowers|engagementType|engagingWith|engagingWithGuid|guid):"
+        },
+        {
+          "name": "entity.name.tag.field.tumblr.bwq",
+          "match": "\\b(blogName|parentBlogName|rootBlogName|parentPostId|rootPostId|tags):"
+        },
+        {
+          "name": "entity.name.tag.field.media.bwq",
+          "match": "\\b(brandIds|objects|imageType|publisherSubType):"
+        },
+        {
+          "name": "entity.name.tag.field.reddit.bwq",
+          "match": "\\b(redditAuthorFlair|redditPostFlair|redditSpoiler|subreddit|subredditNSFW|subredditTopics|weblogTitle):"
+        },
+        {
+          "name": "entity.name.tag.field.other.bwq",
+          "match": "\\b(itemReview|topLevelDomain|sensitiveContent):"
+        }
+      ]
+    },
+    "proximity-operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.proximity.tilde.bwq",
+          "match": "~\\d+"
+        }
+      ]
+    },
+    "brackets": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.group.begin.bwq",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.definition.group.end.bwq",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.definition.range.begin.bwq",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.definition.range.end.bwq",
+          "match": "\\]"
+        }
+      ]
+    },
+    "wildcards": {
+      "patterns": [
+        {
+          "name": "keyword.operator.wildcard.bwq",
+          "match": "\\*"
+        },
+        {
+          "name": "keyword.operator.replacement.bwq",
+          "match": "\\?"
+        }
+      ]
+    },
+    "case-sensitive": {
+      "patterns": [
+        {
+          "name": "markup.italic.case-sensitive.bwq",
+          "begin": "\\{",
+          "end": "\\}",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.case-sensitive.bwq"
+            }
+          }
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.bwq",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "hashtags": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.hashtag.bwq",
+          "match": "#\\w+"
+        }
+      ]
+    },
+    "mentions": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.mention.bwq",
+          "match": "@\\w+"
+        }
+      ]
+    }
+  }
+}

@@ -28,7 +28,6 @@ impl ValidationEngine {
                 Box::new(BinaryOperatorRule),
                 // Performance validation rules
                 Box::new(WildcardPerformanceRule),
-                Box::new(ProximityDistanceRule),
                 Box::new(ShortTermRule),
                 Box::new(RangePerformanceRule),
             ],

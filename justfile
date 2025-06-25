@@ -31,10 +31,21 @@ examples:
 # Compare our linter with Brandwatch API validation (auto-detects input type)
 compare query-or-file:
 	@echo "=== Our Linter ==="
-	@cargo run -- "{{query-or-file}}" || true
+	@just compare-our '{{query-or-file}}' || true
 	@echo ""
 	@echo "=== Brandwatch API ==="
-	@just compare-bw "{{query-or-file}}" || true
+	@just compare-bw '{{query-or-file}}' || true
+
+# Helper for our linter comparison (handles glob patterns in queries)
+compare-our query-or-file:
+	#!/usr/bin/env bash
+	if [ -f "{{query-or-file}}" ]; then
+		cargo run -- file "{{query-or-file}}"
+	elif [[ "{{query-or-file}}" == *"*"* ]] || [[ "{{query-or-file}}" == *"?"* ]] || [[ "{{query-or-file}}" == *"["* ]] || [[ "{{query-or-file}}" == *"{"* ]]; then
+		cargo run -- lint "{{query-or-file}}"
+	else
+		cargo run -- "{{query-or-file}}"
+	fi
 
 # Helper for BW API comparison
 compare-bw query-or-file:

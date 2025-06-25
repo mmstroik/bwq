@@ -151,15 +151,13 @@ fn test_invalid_queries() {
 fn test_validation_warnings() {
     let mut linter = BrandwatchLinter::new();
 
-    // Test performance warnings
-    let report = linter.lint("a*").unwrap(); // Short wildcard
+    let report = linter.lint("ab*").unwrap();
     assert!(!report.warnings.is_empty());
 
-    let report = linter.lint("authorFollowers:[1 TO 2000000000]").unwrap(); // Very large range
+    let report = linter.lint("authorFollowers:[1 TO 2000000000]").unwrap();
     assert!(!report.warnings.is_empty());
 
-    let report = linter.lint("languag:e").unwrap(); // Potential typo in field name
-                                                    // This should generate an error for unknown field
+    let report = linter.lint("languag:e").unwrap();
     assert!(report.has_errors());
 }
 
@@ -292,16 +290,30 @@ fn test_analysis_result_formatting() {
 fn test_performance_edge_cases() {
     let mut linter = BrandwatchLinter::new();
 
-    // Very long proximity distances should generate warnings
     let report = linter.lint("apple NEAR/150 juice").unwrap();
-    assert!(!report.warnings.is_empty());
+    assert!(report.warnings.is_empty());
 
-    // Multiple wildcards in OR should generate performance warning
     let report = linter.lint("apple* OR juice*").unwrap();
     assert!(!report.warnings.is_empty());
 
-    // Single character terms should generate performance warning
     let report = linter.lint("a").unwrap();
+    assert!(report.warnings.is_empty());
+}
+
+#[test]
+fn test_wildcard_position_validation() {
+    let mut linter = BrandwatchLinter::new();
+
+    let report = linter.lint("tes*t").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.warnings.is_empty());
+
+    let report = linter.lint("#test*").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.warnings.is_empty());
+
+    let report = linter.lint("#*test").unwrap();
+    assert!(!report.has_errors());
     assert!(!report.warnings.is_empty());
 }
 
@@ -309,7 +321,6 @@ fn test_performance_edge_cases() {
 fn test_empty_and_whitespace_queries() {
     let mut linter = BrandwatchLinter::new();
 
-    // These should fail at the parsing level
     assert!(!linter.is_valid(""));
     assert!(!linter.is_valid("   "));
     assert!(!linter.is_valid("\n\t"));
@@ -572,7 +583,6 @@ fn test_range_operators_in_complex_contexts() {
     // Complex range combinations
     assert!(is_valid_query("(((rating:[4 TO 5] AND authorFollowers:[1000 TO 50000]) OR (rating:[3 TO 5] AND authorVerified:true)) AND ((engagementType:RETWEET OR engagementType:QUOTE) AND language:en)) AND ((minuteOfDay:[480 TO 720] OR minuteOfDay:[1080 TO 1320]) AND country:usa)"));
 
-    // Geographic ranges with complex logic
     assert!(is_valid_query("(((latitude:[40 TO 42] AND longitude:[-75 TO -73]) OR (latitude:[51 TO 53] AND longitude:[-1 TO 1])) AND ((city:\"new york\" OR city:london) AND language:en)) AND authorVerified:true"));
 }
 
@@ -580,19 +590,17 @@ fn test_range_operators_in_complex_contexts() {
 fn test_performance_warnings_in_complex_queries() {
     let mut linter = BrandwatchLinter::new();
 
-    // Complex query with performance issues should still validate but warn
     let report = linter
-        .lint("((a* OR b*) AND (c* OR d*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))")
+        .lint("((ab* OR bc*) AND (cd* OR de*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))")
         .unwrap();
     assert!(!report.has_errors());
     assert!(!report.warnings.is_empty());
 
-    // Single character terms in complex context
     let report = linter
         .lint("((a OR b) AND (c OR d)) AND ((e NEAR/5 f) OR (g AND h))")
         .unwrap();
     assert!(!report.has_errors());
-    assert!(!report.warnings.is_empty());
+    assert!(report.warnings.is_empty());
 }
 
 #[test]
@@ -651,6 +659,31 @@ fn test_tilde_proximity_operators() {
 
     // Tilde with complex expressions
     assert!(is_valid_query("((tech OR technology) AND innovation)~7"));
+}
+
+#[test]
+fn test_invalid_tilde_syntax() {
+    let mut linter = BrandwatchLinter::new();
+
+    // Invalid: tilde between separate terms (this was the bug we fixed)
+    // This should now fail parsing, so we check the error directly
+    assert!(!linter.is_valid("apple ~5 juice"));
+    assert!(!linter.is_valid("word1 ~10 word2"));
+
+    // Verify the specific error message
+    match linter.lint("apple ~5 juice") {
+        Err(error) => {
+            assert!(error
+                .to_string()
+                .contains("The ~ character should be used after a search term or quoted phrase"));
+        }
+        Ok(_) => panic!("Expected parsing error for invalid tilde syntax"),
+    }
+
+    // These should still be valid (no regression)
+    assert!(linter.is_valid("\"apple juice\"~5")); // Quoted phrase
+    assert!(linter.is_valid("apple~5")); // Single term fuzzy
+    assert!(linter.is_valid("((apple OR orange) AND phone)~5")); // Group
 }
 
 #[test]

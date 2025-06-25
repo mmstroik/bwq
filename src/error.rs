@@ -87,7 +87,7 @@ pub enum LintWarning {
 
 pub type LintResult<T> = Result<T, LintError>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct LintReport {
     pub errors: Vec<LintError>,
     pub warnings: Vec<LintWarning>,

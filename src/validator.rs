@@ -20,7 +20,6 @@ impl Validator {
     pub fn validate(&mut self, query: &Query) -> LintReport {
         let mut report = self.engine.validate(query);
 
-        // Handle pure negative query check at the query level
         if self
             .pure_negative_rule
             .is_pure_negative_query(&query.expression)
@@ -169,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_performance_warnings() {
-        let mut lexer = Lexer::new("a*");
+        let mut lexer = Lexer::new("ab*");
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let result = parser.parse().unwrap();
