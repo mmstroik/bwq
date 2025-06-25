@@ -3,6 +3,7 @@ pub mod error;
 pub mod lexer;
 pub mod parser;
 pub mod validator;
+pub mod validation;
 
 use error::{LintError, LintReport, LintResult};
 use lexer::Lexer;
