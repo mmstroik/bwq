@@ -1,6 +1,6 @@
 # bwq-lint
 
-brandwatch boolean search query linter written in rust.
+brandwatch boolean search query linter and LSP written in rust.
 
 ## install
 
@@ -26,10 +26,10 @@ bwq-lint --no-warnings
 
 ## operators
 
-boolean: `AND`, `OR`, `NOT`
-proximity: `~`, `NEAR/x`, `NEAR/xf`
-wildcards: `*`, `?`
-fields: `title:`, `site:`, `rating:[1 TO 5]`
-special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
+- boolean: `AND`, `OR`, `NOT`
+- proximity: `~`, `NEAR/x`, `NEAR/xf`
+- wildcards: `*`, `?`
+- fields: `title:`, `site:`, `rating:[1 TO 5]`
+- special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 
 run `bwq-lint examples` for more
