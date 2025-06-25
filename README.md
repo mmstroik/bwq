@@ -1,6 +1,6 @@
 # bwq-lint
 
-brandwatch query linter written in rust.
+brandwatch boolean search query linter written in rust.
 
 ## install
 
