@@ -68,6 +68,9 @@ enum Commands {
         #[arg(long, default_value = "*.bwq")]
         pattern: String,
     },
+
+    /// Start LSP server
+    Lsp,
 }
 
 fn main() {
@@ -105,11 +108,22 @@ fn main() {
         }) => {
             lint_directory(&path, !no_warnings, &format, &pattern);
         }
+        Some(Commands::Lsp) => {
+            if let Err(e) = bwq_lint::lsp::LspServer::run() {
+                eprintln!("LSP server error: {}", e);
+                std::process::exit(1);
+            }
+        }
         None => {
             if let Some(input) = cli.input {
                 auto_detect_and_process(&input, !cli.no_warnings, &cli.format, &cli.pattern);
             } else {
-                lint_directory(&PathBuf::from("."), !cli.no_warnings, &cli.format, &cli.pattern);
+                lint_directory(
+                    &PathBuf::from("."),
+                    !cli.no_warnings,
+                    &cli.format,
+                    &cli.pattern,
+                );
             }
         }
     }
