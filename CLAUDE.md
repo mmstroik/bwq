@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Rust-based linter and parser for Brandwatch boolean search queries. It validates query syntax, provides detailed error reporting with position information, and supports all Brandwatch operators including boolean operations, proximity searches, field operations, and wildcards.
+This is a Rust-based linter and parser for Brandwatch query files (.bwq). It validates query syntax, provides detailed error reporting with position information, and supports all Brandwatch operators including boolean operations, proximity searches, field operations, and wildcards.
 
 ## Key Commands
 
@@ -20,20 +20,20 @@ Linting and validation:
 ```bash
 just lint "query"         # Lint a query with warnings
 just validate "query"     # Validate query (exit code 0/1)
-just compare "query"      # Compare linter vs Brandwatch API
 ```
 
-**Shell Escaping Issues:** If encountering shell parsing issues with special characters (like `~`, quotes, etc.), create a `.bq` file with the query content and test using:
+**File Processing:** For complex multi-line queries or shell escaping issues, use .bwq files:
 ```bash
-bw-bool lint "$(cat query.bq)"     # Test from file
-bw-bool lint *.bq                  # Test multiple .bq files
+bwq-lint query.bwq                  # Auto-detects and lints .bwq file
+bwq-lint tests/fixtures             # Auto-detects and processes directory  
+bwq-lint "*.bwq"                    # Auto-detects glob pattern
 ```
 
 Installation and usage:
 ```bash
 just install              # Install globally via cargo
-bw-bool lint "query"      # Use installed binary
-bw-bool interactive       # Interactive mode
+bwq-lint "query"          # Use installed binary (auto-detects input type)
+bwq-lint interactive      # Interactive mode
 ```
 
 ## Architecture
@@ -56,32 +56,33 @@ The codebase follows a classic compiler architecture:
 
 **Implicit AND Support:** The parser supports space-separated terms as implicit AND operations (for Brandwatch compatibility) but generates warnings encouraging explicit operators. This is handled in `parse_and_expression()` via `is_implicit_and_candidate()`.
 
-**Field Validation:** Comprehensive field-specific validation (ratings 1-5, coordinates, language codes, etc.) with both errors and performance warnings.
+**Field Validation:** Comprehensive field-specific validation (ratings 0-5, coordinates, language codes, etc.) with both errors and performance warnings.
 
 **Position Tracking:** All errors include precise position information (line, column, offset) via the `Span` system for excellent user experience.
 
 ## Testing Strategy
 
 - **Unit tests** in each module for core functionality
-- **Integration tests** (`tests/integration_tests.rs`) with real-world queries including user-provided edge cases
-- **API comparison** (`test_alignment.sh`) to validate against actual Brandwatch API behavior
-- **Implicit AND behavior tests** specifically validate the space-separated term handling
+- **Integration tests** (`tests/integration_tests.rs`) with real-world queries and edge cases
+- **Test fixtures** (`tests/fixtures/*.bwq`) for multi-line queries and complex scenarios
+- **File processing tests** validate .bwq file handling and directory processing
 
 ## Key Files
 
 - `brandwatch-query-operators.md` - Complete operator reference (do not modify)
-- `justfile` - Development commands and API comparison tools
-- `test_queries.txt` - Sample queries for testing (if exists)
+- `justfile` - Development commands and build tools
+- `tests/fixtures/*.bwq` - Test fixture files for complex queries
 
 ## Validation Rules
 
 The validator implements strict Brandwatch-specific rules:
 - Boolean operators must be capitalized (AND, OR, NOT)
 - Wildcards cannot start words (*invalid)
-- Rating values must be 1-5
+- Rating values must be 0-5
 - Coordinate ranges for latitude/longitude
 - Proximity distance limits and performance warnings
-- Field-specific value validation (gender: F/M, language: ISO codes, etc.)
+- Mixed operators require parentheses (AND/OR, NEAR/OR combinations)
+- Field-specific value validation (language: ISO codes, etc.)
 
 ## Notes for Future Development
 
@@ -89,8 +90,6 @@ When modifying the parser, remember that NOT is binary, not unary. When adding n
 
 ## Claude Guidance
 
-- It is very very very important that you use `just compare "query"` often rather than making assumptions
-
-## Memories
-
-- Reference/read `./brandwatch-query-operators.md` often for guidance on list of operators and general syntax
+- Always reference `./brandwatch-query-operators.md` for operator syntax and behavior
+- Use test fixtures in `tests/fixtures/` for testing complex scenarios
+- When adding validation rules, ensure alignment with actual Brandwatch API behavior

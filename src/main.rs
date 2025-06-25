@@ -1,20 +1,47 @@
-use bw_bool::{analyze_query, BrandwatchLinter};
+use bwq_lint::{analyze_query, BrandwatchLinter};
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
-#[command(name = "bw-bool")]
-#[command(about = "A linter for Brandwatch boolean search queries")]
+#[command(name = "bwq-lint")]
+#[command(about = "A linter for Brandwatch query files (.bwq)")]
 #[command(version = "0.1.0")]
 struct Cli {
+    /// Input to analyze - can be a query string, file path, directory, or glob pattern
+    input: Option<String>,
+    
+    #[arg(short, long)]
+    warnings: bool,
+    
+    #[arg(short, long, default_value = "text")]
+    format: String,
+    
+    #[arg(long, default_value = "*.bwq")]
+    pattern: String,
+    
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Run in interactive mode
+    Interactive {
+        #[arg(short, long)]
+        warnings: bool,
+    },
+    
+    /// Validate a query (returns exit code 0/1)
+    Validate {
+        query: String,
+    },
+    
+    /// Show example queries
+    Examples,
+    
+    /// Lint a specific query string (explicit)
     Lint {
         query: String,
         #[arg(short, long)]
@@ -23,6 +50,7 @@ enum Commands {
         format: String,
     },
     
+    /// Lint a specific file (explicit)
     File {
         path: PathBuf,
         #[arg(short, long)]
@@ -31,6 +59,7 @@ enum Commands {
         format: String,
     },
     
+    /// Lint a directory (explicit)
     Dir {
         #[arg(short, long, default_value = ".")]
         path: PathBuf,
@@ -38,45 +67,67 @@ enum Commands {
         warnings: bool,
         #[arg(short, long, default_value = "text")]
         format: String,
-        #[arg(long, default_value = "*.bq")]
+        #[arg(long, default_value = "*.bwq")]
         pattern: String,
     },
-    
-    Interactive {
-        #[arg(short, long)]
-        warnings: bool,
-    },
-    
-    Validate {
-        query: String,
-    },
-    
-    Examples,
 }
 
 fn main() {
     let cli = Cli::parse();
     
     match cli.command {
-        Commands::Lint { query, warnings, format } => {
-            lint_single_query(&query, warnings, &format);
-        }
-        Commands::File { path, warnings, format } => {
-            lint_file(&path, warnings, &format);
-        }
-        Commands::Dir { path, warnings, format, pattern } => {
-            lint_directory(&path, warnings, &format, &pattern);
-        }
-        Commands::Interactive { warnings } => {
+        Some(Commands::Interactive { warnings }) => {
             interactive_mode(warnings);
         }
-        Commands::Validate { query } => {
+        Some(Commands::Validate { query }) => {
             validate_query(&query);
         }
-        Commands::Examples => {
+        Some(Commands::Examples) => {
             show_examples();
         }
+        Some(Commands::Lint { query, warnings, format }) => {
+            lint_single_query(&query, warnings, &format);
+        }
+        Some(Commands::File { path, warnings, format }) => {
+            lint_file(&path, warnings, &format);
+        }
+        Some(Commands::Dir { path, warnings, format, pattern }) => {
+            lint_directory(&path, warnings, &format, &pattern);
+        }
+        None => {
+            // Auto-detection mode
+            if let Some(input) = cli.input {
+                auto_detect_and_process(&input, cli.warnings, &cli.format, &cli.pattern);
+            } else {
+                // No input provided, show help or run interactive mode
+                interactive_mode(cli.warnings);
+            }
+        }
     }
+}
+
+fn auto_detect_and_process(input: &str, show_warnings: bool, format: &str, pattern: &str) {
+    let path = Path::new(input);
+    
+    if path.exists() {
+        if path.is_file() {
+            // Input is an existing file
+            lint_file(&path.to_path_buf(), show_warnings, format);
+        } else if path.is_dir() {
+            // Input is an existing directory
+            lint_directory(&path.to_path_buf(), show_warnings, format, pattern);
+        }
+    } else if contains_glob_pattern(input) {
+        // Input contains glob patterns, treat as pattern in current directory
+        lint_directory(&PathBuf::from("."), show_warnings, format, input);
+    } else {
+        // Input is a query string
+        lint_single_query(input, show_warnings, format);
+    }
+}
+
+fn contains_glob_pattern(input: &str) -> bool {
+    input.contains('*') || input.contains('?') || input.contains('[') || input.contains('{')
 }
 
 fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
@@ -249,7 +300,7 @@ fn interactive_mode(show_warnings: bool) {
     let mut stdout = io::stdout();
     
     loop {
-        print!("bw-bool> ");
+        print!("bwq-lint> ");
         stdout.flush().unwrap();
         
         let mut line = String::new();
@@ -300,7 +351,7 @@ fn validate_query(query: &str) {
     }
 }
 
-fn output_text(analysis: &bw_bool::AnalysisResult, show_warnings: bool) {
+fn output_text(analysis: &bwq_lint::AnalysisResult, show_warnings: bool) {
     println!("{}", analysis.summary());
     
     if !analysis.errors.is_empty() {
@@ -318,7 +369,7 @@ fn output_text(analysis: &bw_bool::AnalysisResult, show_warnings: bool) {
     }
 }
 
-fn output_json(analysis: &bw_bool::AnalysisResult) {
+fn output_json(analysis: &bwq_lint::AnalysisResult) {
     let json_output = serde_json::json!({
         "valid": analysis.is_valid,
         "summary": analysis.summary(),

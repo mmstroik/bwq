@@ -1,4 +1,4 @@
-use bw_bool::{analyze_query, is_valid_query, BrandwatchLinter};
+use bwq_lint::{analyze_query, is_valid_query, BrandwatchLinter};
 use std::fs;
 
 #[test]
@@ -642,30 +642,30 @@ fn test_near_operator_interaction_validation() {
 
 #[test]
 fn test_bq_file_fixtures() {
-    let valid_multiline = fs::read_to_string("tests/fixtures/valid_multiline.bq").unwrap();
+    let valid_multiline = fs::read_to_string("tests/fixtures/valid_multiline.bwq").unwrap();
     assert!(is_valid_query(&valid_multiline), "Multi-line query should be valid");
     
-    let complex_near = fs::read_to_string("tests/fixtures/complex_near.bq").unwrap();
+    let complex_near = fs::read_to_string("tests/fixtures/complex_near.bwq").unwrap();
     assert!(is_valid_query(&complex_near), "Complex NEAR query should be valid");
     
-    let field_operations = fs::read_to_string("tests/fixtures/field_operations.bq").unwrap();
+    let field_operations = fs::read_to_string("tests/fixtures/field_operations.bwq").unwrap();
     assert!(is_valid_query(&field_operations), "Field operations query should be valid");
     
-    let comments_and_wildcards = fs::read_to_string("tests/fixtures/comments_and_wildcards.bq").unwrap();
+    let comments_and_wildcards = fs::read_to_string("tests/fixtures/comments_and_wildcards.bwq").unwrap();
     assert!(is_valid_query(&comments_and_wildcards), "Comments and wildcards query should be valid");
     
-    let invalid_mixed = fs::read_to_string("tests/fixtures/invalid_mixed_operators.bq").unwrap();
+    let invalid_mixed = fs::read_to_string("tests/fixtures/invalid_mixed_operators.bwq").unwrap();
     assert!(!is_valid_query(&invalid_mixed), "Mixed operators without parentheses should be invalid");
 }
 
 #[test]
 fn test_bq_file_analysis() {
-    let complex_near = fs::read_to_string("tests/fixtures/complex_near.bq").unwrap();
+    let complex_near = fs::read_to_string("tests/fixtures/complex_near.bwq").unwrap();
     let analysis = analyze_query(&complex_near);
     assert!(analysis.is_valid);
     assert!(!analysis.has_issues());
     
-    let invalid_mixed = fs::read_to_string("tests/fixtures/invalid_mixed_operators.bq").unwrap();
+    let invalid_mixed = fs::read_to_string("tests/fixtures/invalid_mixed_operators.bwq").unwrap();
     let analysis = analyze_query(&invalid_mixed);
     assert!(!analysis.is_valid);
     assert!(analysis.has_issues());

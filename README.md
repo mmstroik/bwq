@@ -1,6 +1,6 @@
-# bw-bool
+# bwq-lint
 
-brandwatch boolean search query linter in rust.
+brandwatch query linter written in rust.
 
 ## install
 
@@ -11,58 +11,24 @@ cargo install --path .
 ## usage
 
 ```bash
-# lint a single query
-bw-bool lint "apple AND juice"
+# auto-detects input type (file, dir, string)
+bwq-lint "apple AND juice"     # query string
+bwq-lint query.bwq             # file
+bwq-lint tests/fixtures        # directory
+bwq-lint "*.bwq"               # glob pattern
 
-# validate query (exit code 0/1)
-bw-bool validate "apple AND juice"
-
-# lint queries from file
-bw-bool file test_queries.txt
-
-# interactive mode
-bw-bool interactive
-
-# show examples
-bw-bool examples
+# explicit commands still work
+bwq-lint validate "apple AND juice"
+bwq-lint interactive
+bwq-lint examples
 ```
 
-## justfile commands
+## operators
 
-```bash
-# build and test
-just build
-just test
+boolean: `AND`, `OR`, `NOT`
+proximity: `~`, `NEAR/x`, `NEAR/xf`
+wildcards: `*`, `?`
+fields: `title:`, `site:`, `rating:[1 TO 5]`
+special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 
-# lint queries
-just lint "your query here"
-just lint-file
-
-# compare with brandwatch api
-just compare "your query here"
-
-# development
-just dev
-```
-
-## features
-
-- comprehensive lexer for all brandwatch operators
-- ast-based parser with validation
-- detailed error reporting with position info
-- performance warnings
-- cli with multiple output formats
-- integration tests with real queries
-
-## operators supported
-
-- boolean: `AND`, `OR`, `NOT`
-- proximity: `~`, `NEAR/x`, `NEAR/xf`
-- wildcards: `*`, `?`
-- case sensitive: `{word}`
-- fields: `title:`, `site:`, `author:`, etc.
-- ranges: `[x TO y]`
-- comments: `<<<text>>>`
-- special chars: `#hashtag`, `@mention`
-
-see `bw-bool examples` for comprehensive list.
+run `bwq-lint examples` for more

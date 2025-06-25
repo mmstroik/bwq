@@ -1,6 +1,6 @@
 set dotenv-load
 
-# Build the Brandwatch boolean query linter
+# Build the Brandwatch query linter
 build:
 	cargo build --release
 
@@ -8,17 +8,13 @@ build:
 test:
 	cargo test
 
-# Run the linter on a specific query
-lint query:
-	cargo run -- lint "{{query}}" --warnings
+# Run the linter on a query, file, or directory (auto-detects input type)
+lint query-or-file:
+	cargo run -- "{{query-or-file}}" --warnings
 
 # Validate a query (returns exit code 0 if valid, 1 if invalid)
 validate query:
 	cargo run -- validate "{{query}}"
-
-# Run the linter on the test queries file
-lint-file:
-	cargo run -- file test_queries.txt --warnings
 
 # Run the linter in interactive mode
 interactive:
@@ -28,13 +24,22 @@ interactive:
 examples:
 	cargo run -- examples
 
-# Compare our linter with Brandwatch API validation
-compare query:
+# Compare our linter with Brandwatch API validation (auto-detects input type)
+compare query-or-file:
 	@echo "=== Our Linter ==="
-	@cargo run -- lint "{{query}}" --warnings || true
+	@cargo run -- "{{query-or-file}}" --warnings || true
 	@echo ""
 	@echo "=== Brandwatch API ==="
-	@just bw-validate "{{query}}" || true
+	@just compare-bw "{{query-or-file}}" || true
+
+# Helper for BW API comparison
+compare-bw query-or-file:
+	#!/usr/bin/env bash
+	if [ -f "{{query-or-file}}" ]; then
+		just bw-validate "$(cat '{{query-or-file}}')"
+	else
+		just bw-validate "{{query-or-file}}"
+	fi
 
 # validate a query using the Brandwatch API (for comparison during development)
 bw-validate query:

@@ -1,11 +1,11 @@
 [package]
-name = "bw-bool"
+name = "bwq-lint"
 version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
-description = "A linter and parser for Brandwatch boolean search queries"
+description = "A linter and parser for Brandwatch query files (.bwq)"
 license = "MIT"
-repository = "https://github.com/your-repo/bw-bool"
+repository = "https://github.com/your-repo/bwq-lint"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
@@ -21,9 +21,9 @@ pretty_assertions = "1.0"
 tempfile = "3.0"
 
 [[bin]]
-name = "bw-bool"
+name = "bwq-lint"
 path = "src/main.rs"
 
 [lib]
-name = "bw_bool"
+name = "bwq_lint"
 path = "src/lib.rs"
