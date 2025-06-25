@@ -662,6 +662,31 @@ fn test_tilde_proximity_operators() {
 }
 
 #[test]
+fn test_invalid_tilde_syntax() {
+    let mut linter = BrandwatchLinter::new();
+
+    // Invalid: tilde between separate terms (this was the bug we fixed)
+    // This should now fail parsing, so we check the error directly
+    assert!(!linter.is_valid("apple ~5 juice"));
+    assert!(!linter.is_valid("word1 ~10 word2"));
+
+    // Verify the specific error message
+    match linter.lint("apple ~5 juice") {
+        Err(error) => {
+            assert!(error
+                .to_string()
+                .contains("The ~ character should be used after a search term or quoted phrase"));
+        }
+        Ok(_) => panic!("Expected parsing error for invalid tilde syntax"),
+    }
+
+    // These should still be valid (no regression)
+    assert!(linter.is_valid("\"apple juice\"~5")); // Quoted phrase
+    assert!(linter.is_valid("apple~5")); // Single term fuzzy
+    assert!(linter.is_valid("((apple OR orange) AND phone)~5")); // Group
+}
+
+#[test]
 fn test_extreme_deep_nesting() {
     // Test 6+ level deep nesting that should work perfectly
     assert!(is_valid_query("((((((apple OR orange) AND fresh) OR (banana AND ripe)) AND (juice OR smoothie)) OR ((grape AND sweet) AND drink)) AND healthy)"));
