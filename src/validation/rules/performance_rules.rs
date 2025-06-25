@@ -102,23 +102,6 @@ impl ValidationRule for WildcardPerformanceRule {
     }
 }
 
-// Proximity distance performance validation rule
-pub struct ProximityDistanceRule;
-
-impl ValidationRule for ProximityDistanceRule {
-    fn name(&self) -> &'static str {
-        "proximity-distance"
-    }
-
-    fn validate(&self, _expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        ValidationResult::new()
-    }
-
-    fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Proximity { .. })
-    }
-}
-
 // Short term performance validation rule
 pub struct ShortTermRule;
 

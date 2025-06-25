@@ -218,21 +218,8 @@ impl Parser {
 
             let terms = vec![left];
             let end_span = tilde_span.end.clone();
-
-            // For single terms, this should be fuzzy matching, not proximity with additional terms
-            if let Expression::Term { .. } = &terms[0] {
-                // Single term fuzzy matching: just return the single term with distance
-                let span = Span::new(terms[0].span().start.clone(), end_span);
-                return Ok(Expression::Proximity {
-                    operator: ProximityOperator::Proximity { distance },
-                    terms,
-                    span,
-                });
-            }
-
-            // For quoted phrases and groups, we can have proximity matching
-            // but we don't consume additional terms after the tilde
             let span = Span::new(terms[0].span().start.clone(), end_span);
+
             return Ok(Expression::Proximity {
                 operator: ProximityOperator::Proximity { distance },
                 terms,
