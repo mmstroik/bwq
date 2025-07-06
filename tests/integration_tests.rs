@@ -1,4 +1,4 @@
-use bwq_lint::{analyze_query, is_valid_query, BrandwatchLinter};
+use bwq::{analyze_query, is_valid_query, BrandwatchLinter};
 use std::fs;
 
 #[test]

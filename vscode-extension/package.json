@@ -1,20 +1,20 @@
 {
-  "name": "bwq-lint",
-  "displayName": "BWQ Lint",
+  "name": "bwq",
+  "displayName": "Brandwatch Query Language",
   "description": "Brandwatch Query Language support with linting and syntax highlighting",
   "version": "0.1.0",
   "publisher": "mmstroik",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mmstroik/bwq-lint"
+    "url": "https://github.com/mmstroik/bwq"
   },
   "engines": {
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages",
-    "Linters"
+    "Languages",
+    "Language Packs"
   ],
   "keywords": [
     "brandwatch",
@@ -46,14 +46,14 @@
       }
     ],
     "configuration": {
-      "title": "BWQ Lint",
+      "title": "Brandwatch Query Language",
       "properties": {
-        "bwqLint.serverPath": {
+        "bwq.serverPath": {
           "type": "string",
-          "default": "bwq-lint",
-          "description": "Path to the bwq-lint executable"
+          "default": "bwq",
+          "description": "Path to the bwq executable"
         },
-        "bwqLint.trace.server": {
+        "bwq.trace.server": {
           "scope": "window",
           "type": "string",
           "enum": [

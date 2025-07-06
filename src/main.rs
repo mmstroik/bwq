@@ -1,32 +1,41 @@
-use bwq_lint::{analyze_query, BrandwatchLinter};
+use bwq::{analyze_query, BrandwatchLinter};
 use clap::{Parser, Subcommand};
+use ignore::WalkBuilder;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
-#[command(name = "bwq-lint")]
+#[command(name = "bwq")]
 #[command(about = "A linter for Brandwatch query files (.bwq)")]
-#[command(version = "0.1.0")]
+#[command(version = "0.2.0")]
 struct Cli {
-    /// Input to analyze - can be a query string, file path, directory, or glob pattern
-    input: Option<String>,
-
-    #[arg(long)]
-    no_warnings: bool,
-
-    #[arg(short, long, default_value = "text")]
-    format: String,
-
-    #[arg(long, default_value = "*.bwq")]
-    pattern: String,
-
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Lint files, directories, or queries (default)
+    #[command(name = "check")]
+    Check {
+        /// List of files or directories to check [default: .]
+        files: Vec<PathBuf>,
+
+        /// Lint a query string directly
+        #[arg(long)]
+        query: Option<String>,
+
+        #[arg(long)]
+        no_warnings: bool,
+
+        #[arg(long, default_value = "text")]
+        output_format: String,
+
+        #[arg(long, default_value = "*.bwq")]
+        pattern: String,
+    },
+
     /// Run in interactive mode
     Interactive {
         #[arg(long)]
@@ -39,36 +48,6 @@ enum Commands {
     /// Show example queries
     Examples,
 
-    /// Lint a specific query string (explicit)
-    Lint {
-        query: String,
-        #[arg(long)]
-        no_warnings: bool,
-        #[arg(short, long, default_value = "text")]
-        format: String,
-    },
-
-    /// Lint a specific file (explicit)
-    File {
-        path: PathBuf,
-        #[arg(long)]
-        no_warnings: bool,
-        #[arg(short, long, default_value = "text")]
-        format: String,
-    },
-
-    /// Lint a directory (explicit)
-    Dir {
-        #[arg(short, long, default_value = ".")]
-        path: PathBuf,
-        #[arg(long)]
-        no_warnings: bool,
-        #[arg(short, long, default_value = "text")]
-        format: String,
-        #[arg(long, default_value = "*.bwq")]
-        pattern: String,
-    },
-
     /// Start LSP server
     Lsp,
 }
@@ -77,6 +56,23 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Some(Commands::Check {
+            files,
+            query,
+            no_warnings,
+            output_format,
+            pattern,
+        }) => {
+            if let Some(query_str) = query {
+                lint_single_query(&query_str, !no_warnings, &output_format);
+            } else if files.is_empty() {
+                if let Err(_) = lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern) {
+                    std::process::exit(1);
+                }
+            } else {
+                process_files(&files, !no_warnings, &output_format, &pattern);
+            }
+        }
         Some(Commands::Interactive { no_warnings }) => {
             interactive_mode(!no_warnings);
         }
@@ -86,73 +82,54 @@ fn main() {
         Some(Commands::Examples) => {
             show_examples();
         }
-        Some(Commands::Lint {
-            query,
-            no_warnings,
-            format,
-        }) => {
-            lint_single_query(&query, !no_warnings, &format);
-        }
-        Some(Commands::File {
-            path,
-            no_warnings,
-            format,
-        }) => {
-            lint_file(&path, !no_warnings, &format);
-        }
-        Some(Commands::Dir {
-            path,
-            no_warnings,
-            format,
-            pattern,
-        }) => {
-            lint_directory(&path, !no_warnings, &format, &pattern);
-        }
         Some(Commands::Lsp) => {
-            if let Err(e) = bwq_lint::lsp::LspServer::run() {
+            if let Err(e) = bwq::lsp::LspServer::run() {
                 eprintln!("LSP server error: {}", e);
                 std::process::exit(1);
             }
         }
         None => {
-            if let Some(input) = cli.input {
-                auto_detect_and_process(&input, !cli.no_warnings, &cli.format, &cli.pattern);
-            } else {
-                lint_directory(
-                    &PathBuf::from("."),
-                    !cli.no_warnings,
-                    &cli.format,
-                    &cli.pattern,
-                );
+            eprintln!("Error: A subcommand is required");
+            eprintln!("\nUsage: bwq <COMMAND>");
+            eprintln!("\nCommands:");
+            eprintln!("  check        Lint files, directories, or queries");
+            eprintln!("  interactive  Run in interactive mode");
+            eprintln!("  validate     Validate a query (returns exit code 0/1)");
+            eprintln!("  examples     Show example queries");
+            eprintln!("  lsp          Start LSP server");
+            eprintln!("\nFor more information, try 'bwq --help'");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn process_files(files: &[PathBuf], show_warnings: bool, output_format: &str, pattern: &str) {
+    let mut any_errors = false;
+    
+    for file_path in files {
+        if file_path.is_file() {
+            if let Err(_) = lint_file(file_path, show_warnings, output_format) {
+                any_errors = true;
             }
+        } else if file_path.is_dir() {
+            if let Err(_) = lint_directory(file_path, show_warnings, output_format, pattern) {
+                any_errors = true;
+            }
+        } else {
+            eprintln!("Path does not exist: {}", file_path.display());
+            any_errors = true;
         }
+    }
+    
+    if any_errors {
+        std::process::exit(1);
     }
 }
 
-fn auto_detect_and_process(input: &str, show_warnings: bool, format: &str, pattern: &str) {
-    let path = Path::new(input);
-
-    if path.exists() {
-        if path.is_file() {
-            lint_file(&path.to_path_buf(), show_warnings, format);
-        } else if path.is_dir() {
-            lint_directory(path, show_warnings, format, pattern);
-        }
-    } else if contains_glob_pattern(input) {
-        lint_directory(&PathBuf::from("."), show_warnings, format, input);
-    } else {
-        lint_single_query(input, show_warnings, format);
-    }
-}
-
-fn contains_glob_pattern(input: &str) -> bool {
-    input.contains('*') || input.contains('?') || input.contains('[') || input.contains('{')
-}
-
-fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
+fn lint_single_query(query: &str, show_warnings: bool, output_format: &str) {
     let analysis = analyze_query(query);
 
-    match format {
+    match output_format {
         "json" => {
             output_json(&analysis);
         }
@@ -166,23 +143,23 @@ fn lint_single_query(query: &str, show_warnings: bool, format: &str) {
     }
 }
 
-fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
+fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result<(), ()> {
     let content = match fs::read_to_string(path) {
         Ok(content) => content,
         Err(e) => {
             eprintln!("Error reading file {}: {}", path.display(), e);
-            std::process::exit(1);
+            return Err(());
         }
     };
     let query = content.trim();
     if query.is_empty() {
         eprintln!("File {} is empty", path.display());
-        std::process::exit(1);
+        return Err(());
     }
 
     let analysis = analyze_query(query);
 
-    match format {
+    match output_format {
         "json" => {
             let json_analysis = serde_json::json!({
                 "file": path.display().to_string(),
@@ -201,34 +178,26 @@ fn lint_file(path: &PathBuf, show_warnings: bool, format: &str) {
     }
 
     if !analysis.is_valid {
-        std::process::exit(1);
+        return Err(());
     }
+    Ok(())
 }
 
-fn lint_directory(path: &Path, show_warnings: bool, format: &str, pattern: &str) {
-    let search_pattern = if path.display().to_string() == "." {
-        format!("**/{}", pattern)
-    } else {
-        format!("{}/**/{}", path.display(), pattern)
-    };
-
-    let entries = match glob::glob(&search_pattern) {
-        Ok(entries) => entries,
-        Err(e) => {
-            eprintln!("Error parsing glob pattern '{}': {}", search_pattern, e);
-            std::process::exit(1);
-        }
-    };
-
+fn lint_directory(path: &Path, show_warnings: bool, output_format: &str, pattern: &str) -> Result<(), ()> {
+    let mut builder = WalkBuilder::new(path);
+    builder.hidden(false);
+    
     let mut total_files = 0;
     let mut valid_files = 0;
     let mut any_errors = false;
     let mut results = Vec::new();
 
-    for entry in entries {
+    for entry in builder.build() {
         match entry {
-            Ok(file_path) => {
-                if file_path.is_file() {
+            Ok(dir_entry) => {
+                let file_path = dir_entry.path();
+                
+                if file_path.is_file() && file_path.extension().and_then(|s| s.to_str()) == Some("bwq") {
                     total_files += 1;
 
                     let content = match fs::read_to_string(&file_path) {
@@ -254,7 +223,7 @@ fn lint_directory(path: &Path, show_warnings: bool, format: &str, pattern: &str)
                         any_errors = true;
                     }
 
-                    results.push((file_path, analysis, query.to_string()));
+                    results.push((file_path.to_path_buf(), analysis, query.to_string()));
                 }
             }
             Err(e) => {
@@ -270,9 +239,9 @@ fn lint_directory(path: &Path, show_warnings: bool, format: &str, pattern: &str)
             pattern,
             path.display()
         );
-        std::process::exit(1);
+        return Err(());
     }
-    match format {
+    match output_format {
         "json" => {
             let json_results: Vec<serde_json::Value> = results.into_iter().map(|(file_path, analysis, query)| {
                 serde_json::json!({
@@ -309,8 +278,9 @@ fn lint_directory(path: &Path, show_warnings: bool, format: &str, pattern: &str)
     }
 
     if any_errors {
-        std::process::exit(1);
+        return Err(());
     }
+    Ok(())
 }
 
 fn interactive_mode(show_warnings: bool) {
@@ -322,7 +292,7 @@ fn interactive_mode(show_warnings: bool) {
     let mut stdout = io::stdout();
 
     loop {
-        print!("bwq-lint> ");
+        print!("bwq> ");
         stdout.flush().unwrap();
 
         let mut line = String::new();
@@ -373,7 +343,7 @@ fn validate_query(query: &str) {
     }
 }
 
-fn output_text(analysis: &bwq_lint::AnalysisResult, show_warnings: bool) {
+fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
     println!("{}", analysis.summary());
 
     if !analysis.errors.is_empty() {
@@ -391,7 +361,7 @@ fn output_text(analysis: &bwq_lint::AnalysisResult, show_warnings: bool) {
     }
 }
 
-fn output_json(analysis: &bwq_lint::AnalysisResult) {
+fn output_json(analysis: &bwq::AnalysisResult) {
     let json_output = serde_json::json!({
         "valid": analysis.is_valid,
         "summary": analysis.summary(),

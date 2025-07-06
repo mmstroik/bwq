@@ -8,17 +8,21 @@ build:
 test:
 	cargo test
 
-# Lint current directory recursively (default behavior)
-lint-dir:
-	cargo run --
+# Check current directory recursively
+check:
+	cargo run -- check
 
-# Run the linter on a query, file, or directory (auto-detects input type)
-lint query-or-file:
-	cargo run -- "{{query-or-file}}"
+# Check a file or directory
+check-input query-or-file:
+	cargo run -- check "{{query-or-file}}"
 
 # Validate a query (returns exit code 0 if valid, 1 if invalid)
 validate query:
 	cargo run -- validate "{{query}}"
+
+# Check a query string directly
+check-query query:
+	cargo run -- check --query "{{query}}"
 
 # Run the linter in interactive mode
 interactive:
@@ -28,7 +32,7 @@ interactive:
 examples:
 	cargo run -- examples
 
-# Compare our linter with Brandwatch API validation (auto-detects input type)
+# Compare our linter with Brandwatch API validation
 compare query-or-file:
 	@echo "=== Our Linter ==="
 	@just compare-our '{{query-or-file}}' || true
@@ -36,15 +40,13 @@ compare query-or-file:
 	@echo "=== Brandwatch API ==="
 	@just compare-bw '{{query-or-file}}' || true
 
-# Helper for our linter comparison (handles glob patterns in queries)
+# Helper for our linter comparison
 compare-our query-or-file:
 	#!/usr/bin/env bash
 	if [ -f "{{query-or-file}}" ]; then
-		cargo run -- file "{{query-or-file}}"
-	elif [[ "{{query-or-file}}" == *"*"* ]] || [[ "{{query-or-file}}" == *"?"* ]] || [[ "{{query-or-file}}" == *"["* ]] || [[ "{{query-or-file}}" == *"{"* ]]; then
-		cargo run -- lint "{{query-or-file}}"
+		cargo run -- check "{{query-or-file}}"
 	else
-		cargo run -- "{{query-or-file}}"
+		cargo run -- check --query "{{query-or-file}}"
 	fi
 
 # Helper for BW API comparison
@@ -70,7 +72,7 @@ test-all:
 	@echo "Running unit tests..."
 	@just test
 	@echo "Testing fixtures..."
-	@cargo run -- tests/fixtures
+	@cargo run -- check tests/fixtures
 	@echo "All tests completed!"
 
 # Format code

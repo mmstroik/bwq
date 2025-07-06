@@ -1,13 +1,13 @@
-# bwq-lint
+# bwq
 
-brandwatch boolean search query linter for vs code.
+brandwatch boolean search query linter and language server for vs code.
 
 ## install
 
-requires the `bwq-lint` binary:
+requires the `bwq` binary:
 
 ```bash
-cargo install bwq-lint
+cargo install bwq
 ```
 
 ## features
@@ -50,5 +50,5 @@ special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 
 ## config
 
-- `bwqLint.serverPath`: path to bwq-lint executable (default: "bwq-lint")
-- `bwqLint.trace.server`: trace communication with language server
+- `bwq.serverPath`: path to bwq executable (default: "bwq")
+- `bwq.trace.server`: trace communication with language server

@@ -53,7 +53,7 @@ impl LspServer {
                 ..Default::default()
             },
             server_info: Some(lsp_types::ServerInfo {
-                name: "bwq-lint-lsp".to_string(),
+                name: "bwq-lsp".to_string(),
                 version: Some("0.1.0".to_string()),
             }),
         };
@@ -68,7 +68,7 @@ impl LspServer {
     }
 
     fn main_loop(&mut self) -> Result<()> {
-        eprintln!("bwq-lint LSP server started");
+        eprintln!("bwq LSP server started");
 
         while let Ok(msg) = self.connection.receiver.recv() {
             match msg {
@@ -85,7 +85,7 @@ impl LspServer {
             }
         }
 
-        eprintln!("bwq-lint LSP server stopped");
+        eprintln!("bwq LSP server stopped");
         Ok(())
     }
 
