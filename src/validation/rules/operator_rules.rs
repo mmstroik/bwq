@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::error::LintError;
 use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
-// Mixed AND/OR validation rule
 pub struct MixedAndOrRule;
 
 impl ValidationRule for MixedAndOrRule {
@@ -80,7 +79,6 @@ impl MixedAndOrRule {
     }
 }
 
-// Mixed NEAR/boolean validation rule
 pub struct MixedNearRule;
 
 impl ValidationRule for MixedNearRule {
@@ -178,7 +176,6 @@ impl MixedNearRule {
     }
 }
 
-// Pure negative query validation rule
 pub struct PureNegativeRule;
 
 impl ValidationRule for PureNegativeRule {
@@ -187,12 +184,12 @@ impl ValidationRule for PureNegativeRule {
     }
 
     fn validate(&self, _expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        // This will be handled at the query level in the engine, not per expression
+        // handled at the query level in the engine, not per expression
         ValidationResult::new()
     }
 
     fn can_validate(&self, _expr: &Expression) -> bool {
-        // Only validate at the root query level
+        // only validate at the root query level
         false
     }
 }
@@ -201,22 +198,21 @@ impl PureNegativeRule {
     #[allow(clippy::only_used_in_recursion)]
     pub fn is_pure_negative_query(&self, expr: &Expression) -> bool {
         match expr {
-            // For binary NOT, check if we're starting with a NOT operation at the top level
+            // check if we're starting with a NOT operation at the top level
             Expression::BooleanOp {
                 operator: BooleanOperator::Not,
                 left,
                 right: _,
                 ..
             } => {
-                // Check if this is a leading NOT (dummy left operand)
+                // check for dummy left operand
                 if let Expression::Term {
                     term: Term::Word { value },
                     ..
                 } = left.as_ref()
                 {
                     if value.is_empty() {
-                        // This is a leading NOT - ANY leading NOT is pure negative
-                        // according to Brandwatch API behavior
+                        // any leading NOT is pure negative
                         return true;
                     }
                 }
@@ -250,7 +246,6 @@ impl PureNegativeRule {
     }
 }
 
-// Binary operator validation rule
 pub struct BinaryOperatorRule;
 
 impl ValidationRule for BinaryOperatorRule {
@@ -266,7 +261,7 @@ impl ValidationRule for BinaryOperatorRule {
             span,
         } = expr
         {
-            // Check for NOT operator with empty left operand (this is valid binary NOT)
+            // check for NOT operator with empty left operand (valid binary NOT)
             if matches!(operator, BooleanOperator::Not) {
                 if let Expression::Term {
                     term: Term::Word { value },
@@ -285,7 +280,7 @@ impl ValidationRule for BinaryOperatorRule {
                 }
             }
 
-            // For non-NOT operators, ensure we have both operands
+            // ensure we have both operands for non-NOT operators
             if right.is_none() && !matches!(operator, BooleanOperator::Not) {
                 return ValidationResult::with_error(LintError::ValidationError {
                     span: span.clone(),

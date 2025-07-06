@@ -2,8 +2,7 @@ use crate::ast::*;
 use crate::error::{LintError, LintReport};
 use crate::validation::{rules::PureNegativeRule, ValidationEngine};
 
-/// Validator for Brandwatch boolean queries
-/// Now uses a plugin-based validation system for better maintainability
+/// plugin-based query-level validator
 pub struct Validator {
     engine: ValidationEngine,
     pure_negative_rule: PureNegativeRule,

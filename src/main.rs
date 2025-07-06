@@ -1,4 +1,4 @@
-use bwq::{analyze_query, BrandwatchLinter};
+use bwq::analyze_query;
 use clap::{Parser, Subcommand};
 use ignore::WalkBuilder;
 use std::fs;
@@ -16,13 +16,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Lint files, directories, or queries (default)
+    /// lint files, directories, or query strings
     #[command(name = "check")]
     Check {
-        /// List of files or directories to check [default: .]
+        /// list of files or directories to check [default: .]
         files: Vec<PathBuf>,
 
-        /// Lint a query string directly
+        /// lint a query string directly
         #[arg(long)]
         query: Option<String>,
 
@@ -32,23 +32,25 @@ enum Commands {
         #[arg(long, default_value = "text")]
         output_format: String,
 
+        /// exit with status code 0, even upon detecting lint violations
+        #[arg(long)]
+        exit_zero: bool,
+
         #[arg(long, default_value = "*.bwq")]
         pattern: String,
     },
 
-    /// Run in interactive mode
+    /// run in interactive mode
     Interactive {
         #[arg(long)]
         no_warnings: bool,
     },
 
-    /// Validate a query (returns exit code 0/1)
-    Validate { query: String },
 
-    /// Show example queries
+    /// show example queries
     Examples,
 
-    /// Start LSP server
+    /// start LSP server
     Lsp,
 }
 
@@ -62,22 +64,22 @@ fn main() {
             no_warnings,
             output_format,
             pattern,
+            exit_zero,
         }) => {
             if let Some(query_str) = query {
-                lint_single_query(&query_str, !no_warnings, &output_format);
+                lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
                 if let Err(_) = lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern) {
-                    std::process::exit(1);
+                    if !exit_zero {
+                        std::process::exit(1);
+                    }
                 }
             } else {
-                process_files(&files, !no_warnings, &output_format, &pattern);
+                process_files(&files, !no_warnings, &output_format, &pattern, exit_zero);
             }
         }
         Some(Commands::Interactive { no_warnings }) => {
             interactive_mode(!no_warnings);
-        }
-        Some(Commands::Validate { query }) => {
-            validate_query(&query);
         }
         Some(Commands::Examples) => {
             show_examples();
@@ -94,7 +96,6 @@ fn main() {
             eprintln!("\nCommands:");
             eprintln!("  check        Lint files, directories, or queries");
             eprintln!("  interactive  Run in interactive mode");
-            eprintln!("  validate     Validate a query (returns exit code 0/1)");
             eprintln!("  examples     Show example queries");
             eprintln!("  lsp          Start LSP server");
             eprintln!("\nFor more information, try 'bwq --help'");
@@ -103,7 +104,7 @@ fn main() {
     }
 }
 
-fn process_files(files: &[PathBuf], show_warnings: bool, output_format: &str, pattern: &str) {
+fn process_files(files: &[PathBuf], show_warnings: bool, output_format: &str, pattern: &str, exit_zero: bool) {
     let mut any_errors = false;
     
     for file_path in files {
@@ -121,12 +122,12 @@ fn process_files(files: &[PathBuf], show_warnings: bool, output_format: &str, pa
         }
     }
     
-    if any_errors {
+    if any_errors && !exit_zero {
         std::process::exit(1);
     }
 }
 
-fn lint_single_query(query: &str, show_warnings: bool, output_format: &str) {
+fn lint_single_query(query: &str, show_warnings: bool, output_format: &str, exit_zero: bool) {
     let analysis = analyze_query(query);
 
     match output_format {
@@ -138,7 +139,7 @@ fn lint_single_query(query: &str, show_warnings: bool, output_format: &str) {
         }
     }
 
-    if !analysis.is_valid {
+    if !analysis.is_valid && !exit_zero {
         std::process::exit(1);
     }
 }
@@ -330,19 +331,6 @@ fn interactive_mode(show_warnings: bool) {
     }
 }
 
-fn validate_query(query: &str) {
-    let mut linter = BrandwatchLinter::new();
-    let is_valid = linter.is_valid(query);
-
-    if is_valid {
-        println!("Query is valid");
-        std::process::exit(0);
-    } else {
-        println!("Query is invalid");
-        std::process::exit(1);
-    }
-}
-
 fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
     println!("{}", analysis.summary());
 
@@ -449,7 +437,6 @@ mod tests {
 
     #[test]
     fn test_lint_single_query() {
-        // This is more of an integration test
         let analysis = analyze_query("apple AND juice");
         assert!(analysis.is_valid);
     }

@@ -3,6 +3,7 @@ use super::{ValidationContext, ValidationRule};
 use crate::ast::*;
 use crate::error::{LintError, LintReport, LintWarning};
 
+/// per-expression validation engine
 pub struct ValidationEngine {
     rules: Vec<Box<dyn ValidationRule>>,
 }
@@ -11,7 +12,7 @@ impl ValidationEngine {
     pub fn new() -> Self {
         Self {
             rules: vec![
-                // Field validation rules
+                // field validation rules
                 Box::new(RatingFieldRule),
                 Box::new(CoordinateFieldRule),
                 Box::new(LanguageFieldRule),
@@ -21,12 +22,12 @@ impl ValidationEngine {
                 Box::new(VerifiedTypeFieldRule),
                 Box::new(MinuteOfDayFieldRule),
                 Box::new(RangeFieldRule),
-                // Operator validation rules
+                // operator validation rules
                 Box::new(MixedAndOrRule),
                 Box::new(MixedNearRule),
                 Box::new(PureNegativeRule),
                 Box::new(BinaryOperatorRule),
-                // Performance validation rules
+                // performance validation rules
                 Box::new(WildcardPerformanceRule),
                 Box::new(ShortTermRule),
                 Box::new(RangePerformanceRule),
@@ -54,7 +55,7 @@ impl ValidationEngine {
         errors: &mut Vec<LintError>,
         warnings: &mut Vec<LintWarning>,
     ) {
-        // Apply all relevant rules to this expression
+        // apply all relevant rules to this expression
         for rule in &self.rules {
             if rule.can_validate(expr) {
                 let result = rule.validate(expr, ctx);
@@ -63,7 +64,7 @@ impl ValidationEngine {
             }
         }
 
-        // Recursively validate child expressions with updated context
+        // recursively validate child expressions with updated context
         match expr {
             Expression::BooleanOp {
                 operator,
@@ -95,7 +96,7 @@ impl ValidationEngine {
                 self.walk_expression(value, &field_ctx, errors, warnings);
             }
             Expression::Range { .. } | Expression::Term { .. } | Expression::Comment { .. } => {
-                // Terminal nodes - no recursion needed
+                // terminal nodes - no recursion needed
             }
         }
     }
