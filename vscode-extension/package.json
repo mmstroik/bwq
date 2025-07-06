@@ -3,7 +3,7 @@
   "displayName": "BWQ Lint",
   "description": "Brandwatch Query Language support with linting and syntax highlighting",
   "version": "0.1.0",
-  "publisher": "Milo Stroik",
+  "publisher": "mmstroik",
   "license": "MIT",
   "repository": {
     "type": "git",
