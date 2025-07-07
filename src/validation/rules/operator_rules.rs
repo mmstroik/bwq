@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::error::LintError;
+use crate::error::{LintError, LintWarning};
 use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
 pub struct MixedAndOrRule;
@@ -96,9 +96,7 @@ impl ValidationRule for MixedNearRule {
             } => {
                 if matches!(operator, BooleanOperator::And) {
                     if let Some(right_expr) = right {
-                        if self.contains_near_at_top_level(right_expr)
-                            || self.contains_near_at_top_level(left)
-                        {
+                        if self.is_unparenthesized_near_and_mix(left, right_expr) {
                             return ValidationResult::with_error(LintError::ValidationError {
                                 span: span.clone(),
                                 message: "The AND operator cannot be used within the NEAR operator. Either remove this operator or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
@@ -170,6 +168,26 @@ impl MixedNearRule {
     fn contains_near_at_top_level(&self, expr: &Expression) -> bool {
         match expr {
             Expression::Proximity { .. } => true,
+            Expression::Group { .. } => false,
+            _ => false,
+        }
+    }
+
+    fn is_unparenthesized_near_and_mix(&self, left: &Expression, right: &Expression) -> bool {
+        // check if left side contains NEAR/x operators (not tilde) at top level
+        self.contains_binary_near_at_top_level(left)
+            || self.contains_binary_near_at_top_level(right)
+    }
+
+    fn contains_binary_near_at_top_level(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Proximity { operator, .. } => {
+                // allow tilde proximity (single operand) but reject NEAR/x (binary)
+                matches!(
+                    operator,
+                    ProximityOperator::Near { .. } | ProximityOperator::NearForward { .. }
+                )
+            }
             Expression::Group { .. } => false,
             _ => false,
         }
@@ -261,7 +279,6 @@ impl ValidationRule for BinaryOperatorRule {
             span,
         } = expr
         {
-            // check for NOT operator with empty left operand (valid binary NOT)
             if matches!(operator, BooleanOperator::Not) {
                 if let Expression::Term {
                     term: Term::Word { value },
@@ -280,7 +297,6 @@ impl ValidationRule for BinaryOperatorRule {
                 }
             }
 
-            // ensure we have both operands for non-NOT operators
             if right.is_none() && !matches!(operator, BooleanOperator::Not) {
                 return ValidationResult::with_error(LintError::ValidationError {
                     span: span.clone(),
@@ -293,5 +309,60 @@ impl ValidationRule for BinaryOperatorRule {
 
     fn can_validate(&self, expr: &Expression) -> bool {
         matches!(expr, Expression::BooleanOp { .. })
+    }
+}
+
+pub struct TildeUsageRule;
+
+impl ValidationRule for TildeUsageRule {
+    fn name(&self) -> &'static str {
+        "tilde-usage"
+    }
+
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        if let Expression::Proximity {
+            operator: ProximityOperator::Proximity { .. },
+            terms,
+            span,
+        } = expr
+        {
+            if let Some(first_term) = terms.first() {
+                match first_term {
+                    Expression::Term {
+                        term: Term::Word { .. },
+                        ..
+                    } => {
+                        return ValidationResult::with_warning(LintWarning::PotentialTypo {
+                            span: span.clone(),
+                            suggestion: "Single term tilde may produce unexpected fuzzy matching results. Consider using quoted phrases for proximity: \"term1 term2\"~5".to_string(),
+                        });
+                    }
+                    Expression::Term {
+                        term: Term::Phrase { value },
+                        ..
+                    } => {
+                        let words: Vec<&str> = value.split_whitespace().collect();
+                        if words.len() == 1 {
+                            return ValidationResult::with_warning(LintWarning::PotentialTypo {
+                                span: span.clone(),
+                                suggestion: "Tilde operator on single quoted words has no effect. Use unquoted word or multi-word phrase.".to_string(),
+                            });
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        ValidationResult::new()
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::Proximity {
+                operator: ProximityOperator::Proximity { .. },
+                ..
+            }
+        )
     }
 }

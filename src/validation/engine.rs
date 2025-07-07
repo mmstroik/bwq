@@ -27,6 +27,7 @@ impl ValidationEngine {
                 Box::new(MixedNearRule),
                 Box::new(PureNegativeRule),
                 Box::new(BinaryOperatorRule),
+                Box::new(TildeUsageRule),
                 // performance validation rules
                 Box::new(WildcardPerformanceRule),
                 Box::new(ShortTermRule),
