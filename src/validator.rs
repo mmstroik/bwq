@@ -49,7 +49,7 @@ mod tests {
     fn test_wildcard_validation() {
         let mut lexer = Lexer::new("valid*");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -62,7 +62,7 @@ mod tests {
     fn test_rating_validation() {
         let mut lexer = Lexer::new("rating:6");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -75,7 +75,7 @@ mod tests {
     fn test_valid_query() {
         let mut lexer = Lexer::new("apple AND juice");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -88,7 +88,7 @@ mod tests {
     fn test_mixed_and_or_validation() {
         let mut lexer = Lexer::new("apple AND banana OR juice");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -104,7 +104,7 @@ mod tests {
     fn test_pure_negative_query() {
         let mut lexer = Lexer::new("NOT bitter");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -120,7 +120,7 @@ mod tests {
     fn test_coordinate_validation() {
         let mut lexer = Lexer::new("latitude:100");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -136,7 +136,7 @@ mod tests {
     fn test_boolean_field_validation() {
         let mut lexer = Lexer::new("authorVerified:yes");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -153,7 +153,7 @@ mod tests {
     fn test_wildcard_placement_validation() {
         let mut lexer = Lexer::new("*invalid");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();
@@ -169,7 +169,7 @@ mod tests {
     fn test_performance_warnings() {
         let mut lexer = Lexer::new("ab*");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         let mut validator = Validator::new();

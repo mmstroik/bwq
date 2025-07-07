@@ -16,36 +16,41 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        // Filter out all comment-related tokens including content between comment markers
+    pub fn new(tokens: Vec<Token>) -> Result<Self, LintError> {
+        // filter out all comment-related tokens including content between comment markers
         let mut filtered_tokens: Vec<Token> = Vec::new();
         let mut inside_comment = false;
+        let mut comment_start_span: Option<Span> = None;
 
         for token in tokens {
             match &token.token_type {
                 TokenType::CommentStart => {
                     inside_comment = true;
-                    // Don't add CommentStart to filtered tokens
+                    comment_start_span = Some(token.span.clone());
                 }
                 TokenType::CommentEnd => {
                     inside_comment = false;
-                    // Don't add CommentEnd to filtered tokens
+                    comment_start_span = None;
+                }
+                TokenType::Eof if inside_comment => {
+                    return Err(LintError::ValidationError {
+                        span: comment_start_span.unwrap(),
+                        message: "Please add a >>> mark to close this commented text.".to_string(),
+                    });
                 }
                 _ if inside_comment => {
-                    // Skip all tokens inside comments (including regular words, numbers, etc.)
                 }
                 _ => {
-                    // Add all non-comment tokens
                     filtered_tokens.push(token);
                 }
             }
         }
 
-        Self {
+        Ok(Self {
             tokens: filtered_tokens,
             current: 0,
             implicit_and_spans: Vec::new(),
-        }
+        })
     }
 
     /// parse the tokens into a queryAST
@@ -627,7 +632,7 @@ mod tests {
     fn test_basic_parsing() {
         let mut lexer = Lexer::new("apple AND juice");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
@@ -642,7 +647,7 @@ mod tests {
     fn test_quoted_phrase() {
         let mut lexer = Lexer::new("\"apple juice\"");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
@@ -660,7 +665,7 @@ mod tests {
     fn test_field_operation() {
         let mut lexer = Lexer::new("title:\"apple juice\"");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
@@ -675,7 +680,7 @@ mod tests {
     fn test_implicit_and() {
         let mut lexer = Lexer::new("apple banana");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
