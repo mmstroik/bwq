@@ -96,6 +96,7 @@ pub struct Lexer {
     position: usize,
     line: usize,
     column: usize,
+    inside_comment: bool,
 }
 
 impl Lexer {
@@ -105,6 +106,7 @@ impl Lexer {
             position: 0,
             line: 1,
             column: 1,
+            inside_comment: false,
         }
     }
 
@@ -139,6 +141,23 @@ impl Lexer {
 
         let start_pos = self.current_position();
         let ch = self.current_char();
+
+        if self.inside_comment {
+            if ch == '>' && self.peek_ahead(2) == ">>" {
+                self.inside_comment = false;
+                return self.read_comment_end();
+            } else {
+                // skip any character inside comments (including ! and ^)
+                self.advance();
+                if ch == '\n' {
+                    self.line += 1;
+                    self.column = 1;
+                } else {
+                    self.column += 1;
+                }
+                return self.next_token();
+            }
+        }
 
         match ch {
             ' ' | '\t' | '\r' | '\n' => {
@@ -276,7 +295,18 @@ impl Lexer {
                     self.read_number()
                 }
             }
-            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' || ch == '$' => {
+            _ if ch.is_alphabetic()
+                || ch == '_'
+                || ch == '*'
+                || ch == '?'
+                || ch == '$'
+                || ch == '&'
+                || ch == '+'
+                || ch == '%'
+                || ch == '='
+                || ch == '`'
+                || ch == '|' =>
+            {
                 self.read_word_or_operator()
             }
 
@@ -346,7 +376,15 @@ impl Lexer {
                 || self.current_char() == '/'
                 || self.current_char() == '*'
                 || self.current_char() == '?'
-                || self.current_char() == '$')
+                || self.current_char() == '$'
+                || self.current_char() == '&'
+                || self.current_char() == '#'
+                || self.current_char() == '+'
+                || self.current_char() == '%'
+                || self.current_char() == '='
+                || self.current_char() == '`'
+                || self.current_char() == '|'
+                || self.current_char() == '@')
         {
             value.push(self.current_char());
             self.advance();
@@ -426,7 +464,15 @@ impl Lexer {
                 || self.current_char() == '_'
                 || self.current_char() == '*'
                 || self.current_char() == '?'
-                || self.current_char() == '$')
+                || self.current_char() == '$'
+                || self.current_char() == '&'
+                || self.current_char() == '#'
+                || self.current_char() == '+'
+                || self.current_char() == '%'
+                || self.current_char() == '='
+                || self.current_char() == '`'
+                || self.current_char() == '|'
+                || self.current_char() == '@')
         {
             value.push(self.current_char());
             self.advance();
@@ -453,7 +499,15 @@ impl Lexer {
                 || self.current_char() == '_'
                 || self.current_char() == '*'
                 || self.current_char() == '?'
-                || self.current_char() == '$')
+                || self.current_char() == '$'
+                || self.current_char() == '&'
+                || self.current_char() == '#'
+                || self.current_char() == '+'
+                || self.current_char() == '%'
+                || self.current_char() == '='
+                || self.current_char() == '`'
+                || self.current_char() == '|'
+                || self.current_char() == '@')
         {
             value.push(self.current_char());
             self.advance();
@@ -475,6 +529,8 @@ impl Lexer {
         self.advance();
         self.advance();
         self.column += 3;
+
+        self.inside_comment = true;
 
         let end_pos = self.current_position();
         Ok(Some(Token::new(
@@ -567,6 +623,14 @@ impl Lexer {
                 || ch == '*'
                 || ch == '?'
                 || ch == '$'
+                || ch == '&'
+                || ch == '#'
+                || ch == '+'
+                || ch == '%'
+                || ch == '='
+                || ch == '`'
+                || ch == '|'
+                || ch == '@'
             {
                 pos += 1;
             } else {
@@ -618,29 +682,36 @@ mod tests {
     #[test]
     fn test_numbers_vs_words_and_special_chars() {
         let mut lexer = Lexer::new(
-            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U$BER uber$ 123$abc -5$test",
+            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
         );
         let tokens = lexer.tokenize().unwrap();
 
-        assert_eq!(tokens.len(), 12); // 11 tokens + EOF
+        assert_eq!(tokens.len(), 17); // 16 tokens + EOF
 
-        // Pure numbers
+        // pure numbers
         assert!(matches!(tokens[0].token_type, TokenType::Number(ref n) if n == "42"));
         assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "3.14"));
         assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-5"));
 
-        // Alphanumeric starting with digits (should be words due to has_letters_ahead)
+        // alphanumeric starting with digits (should be words due to has_letters_ahead)
         assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
         assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
         assert!(matches!(tokens[5].token_type, TokenType::Word(ref w) if w == "user123"));
 
-        // Dollar sign variations
+        // original special characters
         assert!(matches!(tokens[6].token_type, TokenType::Word(ref w) if w == "$UBER"));
-        assert!(matches!(tokens[7].token_type, TokenType::Word(ref w) if w == "U$BER"));
+        assert!(matches!(tokens[7].token_type, TokenType::Word(ref w) if w == "U&BER"));
         assert!(matches!(tokens[8].token_type, TokenType::Word(ref w) if w == "uber$"));
         assert!(matches!(tokens[9].token_type, TokenType::Word(ref w) if w == "123$abc"));
-        assert!(matches!(tokens[10].token_type, TokenType::Word(ref w) if w == "-5$test"));
 
-        assert!(matches!(tokens[11].token_type, TokenType::Eof));
+        // new special characters
+        assert!(matches!(tokens[10].token_type, TokenType::Word(ref w) if w == "test+word"));
+        assert!(matches!(tokens[11].token_type, TokenType::Word(ref w) if w == "word%test"));
+        assert!(matches!(tokens[12].token_type, TokenType::Word(ref w) if w == "test=word"));
+        assert!(matches!(tokens[13].token_type, TokenType::Word(ref w) if w == "word`test"));
+        assert!(matches!(tokens[14].token_type, TokenType::Word(ref w) if w == "5test|word"));
+        assert!(matches!(tokens[15].token_type, TokenType::Word(ref w) if w == "test@word"));
+
+        assert!(matches!(tokens[16].token_type, TokenType::Eof));
     }
 }

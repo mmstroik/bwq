@@ -1,7 +1,7 @@
 set dotenv-load
 
 build:
-	cargo build --release
+	cargo build
 
 clean:
 	cargo clean
