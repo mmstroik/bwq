@@ -38,8 +38,7 @@ impl Parser {
                         message: "Please add a >>> mark to close this commented text.".to_string(),
                     });
                 }
-                _ if inside_comment => {
-                }
+                _ if inside_comment => {}
                 _ => {
                     filtered_tokens.push(token);
                 }
