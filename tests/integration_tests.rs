@@ -34,14 +34,11 @@ impl QueryTest {
                 // this is a bit tricky with borrowing, so we'll return the last report
                 // for now, create a static empty report reference
                 // TODO: store the report in the struct?
-                assert!(is_valid_query(query), "Query should be valid: {}", query);
+                assert!(is_valid_query(query), "Query should be valid: {query}");
                 &EMPTY_REPORT
             }
             Err(error) => {
-                panic!(
-                    "Expected query to be valid but got parse error: {} - {}",
-                    query, error
-                );
+                panic!("Expected query to be valid but got parse error: {query} - {error}");
             }
         }
     }
@@ -58,16 +55,12 @@ impl QueryTest {
                 );
                 assert!(
                     report.has_warnings(),
-                    "Expected query to have warnings: {}",
-                    query
+                    "Expected query to have warnings: {query}"
                 );
                 &EMPTY_REPORT
             }
             Err(error) => {
-                panic!(
-                    "Expected query to be valid but got parse error: {} - {}",
-                    query, error
-                );
+                panic!("Expected query to be valid but got parse error: {query} - {error}");
             }
         }
     }
@@ -78,8 +71,7 @@ impl QueryTest {
             Ok(report) => {
                 assert!(
                     report.has_errors(),
-                    "Expected query to have errors: {}",
-                    query
+                    "Expected query to have errors: {query}"
                 );
                 assert!(
                     report.errors.iter().any(|e| e.code() == expected_code),
@@ -111,8 +103,7 @@ impl QueryTest {
             .expect("Query should parse successfully");
         assert!(
             !report.warnings.is_empty(),
-            "Expected query to have warnings: {}",
-            query
+            "Expected query to have warnings: {query}"
         );
         assert!(
             report.warnings.iter().any(|w| w.code() == expected_code),
@@ -316,7 +307,7 @@ fn test_invalid_queries() {
 
     for query in invalid_queries {
         let analysis = analyze_query(query);
-        assert!(!analysis.is_valid, "Query should be invalid: {}", query);
+        assert!(!analysis.is_valid, "Query should be invalid: {query}");
     }
 }
 

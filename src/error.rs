@@ -162,13 +162,13 @@ impl std::fmt::Display for LintWarning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LintWarning::PotentialTypo { suggestion, .. } => {
-                write!(f, "Potential typo. Did you mean '{}'?", suggestion)
+                write!(f, "Potential typo. Did you mean '{suggestion}'?")
             }
             LintWarning::DeprecatedOperator { replacement, .. } => {
-                write!(f, "Deprecated operator. Consider using '{}'", replacement)
+                write!(f, "Deprecated operator. Consider using '{replacement}'")
             }
             LintWarning::PerformanceWarning { message, .. } => {
-                write!(f, "Performance warning: {}", message)
+                write!(f, "Performance warning: {message}")
             }
         }
     }

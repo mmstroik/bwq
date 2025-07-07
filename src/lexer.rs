@@ -43,9 +43,9 @@ pub enum TokenType {
 impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TokenType::Word(w) => write!(f, "word '{}'", w),
-            TokenType::QuotedString(s) => write!(f, "quoted string '{}'", s),
-            TokenType::Number(n) => write!(f, "number '{}'", n),
+            TokenType::Word(w) => write!(f, "word '{w}'"),
+            TokenType::QuotedString(s) => write!(f, "quoted string '{s}'"),
+            TokenType::Number(n) => write!(f, "number '{n}'"),
             TokenType::And => write!(f, "AND"),
             TokenType::Or => write!(f, "OR"),
             TokenType::Not => write!(f, "NOT"),
@@ -60,14 +60,14 @@ impl fmt::Display for TokenType {
             TokenType::Question => write!(f, "?"),
             TokenType::Asterisk => write!(f, "*"),
             TokenType::To => write!(f, "TO"),
-            TokenType::Near(n) => write!(f, "NEAR/{}", n),
-            TokenType::NearForward(n) => write!(f, "NEAR/{}f", n),
+            TokenType::Near(n) => write!(f, "NEAR/{n}"),
+            TokenType::NearForward(n) => write!(f, "NEAR/{n}f"),
             TokenType::CommentStart => write!(f, "<<<"),
             TokenType::CommentEnd => write!(f, ">>>"),
-            TokenType::CommentText(t) => write!(f, "comment text '{}'", t),
-            TokenType::Field(f_name) => write!(f, "field '{}'", f_name),
-            TokenType::Hashtag(h) => write!(f, "hashtag '{}'", h),
-            TokenType::Mention(m) => write!(f, "mention '{}'", m),
+            TokenType::CommentText(t) => write!(f, "comment text '{t}'"),
+            TokenType::Field(f_name) => write!(f, "field '{f_name}'"),
+            TokenType::Hashtag(h) => write!(f, "hashtag '{h}'"),
+            TokenType::Mention(m) => write!(f, "mention '{m}'"),
             TokenType::Whitespace => write!(f, "whitespace"),
             TokenType::Eof => write!(f, "end of file"),
         }
@@ -280,7 +280,7 @@ impl Lexer {
                 self.column += 1;
                 Err(LintError::LexerError {
                     position: start_pos,
-                    message: format!("Unexpected character '{}'", ch),
+                    message: format!("Unexpected character '{ch}'"),
                 })
             }
         }
@@ -430,7 +430,7 @@ impl Lexer {
         Ok(Some(Token::new(
             TokenType::Hashtag(value.clone()),
             Span::new(start_pos, end_pos),
-            format!("#{}", value),
+            format!("#{value}"),
         )))
     }
 
@@ -456,7 +456,7 @@ impl Lexer {
         Ok(Some(Token::new(
             TokenType::Mention(value.clone()),
             Span::new(start_pos, end_pos),
-            format!("@{}", value),
+            format!("@{value}"),
         )))
     }
 

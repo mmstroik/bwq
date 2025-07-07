@@ -183,7 +183,7 @@ impl LspServer {
             .sender
             .send(Message::Notification(notification))?;
 
-        eprintln!("Closed document: {:?}", uri);
+        eprintln!("Closed document: {uri:?}");
         Ok(())
     }
 

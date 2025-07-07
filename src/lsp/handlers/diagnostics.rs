@@ -51,7 +51,7 @@ impl DiagnosticsHandler {
             LintError::ValidationError { span, message } => (span_to_range(span), message.clone()),
             LintError::InvalidBooleanCase { span, operator } => (
                 span_to_range(span),
-                format!("Boolean operator '{}' must be capitalized", operator),
+                format!("Boolean operator '{operator}' must be capitalized"),
             ),
             LintError::UnbalancedParentheses { span } => {
                 (span_to_range(span), "Unbalanced parentheses".to_string())
@@ -63,18 +63,18 @@ impl DiagnosticsHandler {
             ),
             LintError::InvalidProximityOperator { span, message } => (
                 span_to_range(span),
-                format!("Invalid proximity operator syntax: {}", message),
+                format!("Invalid proximity operator syntax: {message}"),
             ),
             LintError::InvalidFieldOperator { span, message } => (
                 span_to_range(span),
-                format!("Invalid field operator syntax: {}", message),
+                format!("Invalid field operator syntax: {message}"),
             ),
             LintError::InvalidRangeSyntax { span } => (
                 span_to_range(span),
                 "Invalid range syntax: expected '[value TO value]'".to_string(),
             ),
             LintError::UnexpectedToken { span, token } => {
-                (span_to_range(span), format!("Unexpected token '{}'", token))
+                (span_to_range(span), format!("Unexpected token '{token}'"))
             }
             LintError::ExpectedToken {
                 span,
@@ -82,7 +82,7 @@ impl DiagnosticsHandler {
                 found,
             } => (
                 span_to_range(span),
-                format!("Expected '{}' but found '{}'", expected, found),
+                format!("Expected '{expected}' but found '{found}'"),
             ),
             LintError::FieldValidationError { span, message } => {
                 (span_to_range(span), message.clone())
@@ -121,7 +121,7 @@ impl DiagnosticsHandler {
             code: Some(NumberOrString::String(warning.code().to_string())),
             code_description: None,
             source: Some("bwq".to_string()),
-            message: format!("{}", warning),
+            message: format!("{warning}"),
             related_information: None,
             tags: None,
             data: None,

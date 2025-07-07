@@ -131,7 +131,7 @@ impl ValidationRule for ShortTermRule {
                                 {
                                     result.errors.push(LintError::FieldValidationError {
                                         span: span.clone(),
-                                        message: format!("Unknown field type: {}", field_part),
+                                        message: format!("Unknown field type: {field_part}"),
                                     });
                                 }
                             }
