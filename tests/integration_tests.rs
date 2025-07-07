@@ -1,3 +1,4 @@
+use bwq::error::LintWarning;
 use bwq::{analyze_query, is_valid_query, BrandwatchLinter};
 use std::fs;
 
@@ -51,7 +52,7 @@ fn test_wildcards_and_replacement() {
 fn test_field_operators() {
     assert!(is_valid_query("title:\"apple juice\""));
     assert!(is_valid_query("site:twitter.com"));
-    assert!(is_valid_query("author:brandwatch"));
+    assert!(is_valid_query("author:  brandwatch")); // whitespace after colon is allowed
     assert!(is_valid_query("language:en"));
     assert!(is_valid_query("country:usa"));
     assert!(is_valid_query("region:usa.ca"));
@@ -470,12 +471,11 @@ fn test_operators_on_groupings() {
     // Multiple NEAR operations on groups
     assert!(is_valid_query("((smartphone OR phone) NEAR/5 (review OR rating)) AND ((camera OR battery) NEAR/3 (excellent OR amazing))"));
 
-    // Tilde proximity with AND requires parentheses
-    assert!(!is_valid_query(
-        "\"apple juice\"~5 AND (organic OR natural)"
-    ));
+    // Tilde proximity with AND should work without parentheses
+    assert!(is_valid_query("\"apple juice\"~5 AND (organic OR natural)"));
+    assert!(is_valid_query("(apple AND juice)~2 AND test"));
 
-    // Properly parenthesized tilde/AND should work
+    // Parenthesized versions still work
     assert!(is_valid_query(
         "(\"apple juice\"~5) AND (organic OR natural)"
     ));
@@ -649,28 +649,86 @@ fn test_tilde_proximity_operators() {
 }
 
 #[test]
-fn test_invalid_tilde_syntax() {
+fn test_tilde_syntax_comprehensive() {
     let mut linter = BrandwatchLinter::new();
 
-    // Invalid: tilde between separate terms (this was the bug we fixed)
-    // This should now fail parsing, so we check the error directly
-    assert!(!linter.is_valid("apple ~5 juice"));
-    assert!(!linter.is_valid("word1 ~10 word2"));
+    // Valid tilde usage - standard cases
+    assert!(linter.is_valid("\"apple juice\"~5"));
+    assert!(linter.is_valid("((apple OR orange) AND phone)~5"));
 
-    // Verify the specific error message
-    match linter.lint("apple ~5 juice") {
+    // Valid tilde with boolean operations (no parentheses needed)
+    assert!(linter.is_valid("\"apple juice\"~5 AND test"));
+    assert!(linter.is_valid("(apple AND juice)~2 AND test"));
+
+    // Valid but with warnings - single term usage
+    let report = linter.lint("apple~5").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.has_warnings());
+    assert!(report.warnings.iter().any(|w| match w {
+        LintWarning::PotentialTypo { suggestion, .. } =>
+            suggestion.contains("Single term tilde may produce unexpected fuzzy matching"),
+        _ => false,
+    }));
+
+    // Valid but with warnings - single quoted word
+    let report = linter.lint("\"apple\"~5").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.has_warnings());
+    assert!(report.warnings.iter().any(|w| match w {
+        LintWarning::PotentialTypo { suggestion, .. } => suggestion.contains("no effect"),
+        _ => false,
+    }));
+
+    // Valid with implicit AND and warnings
+    let report = linter.lint("apple~5 juice").unwrap();
+    assert!(!report.has_errors());
+    assert!(report.has_warnings());
+    assert!(report.warnings.iter().any(|w| match w {
+        LintWarning::PotentialTypo { suggestion, .. } => suggestion.contains("Single term tilde"),
+        _ => false,
+    }));
+    assert!(report.warnings.iter().any(|w| match w {
+        LintWarning::PotentialTypo { suggestion, .. } =>
+            suggestion.contains("explicit 'AND' operator"),
+        _ => false,
+    }));
+
+    // Invalid: tilde without distance number
+    assert!(!linter.is_valid("\"apple juice\"~"));
+    assert!(!linter.is_valid("apple~"));
+
+    // Invalid: tilde with spaces (separate tokens)
+    assert!(!linter.is_valid("apple ~ juice"));
+    assert!(!linter.is_valid("apple~ 5")); // Space between tilde and number
+    assert!(!linter.is_valid("apple ~5")); // Space before tilde
+    assert!(!linter.is_valid("apple~5t")); // Invalid characters after number
+
+    // Verify specific error messages
+    match linter.lint("\"apple juice\"~") {
         Err(error) => {
-            assert!(error
-                .to_string()
-                .contains("The ~ character should be used after a search term or quoted phrase"));
+            assert!(error.to_string().contains("requires a distance number"));
         }
-        Ok(_) => panic!("Expected parsing error for invalid tilde syntax"),
+        Ok(report) => {
+            assert!(report.has_errors());
+            assert!(report
+                .errors
+                .iter()
+                .any(|e| e.to_string().contains("requires a distance number")));
+        }
     }
 
-    // These should still be valid (no regression)
-    assert!(linter.is_valid("\"apple juice\"~5")); // Quoted phrase
-    assert!(linter.is_valid("apple~5")); // Single term fuzzy
-    assert!(linter.is_valid("((apple OR orange) AND phone)~5")); // Group
+    match linter.lint("apple ~ juice") {
+        Err(error) => {
+            assert!(error.to_string().contains("must be immediately attached"));
+        }
+        Ok(report) => {
+            assert!(report.has_errors());
+            assert!(report
+                .errors
+                .iter()
+                .any(|e| e.to_string().contains("must be immediately attached")));
+        }
+    }
 }
 
 #[test]

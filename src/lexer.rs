@@ -219,9 +219,36 @@ impl Lexer {
             '~' => {
                 self.advance();
                 self.column += 1;
+
+                // check if tilde is followed by a number and then invalid characters
+                let tilde_end = self.current_position();
+                if !self.is_at_end() && self.current_char().is_ascii_digit() {
+                    while !self.is_at_end() && self.current_char().is_ascii_digit() {
+                        self.advance();
+                        self.column += 1;
+                    }
+
+                    if !self.is_at_end()
+                        && !self.current_char().is_whitespace()
+                        && !matches!(
+                            self.current_char(),
+                            '(' | ')' | '[' | ']' | ':' | '~' | '"' | '#' | '@' | '<' | '>'
+                        )
+                        && !self.current_char().is_ascii_digit()
+                    {
+                        return Err(LintError::LexerError {
+                            position: start_pos,
+                            message: "Invalid characters after proximity operator. Tilde operator format should be ~5 (with proper word boundary).".to_string(),
+                        });
+                    }
+
+                    self.position -= self.current_position().offset - tilde_end.offset;
+                    self.column = tilde_end.column;
+                }
+
                 Ok(Some(Token::new(
                     TokenType::Tilde,
-                    Span::new(start_pos, self.current_position()),
+                    Span::new(start_pos, tilde_end),
                     "~".to_string(),
                 )))
             }

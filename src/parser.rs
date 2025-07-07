@@ -162,44 +162,50 @@ impl Parser {
         // handle proximity operators
         if self.match_token(&TokenType::Tilde) {
             let tilde_span = self.previous().span.clone();
-            let mut distance = None;
+            let distance;
 
-            // check for optional distance number
-            if let TokenType::Number(num_str) = &self.peek().token_type {
-                distance = num_str.parse::<u32>().ok();
-                self.advance();
+            if left.span().end.offset != tilde_span.start.offset {
+                return Err(LintError::ValidationError {
+                    span: tilde_span,
+                    message: "The ~ operator must be immediately attached to the preceding term (e.g., apple~5, not apple ~5).".to_string(),
+                });
             }
 
-            // tilde is only valid:
-            // 1. after quoted phrases for proximity: "apple juice"~5
-            // 2. after grouped expressions for proximity: ((apple OR orange) AND (smartphone OR phone))~5
-            // 3. after single terms for fuzzy matching: apple~5
-
-            let is_valid_tilde_context = match &left {
-                Expression::Term {
-                    term: Term::Phrase { .. },
-                    ..
-                } => true,
-                Expression::Group { .. } => true,
-                Expression::Term { .. } => {
-                    self.is_at_end()
-                        || matches!(
-                            self.peek().token_type,
-                            TokenType::And
-                                | TokenType::Or
-                                | TokenType::Not
-                                | TokenType::RightParen
-                                | TokenType::LeftParen
-                                | TokenType::Eof
-                        )
+            // require distance number immediately after tilde (no spaces)
+            if let TokenType::Number(num_str) = &self.peek().token_type {
+                let number_token = self.peek();
+                if tilde_span.end.offset == number_token.span.start.offset {
+                    distance = num_str.parse::<u32>().ok();
+                    self.advance();
+                    if distance.is_none() {
+                        return Err(LintError::ValidationError {
+                            span: tilde_span,
+                            message:
+                                "Invalid proximity distance. Distance must be a positive number."
+                                    .to_string(),
+                        });
+                    }
+                } else {
+                    return Err(LintError::ValidationError {
+                        span: tilde_span,
+                        message: "The ~ operator requires a distance number immediately after it (e.g., ~5 for proximity within 5 words).".to_string(),
+                    });
                 }
-                _ => false,
-            };
+            } else {
+                return Err(LintError::ValidationError {
+                    span: tilde_span,
+                    message: "The ~ operator requires a distance number (e.g., ~5 for proximity within 5 words).".to_string(),
+                });
+            }
+
+            // tilde is valid after quoted phrases, grouped expressions, or single terms
+            let is_valid_tilde_context =
+                matches!(&left, Expression::Term { .. } | Expression::Group { .. });
 
             if !is_valid_tilde_context {
                 return Err(LintError::ValidationError {
                     span: tilde_span,
-                    message: "The ~ character should be used after a search term or quoted phrase (to specify fuzzy matching), or after a sub-query (to specify proximity matching). If this should be part of a search term, it must be quoted (or escaped using the \\ character).".to_string(),
+                    message: "The ~ operator should be used after a search term, quoted phrase, or grouped expression. If this should be part of a search term, it must be quoted (or escaped using the \\ character).".to_string(),
                 });
             }
 
@@ -208,7 +214,9 @@ impl Parser {
             let span = Span::new(terms[0].span().start.clone(), end_span);
 
             return Ok(Expression::Proximity {
-                operator: ProximityOperator::Proximity { distance },
+                operator: ProximityOperator::Proximity {
+                    distance: Some(distance.unwrap()),
+                },
                 terms,
                 span,
             });
