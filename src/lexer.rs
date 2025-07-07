@@ -682,7 +682,7 @@ mod tests {
     #[test]
     fn test_numbers_vs_words_and_special_chars() {
         let mut lexer = Lexer::new(
-            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test test|word test@word",
+            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
         );
         let tokens = lexer.tokenize().unwrap();
 
