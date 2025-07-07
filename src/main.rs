@@ -94,7 +94,7 @@ fn main() {
         }
         Some(Commands::Lsp) => {
             if let Err(e) = bwq::lsp::LspServer::run() {
-                eprintln!("LSP server error: {}", e);
+                eprintln!("LSP server error: {e}");
                 std::process::exit(1);
             }
         }
@@ -180,7 +180,7 @@ fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result
                 "file": path.display().to_string(),
                 "valid": analysis.is_valid,
                 "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                "warnings": analysis.warnings.iter().map(|w| format!("{:?}", w)).collect::<Vec<_>>(),
+                "warnings": analysis.warnings.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>(),
                 "query": query
             });
             println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
@@ -255,7 +255,7 @@ fn lint_directory(
                 }
             }
             Err(e) => {
-                eprintln!("Error processing path: {}", e);
+                eprintln!("Error processing path: {e}");
                 any_errors = true;
             }
         }
@@ -276,7 +276,7 @@ fn lint_directory(
                     "file": file_path.display().to_string(),
                     "valid": analysis.is_valid,
                     "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                    "warnings": analysis.warnings.iter().map(|w| format!("{:?}", w)).collect::<Vec<_>>(),
+                    "warnings": analysis.warnings.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>(),
                     "query": query
                 })
             }).collect();
@@ -301,7 +301,7 @@ fn lint_directory(
                 }
             }
 
-            println!("Summary: {}/{} files valid", valid_files, total_files);
+            println!("Summary: {valid_files}/{total_files} files valid");
         }
     }
 
@@ -351,7 +351,7 @@ fn interactive_mode(show_warnings: bool) {
                 println!();
             }
             Err(e) => {
-                eprintln!("Error reading input: {}", e);
+                eprintln!("Error reading input: {e}");
                 break;
             }
         }
@@ -381,7 +381,7 @@ fn output_json(analysis: &bwq::AnalysisResult) {
         "valid": analysis.is_valid,
         "summary": analysis.summary(),
         "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-        "warnings": analysis.warnings.iter().map(|w| format!("{:?}", w)).collect::<Vec<_>>(),
+        "warnings": analysis.warnings.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>(),
         "query": analysis.query
     });
 

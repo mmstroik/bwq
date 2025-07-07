@@ -16,12 +16,40 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Self {
-            tokens,
+    pub fn new(tokens: Vec<Token>) -> Result<Self, LintError> {
+        // filter out all comment-related tokens including content between comment markers
+        let mut filtered_tokens: Vec<Token> = Vec::new();
+        let mut inside_comment = false;
+        let mut comment_start_span: Option<Span> = None;
+
+        for token in tokens {
+            match &token.token_type {
+                TokenType::CommentStart => {
+                    inside_comment = true;
+                    comment_start_span = Some(token.span.clone());
+                }
+                TokenType::CommentEnd => {
+                    inside_comment = false;
+                    comment_start_span = None;
+                }
+                TokenType::Eof if inside_comment => {
+                    return Err(LintError::ValidationError {
+                        span: comment_start_span.unwrap(),
+                        message: "Please add a >>> mark to close this commented text.".to_string(),
+                    });
+                }
+                _ if inside_comment => {}
+                _ => {
+                    filtered_tokens.push(token);
+                }
+            }
+        }
+
+        Ok(Self {
+            tokens: filtered_tokens,
             current: 0,
             implicit_and_spans: Vec::new(),
-        }
+        })
     }
 
     /// parse the tokens into a queryAST
@@ -54,10 +82,7 @@ impl Parser {
     fn parse_expression(&mut self) -> LintResult<Expression> {
         let mut left = self.parse_and_expression()?;
 
-        while {
-            self.skip_comments();
-            self.match_token(&TokenType::Or)
-        } {
+        while self.match_token(&TokenType::Or) {
             let operator = BooleanOperator::Or;
             let _operator_span = self.previous().span.clone();
             let right = self.parse_and_expression()?;
@@ -78,8 +103,6 @@ impl Parser {
         let mut left = self.parse_not_expression()?;
 
         loop {
-            self.skip_comments();
-
             if self.match_token(&TokenType::And) {
                 let operator = BooleanOperator::And;
                 let _operator_span = self.previous().span.clone();
@@ -136,10 +159,7 @@ impl Parser {
 
         let mut left = self.parse_proximity_expression()?;
 
-        while {
-            self.skip_comments();
-            self.match_token(&TokenType::Not)
-        } {
+        while self.match_token(&TokenType::Not) {
             let operator = BooleanOperator::Not;
             let _operator_span = self.previous().span.clone();
             let right = self.parse_proximity_expression()?;
@@ -315,10 +335,7 @@ impl Parser {
             return self.parse_range();
         }
 
-        // comments <<<text>>>
-        if self.match_token(&TokenType::CommentStart) {
-            return self.parse_comment();
-        }
+        // Comments are now filtered out during parser construction
 
         // field operations
         if let TokenType::Word(word) = &self.peek().token_type {
@@ -374,7 +391,7 @@ impl Parser {
                                     Expression::Term {
                                         term: Term::Phrase { value },
                                         ..
-                                    } => format!("\"{}\"", value),
+                                    } => format!("\"{value}\""),
                                     _ => "unknown".to_string(),
                                 }
                             ),
@@ -448,37 +465,7 @@ impl Parser {
         })
     }
 
-    fn parse_comment(&mut self) -> LintResult<Expression> {
-        let start_span = self.previous().span.clone();
-        let mut comment_text = String::new();
-
-        while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {
-            match &self.peek().token_type {
-                TokenType::Word(w) => comment_text.push_str(w),
-                TokenType::QuotedString(s) => comment_text.push_str(&format!("\"{}\"", s)),
-                TokenType::Number(n) => comment_text.push_str(n),
-                TokenType::Whitespace => comment_text.push(' '),
-                _ => comment_text.push_str(&self.peek().raw),
-            }
-            self.advance();
-        }
-
-        if !self.match_token(&TokenType::CommentEnd) {
-            return Err(LintError::ExpectedToken {
-                span: self.peek().span.clone(),
-                expected: ">>>".to_string(),
-                found: self.peek().token_type.to_string(),
-            });
-        }
-
-        let end_span = self.previous().span.clone();
-        let span = Span::new(start_span.start, end_span.end);
-
-        Ok(Expression::Comment {
-            text: comment_text.trim().to_string(),
-            span,
-        })
-    }
+    // parse_comment function removed - comments are now filtered out during parser construction
 
     fn parse_term(&mut self) -> LintResult<Expression> {
         let token = self.peek().clone();
@@ -619,15 +606,7 @@ impl Parser {
         }
     }
 
-    /// skip any comments at the current position
-    fn skip_comments(&mut self) {
-        while self.match_token(&TokenType::CommentStart) {
-            while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {
-                self.advance();
-            }
-            self.match_token(&TokenType::CommentEnd);
-        }
-    }
+    // skip_comments function removed - comments are now filtered out during parser construction
 }
 
 impl Expression {
@@ -639,7 +618,6 @@ impl Expression {
             Expression::Field { span, .. } => span,
             Expression::Range { span, .. } => span,
             Expression::Term { span, .. } => span,
-            Expression::Comment { span, .. } => span,
         }
     }
 }
@@ -653,7 +631,7 @@ mod tests {
     fn test_basic_parsing() {
         let mut lexer = Lexer::new("apple AND juice");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
@@ -668,7 +646,7 @@ mod tests {
     fn test_quoted_phrase() {
         let mut lexer = Lexer::new("\"apple juice\"");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
@@ -686,7 +664,7 @@ mod tests {
     fn test_field_operation() {
         let mut lexer = Lexer::new("title:\"apple juice\"");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {
@@ -701,7 +679,7 @@ mod tests {
     fn test_implicit_and() {
         let mut lexer = Lexer::new("apple banana");
         let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
         match result.query.expression {

@@ -276,7 +276,7 @@ impl ValidationRule for BooleanFieldRule {
                         let field_name = field.as_str();
                         return ValidationResult::with_error(LintError::ValidationError {
                             span: span.clone(),
-                            message: format!("{} must be 'true' or 'false'", field_name),
+                            message: format!("{field_name} must be 'true' or 'false'"),
                         });
                     }
                 }

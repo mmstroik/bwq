@@ -51,7 +51,7 @@ impl DiagnosticsHandler {
             LintError::ValidationError { span, message } => (span_to_range(span), message.clone()),
             LintError::InvalidBooleanCase { span, operator } => (
                 span_to_range(span),
-                format!("Boolean operator '{}' must be capitalized", operator),
+                format!("Boolean operator '{operator}' must be capitalized"),
             ),
             LintError::UnbalancedParentheses { span } => {
                 (span_to_range(span), "Unbalanced parentheses".to_string())
@@ -63,18 +63,18 @@ impl DiagnosticsHandler {
             ),
             LintError::InvalidProximityOperator { span, message } => (
                 span_to_range(span),
-                format!("Invalid proximity operator syntax: {}", message),
+                format!("Invalid proximity operator syntax: {message}"),
             ),
             LintError::InvalidFieldOperator { span, message } => (
                 span_to_range(span),
-                format!("Invalid field operator syntax: {}", message),
+                format!("Invalid field operator syntax: {message}"),
             ),
             LintError::InvalidRangeSyntax { span } => (
                 span_to_range(span),
                 "Invalid range syntax: expected '[value TO value]'".to_string(),
             ),
             LintError::UnexpectedToken { span, token } => {
-                (span_to_range(span), format!("Unexpected token '{}'", token))
+                (span_to_range(span), format!("Unexpected token '{token}'"))
             }
             LintError::ExpectedToken {
                 span,
@@ -82,7 +82,7 @@ impl DiagnosticsHandler {
                 found,
             } => (
                 span_to_range(span),
-                format!("Expected '{}' but found '{}'", expected, found),
+                format!("Expected '{expected}' but found '{found}'"),
             ),
         };
 
@@ -103,15 +103,15 @@ impl DiagnosticsHandler {
         let (range, message) = match warning {
             LintWarning::PotentialTypo { span, suggestion } => (
                 span_to_range(span),
-                format!("Potential typo. Did you mean '{}'?", suggestion),
+                format!("Potential typo. Did you mean '{suggestion}'?"),
             ),
             LintWarning::DeprecatedOperator { span, replacement } => (
                 span_to_range(span),
-                format!("Deprecated operator. Consider using '{}'", replacement),
+                format!("Deprecated operator. Consider using '{replacement}'"),
             ),
             LintWarning::PerformanceWarning { span, message } => (
                 span_to_range(span),
-                format!("Performance warning: {}", message),
+                format!("Performance warning: {message}"),
             ),
         };
 

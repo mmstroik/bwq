@@ -131,7 +131,7 @@ impl ValidationRule for ShortTermRule {
                                 {
                                     result.errors.push(LintError::ValidationError {
                                         span: span.clone(),
-                                        message: format!("Unknown field type: {}", field_part),
+                                        message: format!("Unknown field type: {field_part}"),
                                     });
                                 }
                             }
@@ -183,22 +183,12 @@ impl ValidationRule for ShortTermRule {
                     _ => ValidationResult::new(),
                 }
             }
-            Expression::Comment { text, span } => {
-                if text.trim().is_empty() {
-                    ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                        span: span.clone(),
-                        message: "Empty comment".to_string(),
-                    })
-                } else {
-                    ValidationResult::new()
-                }
-            }
             _ => ValidationResult::new(),
         }
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Term { .. } | Expression::Comment { .. })
+        matches!(expr, Expression::Term { .. })
     }
 }
 

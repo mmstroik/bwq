@@ -28,7 +28,7 @@ impl BrandwatchLinter {
         let mut lexer = Lexer::new(query);
         let tokens = lexer.tokenize()?;
 
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens)?;
         let parse_result = parser.parse()?;
 
         let mut report = self.validator.validate(&parse_result.query);

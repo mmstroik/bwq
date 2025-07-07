@@ -43,11 +43,6 @@ pub enum Expression {
         term: Term,
         span: Span,
     },
-
-    Comment {
-        text: String,
-        span: Span,
-    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
