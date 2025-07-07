@@ -276,7 +276,13 @@ impl Lexer {
                     self.read_number()
                 }
             }
-            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' || ch == '$' => {
+            _ if ch.is_alphabetic()
+                || ch == '_'
+                || ch == '*'
+                || ch == '?'
+                || ch == '$'
+                || ch == '&' =>
+            {
                 self.read_word_or_operator()
             }
 
@@ -346,7 +352,9 @@ impl Lexer {
                 || self.current_char() == '/'
                 || self.current_char() == '*'
                 || self.current_char() == '?'
-                || self.current_char() == '$')
+                || self.current_char() == '$'
+                || self.current_char() == '&'
+                || self.current_char() == '#')
         {
             value.push(self.current_char());
             self.advance();
@@ -426,7 +434,9 @@ impl Lexer {
                 || self.current_char() == '_'
                 || self.current_char() == '*'
                 || self.current_char() == '?'
-                || self.current_char() == '$')
+                || self.current_char() == '$'
+                || self.current_char() == '&'
+                || self.current_char() == '#')
         {
             value.push(self.current_char());
             self.advance();
@@ -453,7 +463,9 @@ impl Lexer {
                 || self.current_char() == '_'
                 || self.current_char() == '*'
                 || self.current_char() == '?'
-                || self.current_char() == '$')
+                || self.current_char() == '$'
+                || self.current_char() == '&'
+                || self.current_char() == '#')
         {
             value.push(self.current_char());
             self.advance();
@@ -567,6 +579,8 @@ impl Lexer {
                 || ch == '*'
                 || ch == '?'
                 || ch == '$'
+                || ch == '&'
+                || ch == '#'
             {
                 pos += 1;
             } else {
@@ -618,28 +632,28 @@ mod tests {
     #[test]
     fn test_numbers_vs_words_and_special_chars() {
         let mut lexer = Lexer::new(
-            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U$BER uber$ 123$abc -5$test",
+            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U&BER uber$ 123$abc -5$te#st",
         );
         let tokens = lexer.tokenize().unwrap();
 
         assert_eq!(tokens.len(), 12); // 11 tokens + EOF
 
-        // Pure numbers
+        // pure numbers
         assert!(matches!(tokens[0].token_type, TokenType::Number(ref n) if n == "42"));
         assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "3.14"));
         assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-5"));
 
-        // Alphanumeric starting with digits (should be words due to has_letters_ahead)
+        // alphanumeric starting with digits (should be words due to has_letters_ahead)
         assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
         assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
         assert!(matches!(tokens[5].token_type, TokenType::Word(ref w) if w == "user123"));
 
-        // Dollar sign variations
+        // special characters
         assert!(matches!(tokens[6].token_type, TokenType::Word(ref w) if w == "$UBER"));
-        assert!(matches!(tokens[7].token_type, TokenType::Word(ref w) if w == "U$BER"));
+        assert!(matches!(tokens[7].token_type, TokenType::Word(ref w) if w == "U&BER"));
         assert!(matches!(tokens[8].token_type, TokenType::Word(ref w) if w == "uber$"));
         assert!(matches!(tokens[9].token_type, TokenType::Word(ref w) if w == "123$abc"));
-        assert!(matches!(tokens[10].token_type, TokenType::Word(ref w) if w == "-5$test"));
+        assert!(matches!(tokens[10].token_type, TokenType::Word(ref w) if w == "-5$te#st"));
 
         assert!(matches!(tokens[11].token_type, TokenType::Eof));
     }

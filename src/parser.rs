@@ -335,8 +335,6 @@ impl Parser {
             return self.parse_range();
         }
 
-        // Comments are now filtered out during parser construction
-
         // field operations
         if let TokenType::Word(word) = &self.peek().token_type {
             let word = word.clone();
