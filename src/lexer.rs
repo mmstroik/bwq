@@ -74,7 +74,7 @@ impl fmt::Display for TokenType {
     }
 }
 
-/// A token with position information
+/// a token with position information
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub token_type: TokenType,
@@ -92,7 +92,7 @@ impl Token {
     }
 }
 
-/// Lexer for tokenizing Brandwatch boolean queries
+/// lexer for tokenizing  queries
 pub struct Lexer {
     input: Vec<char>,
     position: usize,

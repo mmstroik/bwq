@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::error::{LintError, LintWarning};
 use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
-// Wildcard performance validation rule
 pub struct WildcardPerformanceRule;
 
 impl ValidationRule for WildcardPerformanceRule {
@@ -62,7 +61,7 @@ impl ValidationRule for WildcardPerformanceRule {
                 right,
                 span,
             } => {
-                // Warn about multiple wildcards in OR operations
+                // warn about multiple wildcards in OR operations
                 if let (
                     Expression::Term {
                         term: Term::Wildcard { .. },
@@ -102,7 +101,6 @@ impl ValidationRule for WildcardPerformanceRule {
     }
 }
 
-// Short term performance validation rule
 pub struct ShortTermRule;
 
 impl ValidationRule for ShortTermRule {
@@ -204,7 +202,6 @@ impl ValidationRule for ShortTermRule {
     }
 }
 
-// Range performance validation rule
 pub struct RangePerformanceRule;
 
 impl ValidationRule for RangePerformanceRule {

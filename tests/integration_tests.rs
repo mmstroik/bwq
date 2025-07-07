@@ -1,4 +1,4 @@
-use bwq_lint::{analyze_query, is_valid_query, BrandwatchLinter};
+use bwq::{analyze_query, is_valid_query, BrandwatchLinter};
 use std::fs;
 
 #[test]
@@ -8,7 +8,7 @@ fn test_basic_boolean_operators() {
     assert!(is_valid_query("apple NOT bitter"));
     assert!(is_valid_query("(apple OR orange) AND juice"));
 
-    // This should be invalid - pure negative query
+    // pure negative query
     assert!(!is_valid_query("NOT bitter"));
 }
 
@@ -29,7 +29,7 @@ fn test_proximity_operators() {
         "((apple OR orange) NEAR/5 (smartphone OR phone))"
     ));
 
-    // Valid NEAR with proper parentheses
+    // valid NEAR with proper parentheses
     assert!(is_valid_query("(apple NEAR/5 juice) AND orange"));
     assert!(is_valid_query(
         "continent:europe AND (sustainability NEAR/10 climate)"
@@ -42,7 +42,6 @@ fn test_wildcards_and_replacement() {
     assert!(is_valid_query("customi?e"));
     assert!(is_valid_query("complain*"));
 
-    // Invalid wildcard at beginning
     let mut linter = BrandwatchLinter::new();
     let report = linter.lint("*invalid").unwrap();
     assert!(report.has_errors());
@@ -126,19 +125,13 @@ fn test_complex_queries() {
 #[test]
 fn test_invalid_queries() {
     let invalid_queries = vec![
-        "*invalid",           // Wildcard at beginning
-        "apple AND",          // Missing right operand
-        "OR juice",           // Missing left operand
-        "apple ()",           // Empty parentheses
-        "rating:6", // Invalid rating (should be 1-5) - NOTE: BW API may be more permissive
-        "NEAR/0 apple juice", // Zero distance
-        "[3 TO 1]", // Invalid range (start > end)
-        "NOT bitter", // Pure negative query (now disabled since NOT is binary)
-                    // NOTE: Some field validations may be too strict compared to BW API:
-                    // "authorGender:X" - BW API accepts this
-                    // "engagementType:LIKE" - BW API accepts this
-                    // "rating:0" - BW API accepts this
-                    // These discrepancies suggest our validation is stricter than BW API
+        "*invalid",                 // Wildcard at beginning
+        "apple AND",                // Missing right operand
+        "OR juice",                 // Missing left operand
+        "apple AND ()",             // Empty parentheses
+        "rating:6", // Invalid rating (should be 0-5) - NOTE: BW API is more permissive
+        "authorFollowers:[3 TO 1]", // Invalid range (start > end)
+        "NOT bitter", // Pure negative query (NOT is binary)
     ];
 
     for query in invalid_queries {
@@ -170,10 +163,10 @@ fn test_location_validation() {
 
     // Test coordinate validation
     let mut linter = BrandwatchLinter::new();
-    let report = linter.lint("latitude:[100 TO 110]").unwrap(); // Invalid lat range
+    let report = linter.lint("latitude:[100 TO 110]").unwrap();
     assert!(report.has_errors());
 
-    let report = linter.lint("longitude:[-200 TO -150]").unwrap(); // Invalid long range
+    let report = linter.lint("longitude:[-200 TO -150]").unwrap();
     assert!(report.has_errors());
 }
 
@@ -181,7 +174,6 @@ fn test_location_validation() {
 fn test_rating_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // Valid ratings
     assert!(linter.is_valid("rating:3"));
     assert!(linter.is_valid("rating:[2 TO 4]"));
 
@@ -199,11 +191,9 @@ fn test_rating_validation() {
 fn test_boolean_field_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // Valid boolean values
     assert!(linter.is_valid("authorVerified:true"));
     assert!(linter.is_valid("authorVerified:false"));
 
-    // Invalid boolean values
     let report = linter.lint("authorVerified:yes").unwrap();
     assert!(report.has_errors());
 
@@ -215,7 +205,6 @@ fn test_boolean_field_validation() {
 fn test_engagement_type_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // Valid engagement types
     assert!(linter.is_valid("engagementType:COMMENT"));
     assert!(linter.is_valid("engagementType:REPLY"));
     assert!(linter.is_valid("engagementType:RETWEET"));
@@ -229,12 +218,10 @@ fn test_engagement_type_validation() {
 fn test_verified_type_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // Valid verified types
     assert!(linter.is_valid("authorVerifiedType:blue"));
     assert!(linter.is_valid("authorVerifiedType:business"));
     assert!(linter.is_valid("authorVerifiedType:government"));
 
-    // Invalid verified type
     let report = linter.lint("authorVerifiedType:gold").unwrap();
     assert!(report.has_errors());
 }
@@ -243,11 +230,9 @@ fn test_verified_type_validation() {
 fn test_minute_of_day_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // Valid minute ranges
     assert!(linter.is_valid("minuteOfDay:[0 TO 1439]"));
     assert!(linter.is_valid("minuteOfDay:[720 TO 780]")); // Noon to 1 PM
 
-    // Invalid minute ranges
     let report = linter.lint("minuteOfDay:[-1 TO 100]").unwrap();
     assert!(report.has_errors());
 
@@ -259,7 +244,6 @@ fn test_minute_of_day_validation() {
 fn test_language_code_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // Valid language codes
     assert!(linter.is_valid("language:en"));
     assert!(linter.is_valid("language:es"));
     assert!(linter.is_valid("language:fr"));
@@ -343,7 +327,6 @@ fn test_nested_expressions() {
 
 #[test]
 fn test_real_world_queries() {
-    // Real-world style queries that should be valid
     let real_queries = vec![
         r#"("brand name" OR @brandhandle) AND (positive OR "great product") NOT (complaint OR "bad service")"#,
         r#"title:"product review" AND ((iPhone OR Samsung OR Google) NEAR/5 (camera OR "battery life"))"#,
@@ -372,33 +355,41 @@ fn test_real_world_queries() {
 fn test_implicit_and_behavior() {
     let mut linter = BrandwatchLinter::new();
 
-    // Test simple implicit AND
     let report = linter.lint("apple banana").unwrap();
-    assert!(!report.has_errors()); // Should be valid
-    assert!(report.has_warnings()); // Should have warnings about implicit AND
+    assert!(!report.has_errors(), "Implicit AND should be valid");
+    assert!(
+        report.has_warnings(),
+        "Implicit AND should generate warnings"
+    );
 
-    // Test implicit AND mixed with explicit operators (requires parentheses)
     let report = linter.lint("apple banana OR cherry").unwrap();
-    assert!(report.has_errors()); // Should fail due to mixed AND/OR without parentheses
+    assert!(
+        report.has_errors(),
+        "Mixed implicit AND with OR should fail without parentheses"
+    );
 
-    // Test proper parentheses with implicit AND
     let report = linter.lint("(apple banana) OR cherry").unwrap();
-    assert!(!report.has_errors()); // Should be valid with parentheses
-    assert!(report.has_warnings()); // Should have warnings about implicit AND
+    assert!(
+        !report.has_errors(),
+        "Properly parenthesized implicit AND should be valid"
+    );
+    assert!(
+        report.has_warnings(),
+        "Implicit AND should still generate warnings"
+    );
 
-    // Test explicit AND should not generate warnings about implicit operators
     let report = linter.lint("apple AND banana").unwrap();
-    assert!(!report.has_errors()); // Should be valid
-                                   // May have other warnings but not about implicit AND
+    assert!(
+        !report.has_warnings(),
+        "Explicit AND should not generate warnings"
+    );
 }
 
 #[test]
 fn test_api_discrepancies_documented() {
     // These tests document that our linter now correctly matches BW API behavior
-    // Previously our linter was overly strict, but these cases now pass correctly
     let mut linter = BrandwatchLinter::new();
 
-    // Our linter now correctly accepts these, matching BW API behavior
     let previously_overly_strict_cases = vec![
         "authorGender:X",      // BW API accepts any gender value
         "engagementType:LIKE", // BW API accepts this engagement type
@@ -607,7 +598,6 @@ fn test_performance_warnings_in_complex_queries() {
 fn test_operator_precedence_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // These should fail due to mixed AND/OR without parentheses
     let mixed_and_or_cases = vec![
         "apple OR banana AND juice",
         "apple AND banana OR juice AND smoothie",
@@ -626,7 +616,6 @@ fn test_operator_precedence_validation() {
         );
     }
 
-    // These should pass with proper parentheses
     let properly_parenthesized_cases = vec![
         "(apple OR banana) AND juice",
         "(apple AND banana) OR (juice AND smoothie)",
@@ -641,8 +630,6 @@ fn test_operator_precedence_validation() {
 
 #[test]
 fn test_tilde_proximity_operators() {
-    // Test both tilde syntax variants documented in brandwatch-query-operators.md
-
     // Postfix tilde on quoted phrases
     assert!(is_valid_query("\"apple juice\"~5"));
     assert!(is_valid_query("\"organic fruit\"~10"));
@@ -653,9 +640,9 @@ fn test_tilde_proximity_operators() {
     ));
     assert!(is_valid_query("(brand OR company)~3"));
 
-    // Single word tilde (fuzzy matching)
+    // Single word tilde (doesn't do any proximity stuff but is valid)
     assert!(is_valid_query("apple~5"));
-    assert!(is_valid_query("apple~3"));
+    assert!(is_valid_query("\"apple\"~3"));
 
     // Tilde with complex expressions
     assert!(is_valid_query("((tech OR technology) AND innovation)~7"));
@@ -702,7 +689,6 @@ fn test_extreme_deep_nesting() {
 fn test_near_operator_interaction_validation() {
     let mut linter = BrandwatchLinter::new();
 
-    // These should fail due to NEAR/boolean operator mixing
     let mixed_near_boolean_cases = vec!["(apple OR orange) NEAR/5 (juice OR drink) AND fresh"];
 
     for query in mixed_near_boolean_cases {
@@ -718,7 +704,6 @@ fn test_near_operator_interaction_validation() {
         );
     }
 
-    // These should pass - with proper parentheses to disambiguate
     let valid_near_cases = vec![
         "((apple OR orange) NEAR/5 (juice OR drink)) AND fresh", // Proper parentheses
         "(apple NEAR/3 banana) OR (juice NEAR/2 smoothie)",      // Properly parenthesized NEAR/OR

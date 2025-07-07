@@ -2,13 +2,13 @@ use crate::ast::*;
 use crate::error::{LintError, LintResult, LintWarning, Span};
 use crate::lexer::{Token, TokenType};
 
-/// Result type that includes both the parsed query and any parser warnings
+/// result type with parsed query and any parser warnings
 pub struct ParseResult {
     pub query: Query,
     pub warnings: Vec<LintWarning>,
 }
 
-/// Recursive descent parser for Brandwatch boolean queries
+/// recursive descent parser for queries
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
@@ -24,12 +24,12 @@ impl Parser {
         }
     }
 
-    /// Parse the tokens into a Query AST
+    /// parse the tokens into a queryAST
     pub fn parse(&mut self) -> LintResult<ParseResult> {
         let expression = self.parse_expression()?;
         let span = expression.span().clone();
 
-        // Ensure we've consumed all tokens except EOF
+        // ensure we've consumed all tokens except EOF
         if !self.is_at_end() && !matches!(self.peek().token_type, TokenType::Eof) {
             return Err(LintError::UnexpectedToken {
                 span: self.peek().span.clone(),
@@ -37,7 +37,6 @@ impl Parser {
             });
         }
 
-        // Generate warnings for implicit AND operations
         let mut warnings = Vec::new();
         for span in &self.implicit_and_spans {
             warnings.push(LintWarning::PotentialTypo {
@@ -56,7 +55,6 @@ impl Parser {
         let mut left = self.parse_and_expression()?;
 
         while {
-            // Skip any comments between expressions
             self.skip_comments();
             self.match_token(&TokenType::Or)
         } {
@@ -80,11 +78,9 @@ impl Parser {
         let mut left = self.parse_not_expression()?;
 
         loop {
-            // Skip any comments between expressions
             self.skip_comments();
 
             if self.match_token(&TokenType::And) {
-                // Explicit AND
                 let operator = BooleanOperator::And;
                 let _operator_span = self.previous().span.clone();
                 let right = self.parse_not_expression()?;
@@ -97,7 +93,7 @@ impl Parser {
                     span,
                 };
             } else if self.is_implicit_and_candidate() {
-                // Implicit AND (space-separated terms)
+                // warn on implicit AND (space-separated terms)
                 let right = self.parse_not_expression()?;
 
                 let span = Span::new(left.span().start.clone(), right.span().end.clone());
@@ -108,7 +104,6 @@ impl Parser {
                     span: span.clone(),
                 };
 
-                // Mark this for warning generation
                 self.implicit_and_spans.push(span);
             } else {
                 break;
@@ -119,7 +114,7 @@ impl Parser {
     }
 
     fn parse_not_expression(&mut self) -> LintResult<Expression> {
-        // Handle leading NOT operator
+        // handle leading NOT operator
         if self.match_token(&TokenType::Not) {
             let operator_span = self.previous().span.clone();
             let dummy_left = Expression::Term {
@@ -142,7 +137,6 @@ impl Parser {
         let mut left = self.parse_proximity_expression()?;
 
         while {
-            // Skip any comments between expressions
             self.skip_comments();
             self.match_token(&TokenType::Not)
         } {
@@ -165,35 +159,29 @@ impl Parser {
     fn parse_proximity_expression(&mut self) -> LintResult<Expression> {
         let left = self.parse_primary()?;
 
-        // Handle proximity operators
+        // handle proximity operators
         if self.match_token(&TokenType::Tilde) {
             let tilde_span = self.previous().span.clone();
             let mut distance = None;
 
-            // Check for optional distance number
+            // check for optional distance number
             if let TokenType::Number(num_str) = &self.peek().token_type {
                 distance = num_str.parse::<u32>().ok();
                 self.advance();
             }
 
-            // Validate tilde usage according to Brandwatch rules
-            // Tilde is only valid:
-            // 1. After quoted phrases for proximity: "apple juice"~5
-            // 2. After grouped expressions for proximity: ((apple OR orange) AND (smartphone OR phone))~5
-            // 3. After single terms for fuzzy matching: apple~5 (but NOT apple ~5 juice)
+            // tilde is only valid:
+            // 1. after quoted phrases for proximity: "apple juice"~5
+            // 2. after grouped expressions for proximity: ((apple OR orange) AND (smartphone OR phone))~5
+            // 3. after single terms for fuzzy matching: apple~5
 
             let is_valid_tilde_context = match &left {
-                // Valid: quoted phrases
                 Expression::Term {
                     term: Term::Phrase { .. },
                     ..
                 } => true,
-                // Valid: grouped expressions
                 Expression::Group { .. } => true,
-                // Valid: single terms for fuzzy matching (no additional terms after tilde)
                 Expression::Term { .. } => {
-                    // Check if there are additional terms after the tilde
-                    // If so, this is invalid syntax like "apple ~5 juice"
                     self.is_at_end()
                         || matches!(
                             self.peek().token_type,
@@ -209,7 +197,6 @@ impl Parser {
             };
 
             if !is_valid_tilde_context {
-                // This handles the invalid case like "apple ~5 juice"
                 return Err(LintError::ValidationError {
                     span: tilde_span,
                     message: "The ~ character should be used after a search term or quoted phrase (to specify fuzzy matching), or after a sub-query (to specify proximity matching). If this should be part of a search term, it must be quoted (or escaped using the \\ character).".to_string(),
@@ -227,7 +214,7 @@ impl Parser {
             });
         }
 
-        // Handle NEAR operators
+        // handle NEAR/x and NEAR/xf
         if let TokenType::Near(distance) = &self.peek().token_type {
             let distance = *distance;
             self.advance();
@@ -260,7 +247,7 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> LintResult<Expression> {
-        // Handle parenthesized expressions
+        // parenthesized expressions
         if self.match_token(&TokenType::LeftParen) {
             let start_span = self.previous().span.clone();
             let expr = self.parse_expression()?;
@@ -282,7 +269,7 @@ impl Parser {
             });
         }
 
-        // Handle case-sensitive terms {word}
+        // case-sensitive terms {word}
         if self.match_token(&TokenType::LeftBrace) {
             let start_span = self.previous().span.clone();
 
@@ -315,22 +302,21 @@ impl Parser {
             }
         }
 
-        // Handle ranges [x TO y]
+        // ranges [x TO y]
         if self.match_token(&TokenType::LeftBracket) {
             return self.parse_range();
         }
 
-        // Handle comments <<<text>>>
+        // comments <<<text>>>
         if self.match_token(&TokenType::CommentStart) {
             return self.parse_comment();
         }
 
-        // Handle field operations
+        // field operations
         if let TokenType::Word(word) = &self.peek().token_type {
             let word = word.clone();
             let word_span = self.peek().span.clone();
 
-            // Look ahead for colon to determine if this is a field operation
             if self.peek_ahead(1).map(|t| &t.token_type) == Some(&TokenType::Colon) {
                 self.advance(); // consume field name
                 self.advance(); // consume colon
@@ -625,7 +611,7 @@ impl Parser {
         }
     }
 
-    /// Skip any comments at the current position
+    /// skip any comments at the current position
     fn skip_comments(&mut self) {
         while self.match_token(&TokenType::CommentStart) {
             while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {

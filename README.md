@@ -1,30 +1,33 @@
-# bwq-lint
+# bwq
 
 brandwatch boolean search query linter and LSP written in rust.
 
 ## install
 
 ```bash
-cargo install bwq-lint
+cargo install bwq
 ```
 
 ## usage
 
 ```bash
-# lints current directory (recursively) by default
-bwq-lint
+# lint directory (recursively) or specific file(s)
+bwq check                        # lint all `.bwq` files in the current directory (and subdirectories)
+bwq check path/to/queries/       # lint all `.bwq` files in `path/to/queries/` (and subdirectories)
+bwq check path/to/query.bwq      # lint `query.bwq`
+bwq check path/to/queries/*.txt  # lint all `.txt` files in `path/to/queries/`
 
-# auto-detects input type (string, file, dir, glob)
-bwq-lint "apple AND juice"     # query string
-bwq-lint query.bwq             # file
-bwq-lint tests/fixtures        # directory (recursive)
-bwq-lint "*.bwq"               # glob pattern
+# lint query strings directly
+bwq check --query "term1 AND wildcardterm*"
 
-# warnings shown by default, use --no-warnings to suppress
-bwq-lint --no-warnings
+# lint both .txt and .bwq files in current directory
+bwq check -e txt -e bwq 
+
+# show all options
+bwq check --help
 ```
 
-## operators
+## bw operator support
 
 - boolean: `AND`, `OR`, `NOT`
 - proximity: `~`, `NEAR/x`, `NEAR/xf`
@@ -32,4 +35,4 @@ bwq-lint --no-warnings
 - fields: `title:`, `site:`, `rating:[1 TO 5]`
 - special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 
-run `bwq-lint examples` for more
+run `bwq examples` for more

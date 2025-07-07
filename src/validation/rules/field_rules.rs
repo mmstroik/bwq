@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::error::{LintError, LintWarning};
 use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
-// Rating field validation rule
 pub struct RatingFieldRule;
 
 impl ValidationRule for RatingFieldRule {
@@ -67,7 +66,6 @@ impl ValidationRule for RatingFieldRule {
     }
 }
 
-// Coordinate field validation rule
 pub struct CoordinateFieldRule;
 
 impl ValidationRule for CoordinateFieldRule {
@@ -166,7 +164,6 @@ impl ValidationRule for CoordinateFieldRule {
     }
 }
 
-// Language field validation rule
 pub struct LanguageFieldRule;
 
 impl ValidationRule for LanguageFieldRule {
@@ -208,7 +205,6 @@ impl ValidationRule for LanguageFieldRule {
     }
 }
 
-// Author gender field validation rule
 pub struct AuthorGenderFieldRule;
 
 impl ValidationRule for AuthorGenderFieldRule {
@@ -253,7 +249,6 @@ impl ValidationRule for AuthorGenderFieldRule {
     }
 }
 
-// Boolean field validation rule
 pub struct BooleanFieldRule;
 
 impl ValidationRule for BooleanFieldRule {
@@ -305,7 +300,6 @@ impl ValidationRule for BooleanFieldRule {
     }
 }
 
-// Engagement type field validation rule
 pub struct EngagementTypeFieldRule;
 
 impl ValidationRule for EngagementTypeFieldRule {
@@ -352,7 +346,6 @@ impl ValidationRule for EngagementTypeFieldRule {
     }
 }
 
-// Verified type field validation rule
 pub struct VerifiedTypeFieldRule;
 
 impl ValidationRule for VerifiedTypeFieldRule {
@@ -397,7 +390,6 @@ impl ValidationRule for VerifiedTypeFieldRule {
     }
 }
 
-// Minute of day field validation rule
 pub struct MinuteOfDayFieldRule;
 
 impl ValidationRule for MinuteOfDayFieldRule {
@@ -436,7 +428,6 @@ impl ValidationRule for MinuteOfDayFieldRule {
     }
 }
 
-// Range field validation rule (general range logic)
 pub struct RangeFieldRule;
 
 impl ValidationRule for RangeFieldRule {
