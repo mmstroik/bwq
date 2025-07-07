@@ -68,12 +68,8 @@ fn main() {
             if let Some(query_str) = query {
                 lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
-                if let Err(_) =
-                    lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern)
-                {
-                    if !exit_zero {
-                        std::process::exit(1);
-                    }
+                if lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern).is_err() && !exit_zero {
+                    std::process::exit(1);
                 }
             } else {
                 process_files(&files, !no_warnings, &output_format, &pattern, exit_zero);
@@ -116,11 +112,11 @@ fn process_files(
 
     for file_path in files {
         if file_path.is_file() {
-            if let Err(_) = lint_file(file_path, show_warnings, output_format) {
+            if lint_file(file_path, show_warnings, output_format).is_err() {
                 any_errors = true;
             }
         } else if file_path.is_dir() {
-            if let Err(_) = lint_directory(file_path, show_warnings, output_format, pattern) {
+            if lint_directory(file_path, show_warnings, output_format, pattern).is_err() {
                 any_errors = true;
             }
         } else {
@@ -215,7 +211,7 @@ fn lint_directory(
                 {
                     total_files += 1;
 
-                    let content = match fs::read_to_string(&file_path) {
+                    let content = match fs::read_to_string(file_path) {
                         Ok(content) => content,
                         Err(e) => {
                             eprintln!("Error reading file {}: {}", file_path.display(), e);
