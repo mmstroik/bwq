@@ -68,7 +68,10 @@ fn main() {
             if let Some(query_str) = query {
                 lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
-                if lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern).is_err() && !exit_zero {
+                if lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern)
+                    .is_err()
+                    && !exit_zero
+                {
                     std::process::exit(1);
                 }
             } else {
