@@ -276,7 +276,7 @@ impl Lexer {
                     self.read_number()
                 }
             }
-            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' => {
+            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' || ch == '$' => {
                 self.read_word_or_operator()
             }
 
@@ -345,7 +345,8 @@ impl Lexer {
                 || self.current_char() == '-'
                 || self.current_char() == '/'
                 || self.current_char() == '*'
-                || self.current_char() == '?')
+                || self.current_char() == '?'
+                || self.current_char() == '$')
         {
             value.push(self.current_char());
             self.advance();
@@ -424,7 +425,8 @@ impl Lexer {
             && (self.current_char().is_alphanumeric()
                 || self.current_char() == '_'
                 || self.current_char() == '*'
-                || self.current_char() == '?')
+                || self.current_char() == '?'
+                || self.current_char() == '$')
         {
             value.push(self.current_char());
             self.advance();
@@ -450,7 +452,8 @@ impl Lexer {
             && (self.current_char().is_alphanumeric()
                 || self.current_char() == '_'
                 || self.current_char() == '*'
-                || self.current_char() == '?')
+                || self.current_char() == '?'
+                || self.current_char() == '$')
         {
             value.push(self.current_char());
             self.advance();
