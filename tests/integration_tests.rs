@@ -817,3 +817,12 @@ fn test_bq_file_analysis() {
     assert!(analysis.has_issues());
     assert!(!analysis.errors.is_empty());
 }
+
+#[test]
+fn test_comments_dont_participate_in_implicit_and() {
+    assert!(is_valid_query("apple OR <<<comment>>> juice"));
+    assert!(is_valid_query("<<<comment>>> apple OR juice"));
+    assert!(is_valid_query("apple <<<comment>>> OR juice"));
+    assert!(is_valid_query("(election*) OR <<<DE>>> (wahl OR wahle*)"));
+    assert!(is_valid_query("apple <<<first>>> OR <<<second>>> juice"));
+}

@@ -183,22 +183,12 @@ impl ValidationRule for ShortTermRule {
                     _ => ValidationResult::new(),
                 }
             }
-            Expression::Comment { text, span } => {
-                if text.trim().is_empty() {
-                    ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                        span: span.clone(),
-                        message: "Empty comment".to_string(),
-                    })
-                } else {
-                    ValidationResult::new()
-                }
-            }
             _ => ValidationResult::new(),
         }
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
-        matches!(expr, Expression::Term { .. } | Expression::Comment { .. })
+        matches!(expr, Expression::Term { .. })
     }
 }
 

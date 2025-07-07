@@ -28,7 +28,6 @@ pub enum TokenType {
 
     CommentStart,
     CommentEnd,
-    CommentText(String),
 
     Field(String),
 
@@ -64,7 +63,6 @@ impl fmt::Display for TokenType {
             TokenType::NearForward(n) => write!(f, "NEAR/{n}f"),
             TokenType::CommentStart => write!(f, "<<<"),
             TokenType::CommentEnd => write!(f, ">>>"),
-            TokenType::CommentText(t) => write!(f, "comment text '{t}'"),
             TokenType::Field(f_name) => write!(f, "field '{f_name}'"),
             TokenType::Hashtag(h) => write!(f, "hashtag '{h}'"),
             TokenType::Mention(m) => write!(f, "mention '{m}'"),
