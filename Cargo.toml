@@ -7,6 +7,12 @@ description = "A linter and parser for Brandwatch query files (.bwq)"
 repository = "https://github.com/mmstroik/bwq"
 license = "MIT"
 
+[package.metadata.release]
+publish = false
+push = true
+tag-name = "v{{version}}"
+tag-message = "chore: release v{{version}}"
+
 [lib]
 name = "bwq"
 path = "src/lib.rs"
