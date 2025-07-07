@@ -19,20 +19,22 @@ enum Commands {
     /// lint files, directories, or query strings
     #[command(name = "check")]
     Check {
-        /// list of files or directories to check [default: .]
+        /// Files or directories to check (ignored if --query is used) [default: .]
         files: Vec<PathBuf>,
 
-        /// lint a query string directly
+        /// Lint a query string directly (instead of files)
         #[arg(long)]
         query: Option<String>,
 
+        /// Suppress warning messages
         #[arg(long)]
         no_warnings: bool,
 
+        /// Output format (text or json)
         #[arg(long, default_value = "text")]
         output_format: String,
 
-        /// exit with status code 0, even upon detecting lint violations
+        /// Exit with status code 0, even upon detecting lint violations
         #[arg(long)]
         exit_zero: bool,
 
@@ -41,16 +43,16 @@ enum Commands {
         extensions: Vec<String>,
     },
 
-    /// run in interactive mode
+    /// Run in interactive mode
     Interactive {
         #[arg(long)]
         no_warnings: bool,
     },
 
-    /// show example queries
+    /// Show example queries
     Examples,
 
-    /// start LSP server
+    /// Start LSP server
     Lsp,
 }
 
