@@ -270,7 +270,14 @@ impl Lexer {
 
             '@' => self.read_mention(),
 
-            _ if ch.is_ascii_digit() || ch == '-' => self.read_number(),
+            _ if ch.is_ascii_digit() || ch == '-' => {
+                // look ahead to see if this is actually an alphanumeric word starting with digits
+                if ch.is_ascii_digit() && self.has_letters_ahead() {
+                    self.read_word_or_operator()
+                } else {
+                    self.read_number()
+                }
+            }
             _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' => {
                 self.read_word_or_operator()
             }
@@ -525,6 +532,42 @@ impl Lexer {
         }
         result
     }
+
+    fn has_letters_ahead(&self) -> bool {
+        let mut pos = self.position;
+
+        while pos < self.input.len() && self.input[pos].is_ascii_digit() {
+            pos += 1;
+        }
+
+        // check if we find letters before hitting a word boundary
+        while pos < self.input.len() {
+            let ch = self.input[pos];
+            if ch.is_alphabetic() {
+                return true;
+            } else if ch.is_whitespace()
+                || matches!(
+                    ch,
+                    '(' | ')' | '[' | ']' | '{' | '}' | ':' | '"' | '#' | '@' | '<' | '>' | '~'
+                )
+            {
+                return false;
+            } else if ch.is_alphanumeric()
+                || ch == '_'
+                || ch == '.'
+                || ch == '-'
+                || ch == '/'
+                || ch == '*'
+                || ch == '?'
+            {
+                pos += 1;
+            } else {
+                return false;
+            }
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]
@@ -562,5 +605,30 @@ mod tests {
         assert_eq!(tokens.len(), 3);
         assert!(matches!(tokens[0].token_type, TokenType::Near(5)));
         assert!(matches!(tokens[1].token_type, TokenType::NearForward(3)));
+    }
+
+    #[test]
+    fn test_alphanumeric_tokens_starting_with_digits() {
+        let mut lexer = Lexer::new("0xcharlie 18RahulJoshi user123");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 words + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
+        assert!(matches!(tokens[1].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
+        assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "user123"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_pure_numbers_vs_alphanumeric() {
+        let mut lexer = Lexer::new("42 3.14 -5 0xcharlie");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 5); // 4 tokens + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Number(ref n) if n == "42"));
+        assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "3.14"));
+        assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-5"));
+        assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
+        assert!(matches!(tokens[4].token_type, TokenType::Eof));
     }
 }
