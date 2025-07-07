@@ -84,12 +84,27 @@ impl DiagnosticsHandler {
                 span_to_range(span),
                 format!("Expected '{}' but found '{}'", expected, found),
             ),
+            LintError::FieldValidationError { span, message } => {
+                (span_to_range(span), message.clone())
+            }
+            LintError::ProximityOperatorError { span, message } => {
+                (span_to_range(span), message.clone())
+            }
+            LintError::RangeValidationError { span, message } => {
+                (span_to_range(span), message.clone())
+            }
+            LintError::OperatorMixingError { span, message } => {
+                (span_to_range(span), message.clone())
+            }
+            LintError::PureNegativeQueryError { span, message } => {
+                (span_to_range(span), message.clone())
+            }
         };
 
         Diagnostic {
             range,
             severity: Some(DiagnosticSeverity::ERROR),
-            code: Some(NumberOrString::String(self.error_code(error))),
+            code: Some(NumberOrString::String(error.code().to_string())),
             code_description: None,
             source: Some("bwq".to_string()),
             message,
@@ -100,55 +115,16 @@ impl DiagnosticsHandler {
     }
 
     fn warning_to_diagnostic(&self, warning: &LintWarning) -> Diagnostic {
-        let (range, message) = match warning {
-            LintWarning::PotentialTypo { span, suggestion } => (
-                span_to_range(span),
-                format!("Potential typo. Did you mean '{}'?", suggestion),
-            ),
-            LintWarning::DeprecatedOperator { span, replacement } => (
-                span_to_range(span),
-                format!("Deprecated operator. Consider using '{}'", replacement),
-            ),
-            LintWarning::PerformanceWarning { span, message } => (
-                span_to_range(span),
-                format!("Performance warning: {}", message),
-            ),
-        };
-
         Diagnostic {
-            range,
+            range: span_to_range(warning.span()),
             severity: Some(DiagnosticSeverity::WARNING),
-            code: Some(NumberOrString::String(self.warning_code(warning))),
+            code: Some(NumberOrString::String(warning.code().to_string())),
             code_description: None,
             source: Some("bwq".to_string()),
-            message,
+            message: format!("{}", warning),
             related_information: None,
             tags: None,
             data: None,
-        }
-    }
-
-    fn error_code(&self, error: &LintError) -> String {
-        match error {
-            LintError::LexerError { .. } => "E001".to_string(),
-            LintError::ParserError { .. } => "E002".to_string(),
-            LintError::ValidationError { .. } => "E003".to_string(),
-            LintError::InvalidBooleanCase { .. } => "E004".to_string(),
-            LintError::UnbalancedParentheses { .. } => "E005".to_string(),
-            LintError::InvalidWildcardPlacement { .. } => "E006".to_string(),
-            LintError::InvalidProximityOperator { .. } => "E007".to_string(),
-            LintError::InvalidFieldOperator { .. } => "E008".to_string(),
-            LintError::InvalidRangeSyntax { .. } => "E009".to_string(),
-            LintError::UnexpectedToken { .. } => "E010".to_string(),
-            LintError::ExpectedToken { .. } => "E011".to_string(),
-        }
-    }
-
-    fn warning_code(&self, warning: &LintWarning) -> String {
-        match warning {
-            LintWarning::PotentialTypo { .. } => "W001".to_string(),
-            LintWarning::DeprecatedOperator { .. } => "W002".to_string(),
-            LintWarning::PerformanceWarning { .. } => "W003".to_string(),
         }
     }
 }

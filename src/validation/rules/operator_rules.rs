@@ -22,7 +22,7 @@ impl ValidationRule for MixedAndOrRule {
                         if self.contains_or_at_top_level(right_expr)
                             || self.contains_or_at_top_level(left)
                         {
-                            return ValidationResult::with_error(LintError::ValidationError {
+                            return ValidationResult::with_error(LintError::OperatorMixingError {
                                 span: span.clone(),
                                 message: "The AND and OR operators cannot be mixed in the same sub-query. Please use parentheses to disambiguate - e.g. vanilla AND (icecream OR cake).".to_string(),
                             });
@@ -33,7 +33,7 @@ impl ValidationRule for MixedAndOrRule {
                         if self.contains_and_at_top_level(right_expr)
                             || self.contains_and_at_top_level(left)
                         {
-                            return ValidationResult::with_error(LintError::ValidationError {
+                            return ValidationResult::with_error(LintError::OperatorMixingError {
                                 span: span.clone(),
                                 message: "The AND and OR operators cannot be mixed in the same sub-query. Please use parentheses to disambiguate - e.g. vanilla AND (icecream OR cake).".to_string(),
                             });
@@ -97,7 +97,7 @@ impl ValidationRule for MixedNearRule {
                 if matches!(operator, BooleanOperator::And) {
                     if let Some(right_expr) = right {
                         if self.is_unparenthesized_near_and_mix(left, right_expr) {
-                            return ValidationResult::with_error(LintError::ValidationError {
+                            return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
                                 message: "The AND operator cannot be used within the NEAR operator. Either remove this operator or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
                             });
@@ -109,7 +109,7 @@ impl ValidationRule for MixedNearRule {
                         if self.contains_near_at_top_level(right_expr)
                             || self.contains_near_at_top_level(left)
                         {
-                            return ValidationResult::with_error(LintError::ValidationError {
+                            return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
                                 message: "Please use parentheses for disambiguation when using the OR or NEAR operators with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
                             });
@@ -121,7 +121,7 @@ impl ValidationRule for MixedNearRule {
             Expression::Proximity { terms, span, .. } => {
                 for term in terms {
                     if self.contains_or_at_top_level(term) || self.contains_and_at_top_level(term) {
-                        return ValidationResult::with_error(LintError::ValidationError {
+                        return ValidationResult::with_error(LintError::ProximityOperatorError {
                             span: span.clone(),
                             message: "Please use parentheses for disambiguation when using the OR or NEAR operators with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
                         });
@@ -194,6 +194,12 @@ impl MixedNearRule {
     }
 }
 
+/// Pure negative query validation rule.
+///
+/// NOTE: This rule is designed for query-level validation, not expression-level validation.
+/// It is registered in the ValidationEngine but its can_validate() always returns false
+/// because pure negative validation requires analyzing the entire query structure.
+/// The actual validation logic is in is_pure_negative_query() and is called from validator.rs.
 pub struct PureNegativeRule;
 
 impl ValidationRule for PureNegativeRule {
@@ -202,12 +208,12 @@ impl ValidationRule for PureNegativeRule {
     }
 
     fn validate(&self, _expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        // handled at the query level in the engine, not per expression
+        // handled at the query level in validator.rs, not per expression
         ValidationResult::new()
     }
 
     fn can_validate(&self, _expr: &Expression) -> bool {
-        // only validate at the root query level
+        // only validate at the root query level in validator.rs
         false
     }
 }

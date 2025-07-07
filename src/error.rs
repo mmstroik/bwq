@@ -76,6 +76,79 @@ pub enum LintError {
         expected: String,
         found: String,
     },
+
+    #[error("Field validation error at {span:?}: {message}")]
+    FieldValidationError { span: Span, message: String },
+
+    #[error("Proximity operator error at {span:?}: {message}")]
+    ProximityOperatorError { span: Span, message: String },
+
+    #[error("Range validation error at {span:?}: {message}")]
+    RangeValidationError { span: Span, message: String },
+
+    #[error("Operator mixing error at {span:?}: {message}")]
+    OperatorMixingError { span: Span, message: String },
+
+    #[error("Pure negative query error at {span:?}: {message}")]
+    PureNegativeQueryError { span: Span, message: String },
+}
+
+impl LintError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            LintError::LexerError { .. } => "E001",
+            LintError::ParserError { .. } => "E002",
+            LintError::ValidationError { .. } => "E003",
+            LintError::InvalidBooleanCase { .. } => "E004",
+            LintError::UnbalancedParentheses { .. } => "E005",
+            LintError::InvalidWildcardPlacement { .. } => "E006",
+            LintError::InvalidProximityOperator { .. } => "E007",
+            LintError::InvalidFieldOperator { .. } => "E008",
+            LintError::InvalidRangeSyntax { .. } => "E009",
+            LintError::UnexpectedToken { .. } => "E010",
+            LintError::ExpectedToken { .. } => "E011",
+            LintError::FieldValidationError { .. } => "E012",
+            LintError::ProximityOperatorError { .. } => "E013",
+            LintError::RangeValidationError { .. } => "E014",
+            LintError::OperatorMixingError { .. } => "E015",
+            LintError::PureNegativeQueryError { .. } => "E016",
+        }
+    }
+
+    pub fn span_json(&self) -> serde_json::Value {
+        match self {
+            LintError::LexerError { position, .. } => serde_json::json!({
+                "start": {"line": position.line, "column": position.column, "offset": position.offset},
+                "end": {"line": position.line, "column": position.column + 1, "offset": position.offset + 1}
+            }),
+            LintError::ParserError { span, .. }
+            | LintError::ValidationError { span, .. }
+            | LintError::InvalidBooleanCase { span, .. }
+            | LintError::UnbalancedParentheses { span }
+            | LintError::InvalidWildcardPlacement { span }
+            | LintError::InvalidProximityOperator { span, .. }
+            | LintError::InvalidFieldOperator { span, .. }
+            | LintError::InvalidRangeSyntax { span }
+            | LintError::UnexpectedToken { span, .. }
+            | LintError::ExpectedToken { span, .. }
+            | LintError::FieldValidationError { span, .. }
+            | LintError::ProximityOperatorError { span, .. }
+            | LintError::RangeValidationError { span, .. }
+            | LintError::OperatorMixingError { span, .. }
+            | LintError::PureNegativeQueryError { span, .. } => serde_json::json!({
+                "start": {"line": span.start.line, "column": span.start.column, "offset": span.start.offset},
+                "end": {"line": span.end.line, "column": span.end.column, "offset": span.end.offset}
+            }),
+        }
+    }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "code": self.code(),
+            "message": format!("{}", self),
+            "span": self.span_json()
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,6 +156,52 @@ pub enum LintWarning {
     PotentialTypo { span: Span, suggestion: String },
     DeprecatedOperator { span: Span, replacement: String },
     PerformanceWarning { span: Span, message: String },
+}
+
+impl std::fmt::Display for LintWarning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LintWarning::PotentialTypo { suggestion, .. } => {
+                write!(f, "Potential typo. Did you mean '{}'?", suggestion)
+            }
+            LintWarning::DeprecatedOperator { replacement, .. } => {
+                write!(f, "Deprecated operator. Consider using '{}'", replacement)
+            }
+            LintWarning::PerformanceWarning { message, .. } => {
+                write!(f, "Performance warning: {}", message)
+            }
+        }
+    }
+}
+
+impl LintWarning {
+    pub fn code(&self) -> &'static str {
+        match self {
+            LintWarning::PotentialTypo { .. } => "W001",
+            LintWarning::DeprecatedOperator { .. } => "W002",
+            LintWarning::PerformanceWarning { .. } => "W003",
+        }
+    }
+
+    pub fn span(&self) -> &Span {
+        match self {
+            LintWarning::PotentialTypo { span, .. }
+            | LintWarning::DeprecatedOperator { span, .. }
+            | LintWarning::PerformanceWarning { span, .. } => span,
+        }
+    }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        let span = self.span();
+        serde_json::json!({
+            "code": self.code(),
+            "message": format!("{}", self),
+            "span": {
+                "start": {"line": span.start.line, "column": span.start.column, "offset": span.start.offset},
+                "end": {"line": span.end.line, "column": span.end.column, "offset": span.end.offset}
+            }
+        })
+    }
 }
 
 pub type LintResult<T> = Result<T, LintError>;

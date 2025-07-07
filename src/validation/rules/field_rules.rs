@@ -23,7 +23,7 @@ impl ValidationRule for RatingFieldRule {
                 {
                     if let Ok(rating_num) = rating.parse::<i32>() {
                         if !(0..=5).contains(&rating_num) {
-                            return ValidationResult::with_error(LintError::ValidationError {
+                            return ValidationResult::with_error(LintError::FieldValidationError {
                                 span: span.clone(),
                                 message: "Rating must be between 0 and 5".to_string(),
                             });
@@ -40,7 +40,7 @@ impl ValidationRule for RatingFieldRule {
             } => {
                 if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
                     if !(0..=5).contains(&start_num) || !(0..=5).contains(&end_num) {
-                        return ValidationResult::with_error(LintError::ValidationError {
+                        return ValidationResult::with_error(LintError::FieldValidationError {
                             span: span.clone(),
                             message: "Rating values must be between 0 and 5".to_string(),
                         });
@@ -86,7 +86,7 @@ impl ValidationRule for CoordinateFieldRule {
                             FieldType::Latitude => {
                                 if !(-90.0..=90.0).contains(&coord_num) {
                                     return ValidationResult::with_error(
-                                        LintError::ValidationError {
+                                        LintError::FieldValidationError {
                                             span: span.clone(),
                                             message: "Latitude must be between -90 and 90"
                                                 .to_string(),
@@ -97,7 +97,7 @@ impl ValidationRule for CoordinateFieldRule {
                             FieldType::Longitude => {
                                 if !(-180.0..=180.0).contains(&coord_num) {
                                     return ValidationResult::with_error(
-                                        LintError::ValidationError {
+                                        LintError::FieldValidationError {
                                             span: span.clone(),
                                             message: "Longitude must be between -180 and 180"
                                                 .to_string(),
@@ -123,22 +123,26 @@ impl ValidationRule for CoordinateFieldRule {
                             if !(-90.0..=90.0).contains(&start_num)
                                 || !(-90.0..=90.0).contains(&end_num)
                             {
-                                return ValidationResult::with_error(LintError::ValidationError {
-                                    span: span.clone(),
-                                    message: "Latitude values must be between -90 and 90"
-                                        .to_string(),
-                                });
+                                return ValidationResult::with_error(
+                                    LintError::FieldValidationError {
+                                        span: span.clone(),
+                                        message: "Latitude values must be between -90 and 90"
+                                            .to_string(),
+                                    },
+                                );
                             }
                         }
                         FieldType::Longitude => {
                             if !(-180.0..=180.0).contains(&start_num)
                                 || !(-180.0..=180.0).contains(&end_num)
                             {
-                                return ValidationResult::with_error(LintError::ValidationError {
-                                    span: span.clone(),
-                                    message: "Longitude values must be between -180 and 180"
-                                        .to_string(),
-                                });
+                                return ValidationResult::with_error(
+                                    LintError::FieldValidationError {
+                                        span: span.clone(),
+                                        message: "Longitude values must be between -180 and 180"
+                                            .to_string(),
+                                    },
+                                );
                             }
                         }
                         _ => {}
@@ -274,7 +278,7 @@ impl ValidationRule for BooleanFieldRule {
                 {
                     if !matches!(bool_val.as_str(), "true" | "false") {
                         let field_name = field.as_str();
-                        return ValidationResult::with_error(LintError::ValidationError {
+                        return ValidationResult::with_error(LintError::FieldValidationError {
                             span: span.clone(),
                             message: format!("{} must be 'true' or 'false'", field_name),
                         });
@@ -368,7 +372,7 @@ impl ValidationRule for VerifiedTypeFieldRule {
             } = value.as_ref()
             {
                 if !matches!(verified_type.as_str(), "blue" | "business" | "government") {
-                    return ValidationResult::with_error(LintError::ValidationError {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
                         message: "authorVerifiedType must be 'blue', 'business', or 'government'"
                             .to_string(),
@@ -407,7 +411,7 @@ impl ValidationRule for MinuteOfDayFieldRule {
         {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
                 if !(0..=1439).contains(&start_num) || !(0..=1439).contains(&end_num) {
-                    return ValidationResult::with_error(LintError::ValidationError {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
                         message: "minuteOfDay values must be between 0 and 1439".to_string(),
                     });
@@ -442,7 +446,7 @@ impl ValidationRule for RangeFieldRule {
         {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
                 if start_num > end_num {
-                    return ValidationResult::with_error(LintError::ValidationError {
+                    return ValidationResult::with_error(LintError::RangeValidationError {
                         span: span.clone(),
                         message: "Range start value cannot be greater than end value".to_string(),
                     });

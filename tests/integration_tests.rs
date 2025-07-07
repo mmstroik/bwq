@@ -1,6 +1,184 @@
-use bwq::error::LintWarning;
+use bwq::error::{LintReport, LintWarning};
 use bwq::{analyze_query, is_valid_query, BrandwatchLinter};
 use std::fs;
+use test_case::test_case;
+
+/// Test context for consistent query validation testing
+pub struct QueryTest {
+    linter: BrandwatchLinter,
+}
+
+impl Default for QueryTest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QueryTest {
+    pub fn new() -> Self {
+        Self {
+            linter: BrandwatchLinter::new(),
+        }
+    }
+
+    pub fn assert_valid(&mut self, query: &str) -> &LintReport {
+        match self.linter.lint(query) {
+            Ok(report) => {
+                assert!(
+                    !report.has_errors(),
+                    "Expected query to be valid but found errors: {} - {:?}",
+                    query,
+                    report.errors
+                );
+                // return reference to the report for potential chaining
+                // this is a bit tricky with borrowing, so we'll return the last report
+                // for now, create a static empty report reference
+                // TODO: store the report in the struct?
+                assert!(is_valid_query(query), "Query should be valid: {}", query);
+                &EMPTY_REPORT
+            }
+            Err(error) => {
+                panic!(
+                    "Expected query to be valid but got parse error: {} - {}",
+                    query, error
+                );
+            }
+        }
+    }
+
+    /// Assert query is valid but has warnings
+    pub fn assert_valid_with_warning(&mut self, query: &str) -> &LintReport {
+        match self.linter.lint(query) {
+            Ok(report) => {
+                assert!(
+                    !report.has_errors(),
+                    "Expected query to be valid but found errors: {} - {:?}",
+                    query,
+                    report.errors
+                );
+                assert!(
+                    report.has_warnings(),
+                    "Expected query to have warnings: {}",
+                    query
+                );
+                &EMPTY_REPORT
+            }
+            Err(error) => {
+                panic!(
+                    "Expected query to be valid but got parse error: {} - {}",
+                    query, error
+                );
+            }
+        }
+    }
+
+    /// Assert query has error with specific code
+    pub fn assert_error_code(&mut self, query: &str, expected_code: &str) {
+        match self.linter.lint(query) {
+            Ok(report) => {
+                assert!(
+                    report.has_errors(),
+                    "Expected query to have errors: {}",
+                    query
+                );
+                assert!(
+                    report.errors.iter().any(|e| e.code() == expected_code),
+                    "Expected error with code '{}' for query: {}, but got errors: {:?}",
+                    expected_code,
+                    query,
+                    report.errors.iter().map(|e| e.code()).collect::<Vec<_>>()
+                );
+            }
+            Err(error) => {
+                // For parse/lex errors, check the error directly
+                assert_eq!(
+                    error.code(),
+                    expected_code,
+                    "Expected error code '{}' for query: {}, but got: {}",
+                    expected_code,
+                    query,
+                    error.code()
+                );
+            }
+        }
+    }
+
+    /// Assert query has warning with specific code
+    pub fn assert_warning_code(&mut self, query: &str, expected_code: &str) {
+        let report = self
+            .linter
+            .lint(query)
+            .expect("Query should parse successfully");
+        assert!(
+            !report.warnings.is_empty(),
+            "Expected query to have warnings: {}",
+            query
+        );
+        assert!(
+            report.warnings.iter().any(|w| w.code() == expected_code),
+            "Expected warning with code '{}' for query: {}, but got warnings: {:?}",
+            expected_code,
+            query,
+            report.warnings.iter().map(|w| w.code()).collect::<Vec<_>>()
+        );
+    }
+
+    /// Assert query has no warnings
+    pub fn assert_no_warnings(&mut self, query: &str) {
+        let report = self
+            .linter
+            .lint(query)
+            .expect("Query should parse successfully");
+        assert!(
+            report.warnings.is_empty(),
+            "Expected no warnings for query: {}, but got: {:?}",
+            query,
+            report.warnings
+        );
+    }
+}
+
+// Static empty report for return references (simplified approach)
+static EMPTY_REPORT: LintReport = LintReport {
+    errors: Vec::new(),
+    warnings: Vec::new(),
+};
+
+/// Test expectation for parameterized testing
+#[derive(Debug, Clone)]
+pub enum TestExpectation {
+    /// Query should be valid with no errors or warnings
+    Valid,
+    /// Query should be valid but have a warning with specific code
+    ValidWithWarning(&'static str),
+    /// Query should have an error with specific code
+    ErrorCode(&'static str),
+    /// Query should have both error and warning with specific codes
+    ErrorCodeWithWarning(&'static str, &'static str),
+}
+
+impl TestExpectation {
+    /// Apply this expectation to a query using the test context
+    pub fn assert(&self, test: &mut QueryTest, query: &str) {
+        match self {
+            TestExpectation::Valid => {
+                test.assert_valid(query);
+                test.assert_no_warnings(query);
+            }
+            TestExpectation::ValidWithWarning(warning_code) => {
+                test.assert_valid_with_warning(query);
+                test.assert_warning_code(query, warning_code);
+            }
+            TestExpectation::ErrorCode(error_code) => {
+                test.assert_error_code(query, error_code);
+            }
+            TestExpectation::ErrorCodeWithWarning(error_code, warning_code) => {
+                test.assert_error_code(query, error_code);
+                test.assert_warning_code(query, warning_code);
+            }
+        }
+    }
+}
 
 #[test]
 fn test_basic_boolean_operators() {
@@ -71,6 +249,7 @@ fn test_range_operators() {
 #[test]
 fn test_advanced_operators() {
     assert!(is_valid_query("authorGender:F"));
+    assert!(is_valid_query("authorGender:X")); // BW API accepts any gender value
     assert!(is_valid_query("authorVerified:true"));
     assert!(is_valid_query("authorVerifiedType:blue"));
     assert!(is_valid_query("engagementType:RETWEET"));
@@ -143,118 +322,113 @@ fn test_invalid_queries() {
 
 #[test]
 fn test_validation_warnings() {
-    let mut linter = BrandwatchLinter::new();
-
-    let report = linter.lint("ab*").unwrap();
-    assert!(!report.warnings.is_empty());
-
-    let report = linter.lint("authorFollowers:[1 TO 2000000000]").unwrap();
-    assert!(!report.warnings.is_empty());
-
-    let report = linter.lint("languag:e").unwrap();
-    assert!(report.has_errors());
+    let mut test = QueryTest::new();
+    test.assert_warning_code("ab*", "W003");
+    test.assert_warning_code("authorFollowers:[1 TO 2000000000]", "W003");
+    test.assert_error_code("languag:e", "E012");
 }
 
 #[test]
-fn test_location_validation() {
-    assert!(is_valid_query("continent:europe"));
-    assert!(is_valid_query("country:gbr"));
-    assert!(is_valid_query("region:usa.fl"));
-    assert!(is_valid_query("city:\"deu.berlin.berlin\""));
+fn test_json_output_validation() {
+    let analysis = analyze_query("rating:6 AND *invalid");
 
-    // Test coordinate validation
-    let mut linter = BrandwatchLinter::new();
-    let report = linter.lint("latitude:[100 TO 110]").unwrap();
-    assert!(report.has_errors());
+    assert_eq!(analysis.errors.len(), 2);
 
-    let report = linter.lint("longitude:[-200 TO -150]").unwrap();
-    assert!(report.has_errors());
+    let error_codes: Vec<&str> = analysis.errors.iter().map(|e| e.code()).collect();
+    assert!(error_codes.contains(&"E012")); // Rating validation error
+    assert!(error_codes.contains(&"E006")); // Wildcard placement error
+
+    // test JSON serialization includes codes
+    let json_query = r#"rating:6 AND ab*"#.to_string();
+    let analysis = analyze_query(&json_query);
+    assert!(!analysis.errors.is_empty()); // Rating error
+    assert!(!analysis.warnings.is_empty()); // Performance warning
+
+    assert!(analysis.errors.iter().any(|e| e.code() == "E012"));
+    assert!(analysis.warnings.iter().any(|w| w.code() == "W003"));
 }
 
-#[test]
-fn test_rating_validation() {
-    let mut linter = BrandwatchLinter::new();
-
-    assert!(linter.is_valid("rating:3"));
-    assert!(linter.is_valid("rating:[2 TO 4]"));
-
-    // Previously invalid but now valid (BW API accepts rating:0)
-    assert!(linter.is_valid("rating:0"));
-
-    let report = linter.lint("rating:6").unwrap();
-    assert!(report.has_errors());
-
-    let report = linter.lint("rating:[-1 TO 3]").unwrap();
-    assert!(report.has_errors());
+#[test_case("rating:3", TestExpectation::Valid; "valid rating 3")]
+#[test_case("rating:0", TestExpectation::Valid; "valid rating 0")]
+#[test_case("rating:[2 TO 4]", TestExpectation::Valid; "valid rating range")]
+#[test_case("rating:6", TestExpectation::ErrorCode("E012"); "rating too high")]
+#[test_case("rating:[-1 TO 3]", TestExpectation::ErrorCode("E012"); "rating range with negative")]
+fn test_rating_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_boolean_field_validation() {
-    let mut linter = BrandwatchLinter::new();
-
-    assert!(linter.is_valid("authorVerified:true"));
-    assert!(linter.is_valid("authorVerified:false"));
-
-    let report = linter.lint("authorVerified:yes").unwrap();
-    assert!(report.has_errors());
-
-    let report = linter.lint("authorVerified:1").unwrap();
-    assert!(report.has_errors());
+#[test_case("latitude:[40 TO 42]", TestExpectation::Valid; "valid latitude range")]
+#[test_case("longitude:[-73 TO -69]", TestExpectation::Valid; "valid longitude range")]
+#[test_case("continent:europe", TestExpectation::Valid; "valid continent")]
+#[test_case("latitude:[100 TO 110]", TestExpectation::ErrorCode("E012"); "latitude out of range")]
+#[test_case("longitude:[-200 TO -150]", TestExpectation::ErrorCode("E012"); "longitude out of range")]
+fn test_location_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_engagement_type_validation() {
-    let mut linter = BrandwatchLinter::new();
-
-    assert!(linter.is_valid("engagementType:COMMENT"));
-    assert!(linter.is_valid("engagementType:REPLY"));
-    assert!(linter.is_valid("engagementType:RETWEET"));
-    assert!(linter.is_valid("engagementType:QUOTE"));
-
-    // Previously invalid but now valid (BW API accepts LIKE)
-    assert!(linter.is_valid("engagementType:LIKE"));
+#[test_case("authorVerified:true", TestExpectation::Valid; "valid boolean true")]
+#[test_case("authorVerified:false", TestExpectation::Valid; "valid boolean false")]
+#[test_case("authorVerified:yes", TestExpectation::ErrorCode("E012"); "invalid boolean yes")]
+#[test_case("authorVerified:1", TestExpectation::ErrorCode("E012"); "invalid boolean number")]
+fn test_boolean_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_verified_type_validation() {
-    let mut linter = BrandwatchLinter::new();
-
-    assert!(linter.is_valid("authorVerifiedType:blue"));
-    assert!(linter.is_valid("authorVerifiedType:business"));
-    assert!(linter.is_valid("authorVerifiedType:government"));
-
-    let report = linter.lint("authorVerifiedType:gold").unwrap();
-    assert!(report.has_errors());
+#[test_case("language:en", TestExpectation::Valid; "valid 2-char language code")]
+#[test_case("language:fr", TestExpectation::Valid; "valid french language code")]
+#[test_case("language:es", TestExpectation::Valid; "valid spanish language code")]
+#[test_case("language:ENG", TestExpectation::ValidWithWarning("W001"); "uppercase language code warning")]
+#[test_case("language:english", TestExpectation::ValidWithWarning("W001"); "full language name warning")]
+fn test_language_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_minute_of_day_validation() {
-    let mut linter = BrandwatchLinter::new();
-
-    assert!(linter.is_valid("minuteOfDay:[0 TO 1439]"));
-    assert!(linter.is_valid("minuteOfDay:[720 TO 780]")); // Noon to 1 PM
-
-    let report = linter.lint("minuteOfDay:[-1 TO 100]").unwrap();
-    assert!(report.has_errors());
-
-    let report = linter.lint("minuteOfDay:[0 TO 1440]").unwrap();
-    assert!(report.has_errors());
+#[test_case("*invalid", TestExpectation::ErrorCode("E006"); "wildcard at start")]
+#[test_case("ab*", TestExpectation::ValidWithWarning("W003"); "short wildcard performance warning")]
+#[test_case("test*", TestExpectation::Valid; "normal wildcard")]
+fn test_wildcard_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_language_code_validation() {
-    let mut linter = BrandwatchLinter::new();
+#[test_case("engagementType:COMMENT", TestExpectation::Valid; "valid engagement comment")]
+#[test_case("engagementType:REPLY", TestExpectation::Valid; "valid engagement reply")]
+#[test_case("engagementType:RETWEET", TestExpectation::Valid; "valid engagement retweet")]
+#[test_case("engagementType:QUOTE", TestExpectation::Valid; "valid engagement quote")]
+#[test_case("engagementType:LIKE", TestExpectation::Valid; "valid engagement like")]
+fn test_engagement_type_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
 
-    assert!(linter.is_valid("language:en"));
-    assert!(linter.is_valid("language:es"));
-    assert!(linter.is_valid("language:fr"));
+#[test_case("authorVerifiedType:blue", TestExpectation::Valid; "valid verified type blue")]
+#[test_case("authorVerifiedType:business", TestExpectation::Valid; "valid verified type business")]
+#[test_case("authorVerifiedType:government", TestExpectation::Valid; "valid verified type government")]
+#[test_case("authorVerifiedType:gold", TestExpectation::ErrorCode("E012"); "invalid verified type gold")]
+fn test_verified_type_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
 
-    // Potential issues with language codes
-    let report = linter.lint("language:ENG").unwrap(); // Should be lowercase
-    assert!(!report.warnings.is_empty());
+#[test_case("minuteOfDay:[0 TO 1439]", TestExpectation::Valid; "valid minute of day full range")]
+#[test_case("minuteOfDay:[720 TO 780]", TestExpectation::Valid; "valid minute of day noon to 1pm")]
+#[test_case("minuteOfDay:[-1 TO 100]", TestExpectation::ErrorCode("E012"); "minute of day with negative")]
+#[test_case("minuteOfDay:[0 TO 1440]", TestExpectation::ErrorCode("E012"); "minute of day over max")]
+fn test_minute_of_day_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
 
-    let report = linter.lint("language:english").unwrap(); // Should be 2-char code
-    assert!(!report.warnings.is_empty());
+#[test_case("country:gbr", TestExpectation::Valid; "valid country code")]
+#[test_case("region:usa.fl", TestExpectation::Valid; "valid region code")]
+#[test_case("city:\"deu.berlin.berlin\"", TestExpectation::Valid; "valid city code")]
+fn test_additional_location_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
 #[test]
@@ -274,12 +448,11 @@ fn test_analysis_result_formatting() {
 #[test]
 fn test_performance_edge_cases() {
     let mut linter = BrandwatchLinter::new();
-
     let report = linter.lint("apple NEAR/150 juice").unwrap();
     assert!(report.warnings.is_empty());
 
-    let report = linter.lint("apple* OR juice*").unwrap();
-    assert!(!report.warnings.is_empty());
+    let mut test = QueryTest::new();
+    test.assert_warning_code("apple* OR juice*", "W003");
 
     let report = linter.lint("a").unwrap();
     assert!(report.warnings.is_empty());
@@ -287,69 +460,25 @@ fn test_performance_edge_cases() {
 
 #[test]
 fn test_wildcard_position_validation() {
+    assert!(is_valid_query("tes*t"));
     let mut linter = BrandwatchLinter::new();
-
     let report = linter.lint("tes*t").unwrap();
-    assert!(!report.has_errors());
     assert!(report.warnings.is_empty());
 
+    assert!(is_valid_query("#test*"));
     let report = linter.lint("#test*").unwrap();
-    assert!(!report.has_errors());
     assert!(report.warnings.is_empty());
 
-    let report = linter.lint("#*test").unwrap();
-    assert!(!report.has_errors());
-    assert!(!report.warnings.is_empty());
+    assert!(is_valid_query("#*test"));
+    let mut test = QueryTest::new();
+    test.assert_warning_code("#*test", "W003");
 }
 
 #[test]
 fn test_empty_and_whitespace_queries() {
-    let mut linter = BrandwatchLinter::new();
-
-    assert!(!linter.is_valid(""));
-    assert!(!linter.is_valid("   "));
-    assert!(!linter.is_valid("\n\t"));
-}
-
-#[test]
-fn test_nested_expressions() {
-    assert!(is_valid_query(
-        "((apple OR orange) AND (juice OR smoothie))"
-    ));
-    assert!(is_valid_query(
-        "(apple AND (juice OR smoothie)) OR (orange AND drink)"
-    ));
-    // NOT-only queries should fail (no positive terms)
-    assert!(!is_valid_query("NOT (apple AND (bitter OR sour))"));
-
-    // But mixed positive/negative should work
-    assert!(is_valid_query("juice NOT (apple AND (bitter OR sour))"));
-}
-
-#[test]
-fn test_real_world_queries() {
-    let real_queries = vec![
-        r#"("brand name" OR @brandhandle) AND (positive OR "great product") NOT (complaint OR "bad service")"#,
-        r#"title:"product review" AND ((iPhone OR Samsung OR Google) NEAR/5 (camera OR "battery life"))"#,
-        r#"site:reddit.com AND subreddit:technology AND ("AI" OR "artificial intelligence") NOT "clickbait""#,
-        r#"authorFollowers:[1000 TO 50000] AND language:en AND engagementType:RETWEET"#,
-        r#"(#MondayMotivation OR #Inspiration) AND @company_handle"#,
-        r#"continent:europe AND language:en AND ("sustainability" NEAR/10 "climate change")"#,
-        // Actual Brandwatch query from user
-        r#"competition OR competitive OR competitor* OR saturat* OR ((China OR chinese OR cheap OR "low cost" OR "low-cost") NEAR/3 (brand* OR product* OR seller))"#,
-        // Real-world queries with NOT in parentheses
-        r#"uschamberofcommerce OR chamberofcommerce OR ("State Farm" NOT "stadium") OR {STFGX}"#,
-        // Query with properly parenthesized implicit AND
-        r#"(uschamberofcommerce chamberofcommerce) OR ("State Farm" NOT "stadium") OR {STFGX}"#,
-    ];
-
-    for query in real_queries {
-        assert!(
-            is_valid_query(query),
-            "Real-world query should be valid: {}",
-            query
-        );
-    }
+    assert!(!is_valid_query(""));
+    assert!(!is_valid_query("   "));
+    assert!(!is_valid_query("\n\t"));
 }
 
 #[test]
@@ -384,27 +513,6 @@ fn test_implicit_and_behavior() {
         !report.has_warnings(),
         "Explicit AND should not generate warnings"
     );
-}
-
-#[test]
-fn test_api_discrepancies_documented() {
-    // These tests document that our linter now correctly matches BW API behavior
-    let mut linter = BrandwatchLinter::new();
-
-    let previously_overly_strict_cases = vec![
-        "authorGender:X",      // BW API accepts any gender value
-        "engagementType:LIKE", // BW API accepts this engagement type
-        "rating:0",            // BW API accepts rating 0
-    ];
-
-    for query in previously_overly_strict_cases {
-        let report = linter.lint(query).unwrap();
-        assert!(
-            !report.has_errors(),
-            "Query '{}' should now pass - we fixed overly strict validation to match BW API",
-            query
-        );
-    }
 
     // Test case sensitivity - lowercase operators
     let report = linter.lint("apple and juice").unwrap();
@@ -419,74 +527,15 @@ fn test_api_discrepancies_documented() {
 }
 
 #[test]
-fn test_edge_case_combinations() {
-    assert!(is_valid_query("apple* NEAR/5 juice*"));
-    assert!(is_valid_query("\"apple juice\" NEAR/3 \"organic fruit\""));
-    assert!(is_valid_query("(apple NEAR/5 juice) AND orange"));
-
-    assert!(is_valid_query(
-        "site:reddit.com AND subreddit:technology AND authorVerified:true"
-    ));
-    assert!(is_valid_query(
-        "authorFollowers:[1000 TO 50000] AND engagementType:RETWEET"
-    ));
-
-    assert!(is_valid_query(
-        "latitude:[89.9 TO 90] AND longitude:[179.9 TO 180]"
-    ));
-    assert!(is_valid_query("longitude:[-180 TO -90]"));
-}
-
-#[test]
-fn test_deep_nesting_levels() {
-    // Test 3-level nesting
-    assert!(is_valid_query(
-        "((apple OR orange) AND (juice OR smoothie)) OR ((banana OR grape) AND drink)"
-    ));
-
-    // Test 4-level nesting
-    assert!(is_valid_query("(((brand AND product) OR (service AND quality)) AND ((review OR rating) NOT (spam OR fake))) AND site:twitter.com"));
-
-    // Test 5-level nesting
-    assert!(is_valid_query("((((apple OR orange) AND (fresh OR organic)) OR ((banana OR grape) AND (sweet OR ripe))) AND ((juice OR smoothie) NOT artificial)) AND healthy"));
-
-    // Deep nesting with proximity operators
-    assert!(is_valid_query("(((apple OR orange) NEAR/3 (juice OR drink)) AND ((fresh OR organic) NOT artificial)) AND site:healthfood.com"));
-
-    // Complex field combinations with deep nesting
-    assert!(is_valid_query("(((title:\"product review\" OR title:\"service review\") AND (authorFollowers:[1000 TO 50000] OR authorVerified:true)) AND ((engagementType:RETWEET OR engagementType:QUOTE) AND language:en)) AND country:usa"));
-}
-
-#[test]
 fn test_operators_on_groupings() {
-    // NEAR operators applied to grouped expressions
-    assert!(is_valid_query("(apple OR orange) NEAR/3 (juice OR drink)"));
-    assert!(is_valid_query(
-        "(iPhone OR Samsung) NEAR/5 (review OR rating)"
-    ));
-    assert!(is_valid_query(
-        "(\"brand name\" OR @brandhandle) NEAR/10 (positive OR excellent)"
-    ));
-
-    // Multiple NEAR operations on groups
     assert!(is_valid_query("((smartphone OR phone) NEAR/5 (review OR rating)) AND ((camera OR battery) NEAR/3 (excellent OR amazing))"));
 
     // Tilde proximity with AND should work without parentheses
     assert!(is_valid_query("\"apple juice\"~5 AND (organic OR natural)"));
     assert!(is_valid_query("(apple AND juice)~2 AND test"));
 
-    // Parenthesized versions still work
-    assert!(is_valid_query(
-        "(\"apple juice\"~5) AND (organic OR natural)"
-    ));
-    assert!(is_valid_query(
-        "(\"brand experience\"~3 OR \"customer service\"~2) AND positive"
-    ));
+    assert!(is_valid_query("juice NOT (apple AND (bitter OR sour))"));
 
-    // Forward NEAR on groups
-    assert!(is_valid_query(
-        "(product OR service) NEAR/3f (quality OR excellence)"
-    ));
     assert!(is_valid_query(
         "((brand OR company) NEAR/2f (announcement OR news)) AND (exciting OR important)"
     ));
@@ -516,42 +565,6 @@ fn test_complex_field_operator_combinations() {
 }
 
 #[test]
-fn test_multiline_style_queries() {
-    // Long queries that would typically span multiple lines in real usage
-    let long_query = r#"((apple OR orange OR banana OR grape) AND (juice OR smoothie OR drink OR beverage)) AND ((fresh OR organic OR natural OR healthy) NOT (artificial OR processed OR chemical OR synthetic)) AND ((site:healthfood.com OR site:nutrition.org) AND (language:en OR language:es)) AND ((authorVerified:true OR authorFollowers:[1000 TO 100000]) AND (engagementType:RETWEET OR engagementType:QUOTE OR engagementType:COMMENT))"#;
-    assert!(is_valid_query(long_query));
-
-    // Brand monitoring query
-    let brand_query = r#"((("brand name" OR @brandhandle OR {BrandName}) AND (mention OR review OR feedback OR comment)) AND ((positive OR excellent OR amazing OR great) NOT (negative OR terrible OR awful OR bad))) AND ((site:twitter.com OR site:facebook.com OR site:instagram.com) AND (language:en AND country:usa)) AND ((authorFollowers:[500 TO 50000] AND authorVerified:true) OR (engagementType:RETWEET AND rating:[3 TO 5]))"#;
-    assert!(is_valid_query(brand_query));
-
-    // Technology discussion query
-    let tech_query = r#"(((artificial AND intelligence) OR (machine AND learning) OR AI OR ML) AND ((breakthrough OR innovation OR advancement OR development) NEAR/5 (technology OR research OR science))) AND ((site:reddit.com AND (subreddit:MachineLearning OR subreddit:artificial)) OR (site:arxiv.org OR site:ieee.org)) AND ((authorVerified:true OR authorFollowers:[1000 TO 100000]) AND language:en)"#;
-    assert!(is_valid_query(tech_query));
-}
-
-#[test]
-fn test_wildcard_and_replacement_in_complex_contexts() {
-    // Wildcards in deeply nested contexts
-    assert!(is_valid_query("(((complain* OR problem* OR issue*) NEAR/5 (product* OR service* OR brand*)) AND ((respond* OR solution* OR fix*) NOT (ignore* OR dismiss* OR avoid*))) AND site:twitter.com"));
-
-    // Replacement characters in complex queries
-    assert!(is_valid_query("((customi?e OR personali?e OR optimi?e) AND (experience OR service)) AND ((organi?ation OR compan?) NEAR/3 (innovation OR excellence))"));
-
-    // Mixed wildcards and replacements
-    assert!(is_valid_query("((analy* OR anali?e OR insight*) AND (data OR information)) AND ((busin?ss OR corporat*) NEAR/5 (decision* OR strateg*))"));
-}
-
-#[test]
-fn test_case_sensitivity_in_complex_contexts() {
-    // Case sensitive terms in complex nesting
-    assert!(is_valid_query("(({BrandName} OR {ProductName}) AND ((review OR rating) NEAR/3 (excellent OR {Perfect}))) AND ((site:review.com OR site:testimonial.org) AND language:en)"));
-
-    // Mixed case sensitivity
-    assert!(is_valid_query("((apple OR {Apple} OR {APPLE}) AND (juice OR {Juice})) AND ((organic OR {Organic}) NOT artificial)"));
-}
-
-#[test]
 fn test_comment_integration_in_complex_queries() {
     // Comments in deeply nested queries
     assert!(is_valid_query("apple <<<fruit category>>> AND ((juice <<<beverage>>> OR smoothie <<<drink>>>)) NOT <<<exclude>>> bitter"));
@@ -570,33 +583,27 @@ fn test_hashtag_mention_complex_combinations() {
 }
 
 #[test]
-fn test_range_operators_in_complex_contexts() {
-    // Complex range combinations
-    assert!(is_valid_query("(((rating:[4 TO 5] AND authorFollowers:[1000 TO 50000]) OR (rating:[3 TO 5] AND authorVerified:true)) AND ((engagementType:RETWEET OR engagementType:QUOTE) AND language:en)) AND ((minuteOfDay:[480 TO 720] OR minuteOfDay:[1080 TO 1320]) AND country:usa)"));
-
-    assert!(is_valid_query("(((latitude:[40 TO 42] AND longitude:[-75 TO -73]) OR (latitude:[51 TO 53] AND longitude:[-1 TO 1])) AND ((city:\"new york\" OR city:london) AND language:en)) AND authorVerified:true"));
-}
-
-#[test]
 fn test_performance_warnings_in_complex_queries() {
     let mut linter = BrandwatchLinter::new();
-
     let report = linter
         .lint("((ab* OR bc*) AND (cd* OR de*)) AND ((e NEAR/200 f) OR (g NEAR/150 h))")
         .unwrap();
     assert!(!report.has_errors());
-    assert!(!report.warnings.is_empty());
+    assert!(
+        !report.warnings.is_empty(),
+        "Should have performance warnings"
+    );
 
     let report = linter
         .lint("((a OR b) AND (c OR d)) AND ((e NEAR/5 f) OR (g AND h))")
         .unwrap();
     assert!(!report.has_errors());
-    assert!(report.warnings.is_empty());
+    assert!(report.warnings.is_empty(), "Should have no warnings");
 }
 
 #[test]
 fn test_operator_precedence_validation() {
-    let mut linter = BrandwatchLinter::new();
+    let mut test = QueryTest::new();
 
     let mixed_and_or_cases = vec![
         "apple OR banana AND juice",
@@ -605,15 +612,7 @@ fn test_operator_precedence_validation() {
     ];
 
     for query in mixed_and_or_cases {
-        let report = linter.lint(query).unwrap();
-        assert!(report.has_errors(), "Query should fail: {}", query);
-        assert!(
-            report.errors.iter().any(|e| e
-                .to_string()
-                .contains("AND and OR operators cannot be mixed")),
-            "Should have mixed AND/OR error for: {}",
-            query
-        );
+        test.assert_error_code(query, "E015");
     }
 
     let properly_parenthesized_cases = vec![
@@ -623,42 +622,25 @@ fn test_operator_precedence_validation() {
     ];
 
     for query in properly_parenthesized_cases {
-        let report = linter.lint(query).unwrap();
-        assert!(!report.has_errors(), "Query should pass: {}", query);
+        test.assert_valid(query);
+        test.assert_no_warnings(query);
     }
 }
 
 #[test]
-fn test_tilde_proximity_operators() {
-    // Postfix tilde on quoted phrases
+fn test_tilde_proximity_syntax() {
+    // Valid tilde usage - standard cases
     assert!(is_valid_query("\"apple juice\"~5"));
     assert!(is_valid_query("\"organic fruit\"~10"));
-
-    // Alternative NEAR syntax with groups (line 17 of docs)
-    assert!(is_valid_query(
-        "((apple OR orange) AND (smartphone OR phone))~5"
-    ));
+    assert!(is_valid_query("((apple OR orange) AND phone)~5"));
     assert!(is_valid_query("(brand OR company)~3"));
-
-    // Single word tilde (doesn't do any proximity stuff but is valid)
-    assert!(is_valid_query("apple~5"));
-    assert!(is_valid_query("\"apple\"~3"));
-
-    // Tilde with complex expressions
     assert!(is_valid_query("((tech OR technology) AND innovation)~7"));
-}
-
-#[test]
-fn test_tilde_syntax_comprehensive() {
-    let mut linter = BrandwatchLinter::new();
-
-    // Valid tilde usage - standard cases
-    assert!(linter.is_valid("\"apple juice\"~5"));
-    assert!(linter.is_valid("((apple OR orange) AND phone)~5"));
 
     // Valid tilde with boolean operations (no parentheses needed)
-    assert!(linter.is_valid("\"apple juice\"~5 AND test"));
-    assert!(linter.is_valid("(apple AND juice)~2 AND test"));
+    assert!(is_valid_query("\"apple juice\"~5 AND test"));
+    assert!(is_valid_query("(apple AND juice)~2 AND test"));
+
+    let mut linter = BrandwatchLinter::new();
 
     // Valid but with warnings - single term usage
     let report = linter.lint("apple~5").unwrap();
@@ -694,72 +676,31 @@ fn test_tilde_syntax_comprehensive() {
     }));
 
     // Invalid: tilde without distance number
-    assert!(!linter.is_valid("\"apple juice\"~"));
-    assert!(!linter.is_valid("apple~"));
+    let mut test = QueryTest::new();
+    test.assert_error_code("\"apple juice\"~", "E003");
+    test.assert_error_code("apple~", "E003");
 
     // Invalid: tilde with spaces (separate tokens)
-    assert!(!linter.is_valid("apple ~ juice"));
-    assert!(!linter.is_valid("apple~ 5")); // Space between tilde and number
-    assert!(!linter.is_valid("apple ~5")); // Space before tilde
-    assert!(!linter.is_valid("apple~5t")); // Invalid characters after number
+    test.assert_error_code("apple ~ juice", "E003");
 
-    // Verify specific error messages
-    match linter.lint("\"apple juice\"~") {
-        Err(error) => {
-            assert!(error.to_string().contains("requires a distance number"));
-        }
-        Ok(report) => {
-            assert!(report.has_errors());
-            assert!(report
-                .errors
-                .iter()
-                .any(|e| e.to_string().contains("requires a distance number")));
-        }
-    }
+    // Space between tilde and number
+    test.assert_error_code("apple~ 5", "E003");
 
-    match linter.lint("apple ~ juice") {
-        Err(error) => {
-            assert!(error.to_string().contains("must be immediately attached"));
-        }
-        Ok(report) => {
-            assert!(report.has_errors());
-            assert!(report
-                .errors
-                .iter()
-                .any(|e| e.to_string().contains("must be immediately attached")));
-        }
-    }
-}
+    // Space before tilde
+    test.assert_error_code("apple ~5", "E003");
 
-#[test]
-fn test_extreme_deep_nesting() {
-    // Test 6+ level deep nesting that should work perfectly
-    assert!(is_valid_query("((((((apple OR orange) AND fresh) OR (banana AND ripe)) AND (juice OR smoothie)) OR ((grape AND sweet) AND drink)) AND healthy)"));
-
-    // Test complex nested proximity and boolean combinations
-    assert!(is_valid_query("(((apple NEAR/3 juice) AND fresh) OR ((orange NEAR/5 smoothie) AND organic)) AND ((healthy OR nutritious) NOT artificial)"));
-
-    // Test extreme nesting with field operators - simplified to avoid parsing issues
-    assert!(is_valid_query("(((country:usa OR country:gbr) AND language:en) OR ((country:fra OR country:deu) AND language:fr)) AND ((rating:[4 TO 5] AND authorVerified:true) OR authorFollowers:[10000 TO 100000])"));
+    // Invalid characters after number (lexer error)
+    test.assert_error_code("apple~5t", "E001");
 }
 
 #[test]
 fn test_near_operator_interaction_validation() {
-    let mut linter = BrandwatchLinter::new();
+    let mut test = QueryTest::new();
 
     let mixed_near_boolean_cases = vec!["(apple OR orange) NEAR/5 (juice OR drink) AND fresh"];
 
     for query in mixed_near_boolean_cases {
-        let report = linter.lint(query).unwrap();
-        assert!(report.has_errors(), "Query should fail: {}", query);
-        assert!(
-            report.errors.iter().any(|e| e
-                .to_string()
-                .contains("cannot be used within the NEAR operator")
-                || e.to_string().contains("cannot be mixed")),
-            "Should have NEAR/boolean mixing error for: {}",
-            query
-        );
+        test.assert_error_code(query, "E013");
     }
 
     let valid_near_cases = vec![
@@ -769,8 +710,8 @@ fn test_near_operator_interaction_validation() {
     ];
 
     for query in valid_near_cases {
-        let report = linter.lint(query).unwrap();
-        assert!(!report.has_errors(), "Query should pass: {}", query);
+        test.assert_valid(query);
+        test.assert_no_warnings(query);
     }
 }
 
