@@ -272,7 +272,7 @@ impl Lexer {
 
             _ if ch.is_ascii_digit() || ch == '-' => {
                 // look ahead to see if this is actually an alphanumeric word starting with digits
-                if ch.is_ascii_digit() && self.has_letters_ahead() {
+                if (ch.is_ascii_digit() || ch == '-') && self.has_letters_ahead() {
                     self.read_word_or_operator()
                 } else {
                     self.read_number()
@@ -536,6 +536,12 @@ impl Lexer {
     fn has_letters_ahead(&self) -> bool {
         let mut pos = self.position;
 
+        // Skip initial minus sign if present
+        if pos < self.input.len() && self.input[pos] == '-' {
+            pos += 1;
+        }
+
+        // Skip initial digits
         while pos < self.input.len() && self.input[pos].is_ascii_digit() {
             pos += 1;
         }
