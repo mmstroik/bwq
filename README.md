@@ -20,6 +20,9 @@ bwq check path/to/queries/*.txt  # lint all `.txt` files in `path/to/queries/`
 # lint query strings directly
 bwq check --query "term1 AND wildcardterm*"
 
+# lint both .txt and .bwq files in current directory
+bwq check -e txt -e bwq 
+
 # show all options
 bwq check --help
 ```

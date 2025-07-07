@@ -36,8 +36,9 @@ enum Commands {
         #[arg(long)]
         exit_zero: bool,
 
-        #[arg(long, default_value = "*.bwq")]
-        pattern: String,
+        /// File extensions to check (can be used multiple times)
+        #[arg(long = "extension", short = 'e', default_values = ["bwq"])]
+        extensions: Vec<String>,
     },
 
     /// run in interactive mode
@@ -62,20 +63,25 @@ fn main() {
             query,
             no_warnings,
             output_format,
-            pattern,
+            extensions,
             exit_zero,
         }) => {
             if let Some(query_str) = query {
                 lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
-                if lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern)
-                    .is_err()
+                if lint_directory(
+                    &PathBuf::from("."),
+                    !no_warnings,
+                    &output_format,
+                    &extensions,
+                )
+                .is_err()
                     && !exit_zero
                 {
                     std::process::exit(1);
                 }
             } else {
-                process_files(&files, !no_warnings, &output_format, &pattern, exit_zero);
+                process_files(&files, !no_warnings, &output_format, &extensions, exit_zero);
             }
         }
         Some(Commands::Interactive { no_warnings }) => {
@@ -108,7 +114,7 @@ fn process_files(
     files: &[PathBuf],
     show_warnings: bool,
     output_format: &str,
-    pattern: &str,
+    extensions: &[String],
     exit_zero: bool,
 ) {
     let mut any_errors = false;
@@ -119,7 +125,7 @@ fn process_files(
                 any_errors = true;
             }
         } else if file_path.is_dir() {
-            if lint_directory(file_path, show_warnings, output_format, pattern).is_err() {
+            if lint_directory(file_path, show_warnings, output_format, extensions).is_err() {
                 any_errors = true;
             }
         } else {
@@ -190,11 +196,19 @@ fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result
     Ok(())
 }
 
+fn matches_extensions(file_path: &Path, extensions: &[String]) -> bool {
+    if let Some(file_ext) = file_path.extension().and_then(|ext| ext.to_str()) {
+        extensions.iter().any(|ext| ext == file_ext)
+    } else {
+        false
+    }
+}
+
 fn lint_directory(
     path: &Path,
     show_warnings: bool,
     output_format: &str,
-    pattern: &str,
+    extensions: &[String],
 ) -> Result<(), ()> {
     let mut builder = WalkBuilder::new(path);
     builder.hidden(false);
@@ -209,9 +223,7 @@ fn lint_directory(
             Ok(dir_entry) => {
                 let file_path = dir_entry.path();
 
-                if file_path.is_file()
-                    && file_path.extension().and_then(|s| s.to_str()) == Some("bwq")
-                {
+                if file_path.is_file() && matches_extensions(file_path, extensions) {
                     total_files += 1;
 
                     let content = match fs::read_to_string(file_path) {
@@ -249,8 +261,8 @@ fn lint_directory(
 
     if total_files == 0 {
         eprintln!(
-            "No files found matching pattern '{}' in directory '{}'",
-            pattern,
+            "No files found with extensions [{}] in directory '{}'",
+            extensions.join(", "),
             path.display()
         );
         return Err(());

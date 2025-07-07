@@ -16,7 +16,7 @@ lint-fix:
 	cargo clippy --fix --allow-dirty --allow-staged
 
 dev:
-	@just lint-fix
+	@just lint
 	@just format
 	@just test-all
 	@echo "Development checks passed!"
