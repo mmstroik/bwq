@@ -374,7 +374,7 @@ impl Parser {
                                     Expression::Term {
                                         term: Term::Phrase { value },
                                         ..
-                                    } => format!("\"{}\"", value),
+                                    } => format!("\"{value}\""),
                                     _ => "unknown".to_string(),
                                 }
                             ),
@@ -455,7 +455,7 @@ impl Parser {
         while !self.is_at_end() && !matches!(self.peek().token_type, TokenType::CommentEnd) {
             match &self.peek().token_type {
                 TokenType::Word(w) => comment_text.push_str(w),
-                TokenType::QuotedString(s) => comment_text.push_str(&format!("\"{}\"", s)),
+                TokenType::QuotedString(s) => comment_text.push_str(&format!("\"{s}\"")),
                 TokenType::Number(n) => comment_text.push_str(n),
                 TokenType::Whitespace => comment_text.push(' '),
                 _ => comment_text.push_str(&self.peek().raw),

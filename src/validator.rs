@@ -179,6 +179,6 @@ mod tests {
         assert!(report
             .warnings
             .iter()
-            .any(|w| format!("{:?}", w).contains("performance")));
+            .any(|w| format!("{w:?}").contains("performance")));
     }
 }

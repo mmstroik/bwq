@@ -137,7 +137,7 @@ fn test_invalid_queries() {
 
     for query in invalid_queries {
         let analysis = analyze_query(query);
-        assert!(!analysis.is_valid, "Query should be invalid: {}", query);
+        assert!(!analysis.is_valid, "Query should be invalid: {query}");
     }
 }
 
@@ -346,8 +346,7 @@ fn test_real_world_queries() {
     for query in real_queries {
         assert!(
             is_valid_query(query),
-            "Real-world query should be valid: {}",
-            query
+            "Real-world query should be valid: {query}"
         );
     }
 }
@@ -401,8 +400,7 @@ fn test_api_discrepancies_documented() {
         let report = linter.lint(query).unwrap();
         assert!(
             !report.has_errors(),
-            "Query '{}' should now pass - we fixed overly strict validation to match BW API",
-            query
+            "Query '{query}' should now pass - we fixed overly strict validation to match BW API"
         );
     }
 
@@ -606,13 +604,12 @@ fn test_operator_precedence_validation() {
 
     for query in mixed_and_or_cases {
         let report = linter.lint(query).unwrap();
-        assert!(report.has_errors(), "Query should fail: {}", query);
+        assert!(report.has_errors(), "Query should fail: {query}");
         assert!(
             report.errors.iter().any(|e| e
                 .to_string()
                 .contains("AND and OR operators cannot be mixed")),
-            "Should have mixed AND/OR error for: {}",
-            query
+            "Should have mixed AND/OR error for: {query}"
         );
     }
 
@@ -624,7 +621,7 @@ fn test_operator_precedence_validation() {
 
     for query in properly_parenthesized_cases {
         let report = linter.lint(query).unwrap();
-        assert!(!report.has_errors(), "Query should pass: {}", query);
+        assert!(!report.has_errors(), "Query should pass: {query}");
     }
 }
 
@@ -751,14 +748,13 @@ fn test_near_operator_interaction_validation() {
 
     for query in mixed_near_boolean_cases {
         let report = linter.lint(query).unwrap();
-        assert!(report.has_errors(), "Query should fail: {}", query);
+        assert!(report.has_errors(), "Query should fail: {query}");
         assert!(
             report.errors.iter().any(|e| e
                 .to_string()
                 .contains("cannot be used within the NEAR operator")
                 || e.to_string().contains("cannot be mixed")),
-            "Should have NEAR/boolean mixing error for: {}",
-            query
+            "Should have NEAR/boolean mixing error for: {query}"
         );
     }
 
@@ -770,7 +766,7 @@ fn test_near_operator_interaction_validation() {
 
     for query in valid_near_cases {
         let report = linter.lint(query).unwrap();
-        assert!(!report.has_errors(), "Query should pass: {}", query);
+        assert!(!report.has_errors(), "Query should pass: {query}");
     }
 }
 
