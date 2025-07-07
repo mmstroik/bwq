@@ -28,7 +28,6 @@ pub enum TokenType {
 
     CommentStart,
     CommentEnd,
-    CommentText(String),
 
     Field(String),
 
@@ -64,7 +63,6 @@ impl fmt::Display for TokenType {
             TokenType::NearForward(n) => write!(f, "NEAR/{n}f"),
             TokenType::CommentStart => write!(f, "<<<"),
             TokenType::CommentEnd => write!(f, ">>>"),
-            TokenType::CommentText(t) => write!(f, "comment text '{t}'"),
             TokenType::Field(f_name) => write!(f, "field '{f_name}'"),
             TokenType::Hashtag(h) => write!(f, "hashtag '{h}'"),
             TokenType::Mention(m) => write!(f, "mention '{m}'"),
@@ -270,8 +268,15 @@ impl Lexer {
 
             '@' => self.read_mention(),
 
-            _ if ch.is_ascii_digit() || ch == '-' => self.read_number(),
-            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' => {
+            _ if ch.is_ascii_digit() || ch == '-' => {
+                // look ahead to see if this is actually an alphanumeric word starting with digits
+                if (ch.is_ascii_digit() || ch == '-') && self.has_letters_ahead() {
+                    self.read_word_or_operator()
+                } else {
+                    self.read_number()
+                }
+            }
+            _ if ch.is_alphabetic() || ch == '_' || ch == '*' || ch == '?' || ch == '$' => {
                 self.read_word_or_operator()
             }
 
@@ -340,7 +345,8 @@ impl Lexer {
                 || self.current_char() == '-'
                 || self.current_char() == '/'
                 || self.current_char() == '*'
-                || self.current_char() == '?')
+                || self.current_char() == '?'
+                || self.current_char() == '$')
         {
             value.push(self.current_char());
             self.advance();
@@ -419,7 +425,8 @@ impl Lexer {
             && (self.current_char().is_alphanumeric()
                 || self.current_char() == '_'
                 || self.current_char() == '*'
-                || self.current_char() == '?')
+                || self.current_char() == '?'
+                || self.current_char() == '$')
         {
             value.push(self.current_char());
             self.advance();
@@ -445,7 +452,8 @@ impl Lexer {
             && (self.current_char().is_alphanumeric()
                 || self.current_char() == '_'
                 || self.current_char() == '*'
-                || self.current_char() == '?')
+                || self.current_char() == '?'
+                || self.current_char() == '$')
         {
             value.push(self.current_char());
             self.advance();
@@ -525,6 +533,49 @@ impl Lexer {
         }
         result
     }
+
+    fn has_letters_ahead(&self) -> bool {
+        let mut pos = self.position;
+
+        // Skip initial minus sign if present
+        if pos < self.input.len() && self.input[pos] == '-' {
+            pos += 1;
+        }
+
+        // Skip initial digits
+        while pos < self.input.len() && self.input[pos].is_ascii_digit() {
+            pos += 1;
+        }
+
+        // check if we find letters before hitting a word boundary
+        while pos < self.input.len() {
+            let ch = self.input[pos];
+            if ch.is_alphabetic() {
+                return true;
+            } else if ch.is_whitespace()
+                || matches!(
+                    ch,
+                    '(' | ')' | '[' | ']' | '{' | '}' | ':' | '"' | '#' | '@' | '<' | '>' | '~'
+                )
+            {
+                return false;
+            } else if ch.is_alphanumeric()
+                || ch == '_'
+                || ch == '.'
+                || ch == '-'
+                || ch == '/'
+                || ch == '*'
+                || ch == '?'
+                || ch == '$'
+            {
+                pos += 1;
+            } else {
+                return false;
+            }
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]
@@ -562,5 +613,34 @@ mod tests {
         assert_eq!(tokens.len(), 3);
         assert!(matches!(tokens[0].token_type, TokenType::Near(5)));
         assert!(matches!(tokens[1].token_type, TokenType::NearForward(3)));
+    }
+
+    #[test]
+    fn test_numbers_vs_words_and_special_chars() {
+        let mut lexer = Lexer::new(
+            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U$BER uber$ 123$abc -5$test",
+        );
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 12); // 11 tokens + EOF
+
+        // Pure numbers
+        assert!(matches!(tokens[0].token_type, TokenType::Number(ref n) if n == "42"));
+        assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "3.14"));
+        assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-5"));
+
+        // Alphanumeric starting with digits (should be words due to has_letters_ahead)
+        assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
+        assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
+        assert!(matches!(tokens[5].token_type, TokenType::Word(ref w) if w == "user123"));
+
+        // Dollar sign variations
+        assert!(matches!(tokens[6].token_type, TokenType::Word(ref w) if w == "$UBER"));
+        assert!(matches!(tokens[7].token_type, TokenType::Word(ref w) if w == "U$BER"));
+        assert!(matches!(tokens[8].token_type, TokenType::Word(ref w) if w == "uber$"));
+        assert!(matches!(tokens[9].token_type, TokenType::Word(ref w) if w == "123$abc"));
+        assert!(matches!(tokens[10].token_type, TokenType::Word(ref w) if w == "-5$test"));
+
+        assert!(matches!(tokens[11].token_type, TokenType::Eof));
     }
 }

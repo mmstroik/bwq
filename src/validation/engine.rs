@@ -96,7 +96,7 @@ impl ValidationEngine {
                 field_ctx.field_context = Some(field.clone());
                 self.walk_expression(value, &field_ctx, errors, warnings);
             }
-            Expression::Range { .. } | Expression::Term { .. } | Expression::Comment { .. } => {
+            Expression::Range { .. } | Expression::Term { .. } => {
                 // terminal nodes - no recursion needed
             }
         }
