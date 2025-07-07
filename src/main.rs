@@ -46,7 +46,6 @@ enum Commands {
         no_warnings: bool,
     },
 
-
     /// show example queries
     Examples,
 
@@ -69,7 +68,9 @@ fn main() {
             if let Some(query_str) = query {
                 lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
-                if let Err(_) = lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern) {
+                if let Err(_) =
+                    lint_directory(&PathBuf::from("."), !no_warnings, &output_format, &pattern)
+                {
                     if !exit_zero {
                         std::process::exit(1);
                     }
@@ -104,9 +105,15 @@ fn main() {
     }
 }
 
-fn process_files(files: &[PathBuf], show_warnings: bool, output_format: &str, pattern: &str, exit_zero: bool) {
+fn process_files(
+    files: &[PathBuf],
+    show_warnings: bool,
+    output_format: &str,
+    pattern: &str,
+    exit_zero: bool,
+) {
     let mut any_errors = false;
-    
+
     for file_path in files {
         if file_path.is_file() {
             if let Err(_) = lint_file(file_path, show_warnings, output_format) {
@@ -121,7 +128,7 @@ fn process_files(files: &[PathBuf], show_warnings: bool, output_format: &str, pa
             any_errors = true;
         }
     }
-    
+
     if any_errors && !exit_zero {
         std::process::exit(1);
     }
@@ -184,10 +191,15 @@ fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result
     Ok(())
 }
 
-fn lint_directory(path: &Path, show_warnings: bool, output_format: &str, pattern: &str) -> Result<(), ()> {
+fn lint_directory(
+    path: &Path,
+    show_warnings: bool,
+    output_format: &str,
+    pattern: &str,
+) -> Result<(), ()> {
     let mut builder = WalkBuilder::new(path);
     builder.hidden(false);
-    
+
     let mut total_files = 0;
     let mut valid_files = 0;
     let mut any_errors = false;
@@ -197,8 +209,10 @@ fn lint_directory(path: &Path, show_warnings: bool, output_format: &str, pattern
         match entry {
             Ok(dir_entry) => {
                 let file_path = dir_entry.path();
-                
-                if file_path.is_file() && file_path.extension().and_then(|s| s.to_str()) == Some("bwq") {
+
+                if file_path.is_file()
+                    && file_path.extension().and_then(|s| s.to_str()) == Some("bwq")
+                {
                     total_files += 1;
 
                     let content = match fs::read_to_string(&file_path) {

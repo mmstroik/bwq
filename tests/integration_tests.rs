@@ -125,10 +125,10 @@ fn test_complex_queries() {
 #[test]
 fn test_invalid_queries() {
     let invalid_queries = vec![
-        "*invalid", // Wildcard at beginning
-        "apple AND", // Missing right operand
-        "OR juice", // Missing left operand
-        "apple AND ()", // Empty parentheses
+        "*invalid",                 // Wildcard at beginning
+        "apple AND",                // Missing right operand
+        "OR juice",                 // Missing left operand
+        "apple AND ()",             // Empty parentheses
         "rating:6", // Invalid rating (should be 0-5) - NOTE: BW API is more permissive
         "authorFollowers:[3 TO 1]", // Invalid range (start > end)
         "NOT bitter", // Pure negative query (NOT is binary)
@@ -357,17 +357,32 @@ fn test_implicit_and_behavior() {
 
     let report = linter.lint("apple banana").unwrap();
     assert!(!report.has_errors(), "Implicit AND should be valid");
-    assert!(report.has_warnings(), "Implicit AND should generate warnings");
+    assert!(
+        report.has_warnings(),
+        "Implicit AND should generate warnings"
+    );
 
     let report = linter.lint("apple banana OR cherry").unwrap();
-    assert!(report.has_errors(), "Mixed implicit AND with OR should fail without parentheses");
+    assert!(
+        report.has_errors(),
+        "Mixed implicit AND with OR should fail without parentheses"
+    );
 
     let report = linter.lint("(apple banana) OR cherry").unwrap();
-    assert!(!report.has_errors(), "Properly parenthesized implicit AND should be valid");
-    assert!(report.has_warnings(), "Implicit AND should still generate warnings");
+    assert!(
+        !report.has_errors(),
+        "Properly parenthesized implicit AND should be valid"
+    );
+    assert!(
+        report.has_warnings(),
+        "Implicit AND should still generate warnings"
+    );
 
     let report = linter.lint("apple AND banana").unwrap();
-    assert!(!report.has_warnings(), "Explicit AND should not generate warnings");
+    assert!(
+        !report.has_warnings(),
+        "Explicit AND should not generate warnings"
+    );
 }
 
 #[test]
