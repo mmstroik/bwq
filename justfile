@@ -18,20 +18,11 @@ lint-fix:
 dev:
 	@just lint
 	@just format
-	@just test-all
+	@just test
 	@echo "Development checks passed!"
 
 test:
-	cargo test
-
-test-all:
-	@echo "Building project..."
-	@just build
-	@echo "Running tests..."
-	@just test
-	@echo "Testing fixtures..."
-	@cargo run -- check --exit-zero tests/fixtures
-	@echo "All tests completed!"
+	cargo test -q
 
 # Compare our linter with Brandwatch API validation
 compare query-or-file:

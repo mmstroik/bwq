@@ -1,0 +1,7 @@
+(((smartphone OR phone) NEAR/5 (review OR rating)) AND ((camera OR battery) NEAR/3 (excellent OR amazing))) OR
+("apple juice"~5 AND (organic OR natural)) OR
+((apple AND juice)~2 AND test) OR
+(juice NOT (apple AND (bitter OR sour))) OR
+(((brand OR company) NEAR/2f (announcement OR news)) AND (exciting OR important)) OR
+(((apple NEAR/2 juice) OR (orange NEAR/3 smoothie)) AND fresh) OR
+(((complain* NEAR/5 product*) NOT (resolve* NEAR/3 solution*)) AND site:twitter.com)

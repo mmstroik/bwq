@@ -1,0 +1,4 @@
+((apple OR orange) AND "fruit juice" NOT bitter AND site:twitter.com) OR
+(title:"smartphone review" AND ((iPhone OR Samsung) NEAR/5 (camera OR battery))) OR
+(authorFollowers:[1000 TO 100000] AND engagementType:RETWEET AND language:en) OR
+(("brand name" OR @brandhandle) AND sentiment:positive NOT complaint*)

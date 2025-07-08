@@ -23,7 +23,7 @@ impl Validator {
             .pure_negative_rule
             .is_pure_negative_query(&query.expression)
         {
-            report.errors.push(LintError::ValidationError {
+            report.errors.push(LintError::PureNegativeQueryError {
                 span: query.span.clone(),
                 message: "Queries must contain at least one non-excluded term".to_string(),
             });
@@ -95,9 +95,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e
-            .to_string()
-            .contains("AND and OR operators cannot be mixed")));
+        assert!(report.errors.iter().any(|e| e.code() == "E015"));
     }
 
     #[test]
@@ -111,9 +109,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e
-            .to_string()
-            .contains("must contain at least one non-excluded term")));
+        assert!(report.errors.iter().any(|e| e.code() == "E016"));
     }
 
     #[test]
@@ -127,9 +123,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e
-            .to_string()
-            .contains("Latitude must be between -90 and 90")));
+        assert!(report.errors.iter().any(|e| e.code() == "E012"));
     }
 
     #[test]
@@ -143,10 +137,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report
-            .errors
-            .iter()
-            .any(|e| e.to_string().contains("must be 'true' or 'false'")));
+        assert!(report.errors.iter().any(|e| e.code() == "E012"));
     }
 
     #[test]
@@ -160,9 +151,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e
-            .to_string()
-            .contains("wildcards cannot be at the beginning")));
+        assert!(report.errors.iter().any(|e| e.code() == "E006"));
     }
 
     #[test]
@@ -176,9 +165,6 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(!report.warnings.is_empty());
-        assert!(report
-            .warnings
-            .iter()
-            .any(|w| format!("{w:?}").contains("performance")));
+        assert!(report.warnings.iter().any(|w| w.code() == "W003"));
     }
 }

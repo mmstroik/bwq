@@ -129,7 +129,7 @@ impl ValidationRule for ShortTermRule {
                                 let field_part = parts[0];
                                 if !field_part.is_empty() && FieldType::parse(field_part).is_none()
                                 {
-                                    result.errors.push(LintError::ValidationError {
+                                    result.errors.push(LintError::FieldValidationError {
                                         span: span.clone(),
                                         message: format!("Unknown field type: {field_part}"),
                                     });
@@ -211,7 +211,7 @@ impl ValidationRule for RangePerformanceRule {
                 let mut result = ValidationResult::new();
 
                 if start_num < 0 || end_num < 0 {
-                    result.errors.push(LintError::ValidationError {
+                    result.errors.push(LintError::RangeValidationError {
                         span: span.clone(),
                         message: "Follower counts cannot be negative".to_string(),
                     });

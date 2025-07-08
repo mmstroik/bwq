@@ -23,7 +23,7 @@ enum Commands {
         files: Vec<PathBuf>,
 
         /// Lint a query string directly (instead of files)
-        #[arg(long)]
+        #[arg(long, short = 'q')]
         query: Option<String>,
 
         /// Suppress warning messages
@@ -179,8 +179,8 @@ fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result
             let json_analysis = serde_json::json!({
                 "file": path.display().to_string(),
                 "valid": analysis.is_valid,
-                "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                "warnings": analysis.warnings.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>(),
+                "errors": analysis.errors.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
+                "warnings": analysis.warnings.iter().map(|w| w.to_json()).collect::<Vec<_>>(),
                 "query": query
             });
             println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
@@ -275,8 +275,8 @@ fn lint_directory(
                 serde_json::json!({
                     "file": file_path.display().to_string(),
                     "valid": analysis.is_valid,
-                    "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                    "warnings": analysis.warnings.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>(),
+                    "errors": analysis.errors.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
+                    "warnings": analysis.warnings.iter().map(|w| w.to_json()).collect::<Vec<_>>(),
                     "query": query
                 })
             }).collect();
@@ -364,24 +364,35 @@ fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
     if !analysis.errors.is_empty() {
         println!("\nErrors:");
         for (i, error) in analysis.errors.iter().enumerate() {
-            println!("  {}. {}", i + 1, error);
+            println!("  {}. {}: {}", i + 1, error.code(), error);
         }
     }
 
     if show_warnings && !analysis.warnings.is_empty() {
         println!("\nWarnings:");
         for (i, warning) in analysis.warnings.iter().enumerate() {
-            println!("  {}. {:?}", i + 1, warning);
+            println!("  {}. {}: {}", i + 1, warning.code(), warning);
         }
     }
 }
 
 fn output_json(analysis: &bwq::AnalysisResult) {
+    let errors = analysis
+        .errors
+        .iter()
+        .map(|e| e.to_json())
+        .collect::<Vec<_>>();
+    let warnings = analysis
+        .warnings
+        .iter()
+        .map(|w| w.to_json())
+        .collect::<Vec<_>>();
+
     let json_output = serde_json::json!({
         "valid": analysis.is_valid,
         "summary": analysis.summary(),
-        "errors": analysis.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-        "warnings": analysis.warnings.iter().map(|w| format!("{w:?}")).collect::<Vec<_>>(),
+        "errors": errors,
+        "warnings": warnings,
         "query": analysis.query
     });
 
