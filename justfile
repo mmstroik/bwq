@@ -24,7 +24,6 @@ dev:
 test:
 	cargo test
 
-
 # Compare our linter with Brandwatch API validation
 compare query-or-file:
 	@echo "=== Our Linter ==="

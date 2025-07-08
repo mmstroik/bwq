@@ -229,6 +229,11 @@ impl FileTestExpectation {
     }
 }
 
+// ============================================================================
+// BASIC SYNTAX VALIDATION
+// Tests for basic syntax validation
+// ============================================================================
+
 #[test_case("apple AND juice", TestExpectation::ValidNoWarnings; "basic AND operation")]
 #[test_case("apple OR orange", TestExpectation::ValidNoWarnings; "basic OR operation")]
 #[test_case("apple NOT bitter", TestExpectation::ValidNoWarnings; "basic NOT operation")]

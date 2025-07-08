@@ -23,7 +23,7 @@ enum Commands {
         files: Vec<PathBuf>,
 
         /// Lint a query string directly (instead of files)
-        #[arg(long)]
+        #[arg(long, short = 'q')]
         query: Option<String>,
 
         /// Suppress warning messages
