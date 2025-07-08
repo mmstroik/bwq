@@ -22,7 +22,7 @@ dev:
 	@echo "Development checks passed!"
 
 test:
-	cargo test
+	cargo test -q
 
 # Compare our linter with Brandwatch API validation
 compare query-or-file:

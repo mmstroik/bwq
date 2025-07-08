@@ -5,6 +5,7 @@ use test_case::test_case;
 /// Test context for consistent query validation testing
 pub struct QueryTest {
     linter: BrandwatchLinter,
+    last_report: Option<LintReport>,
 }
 
 impl Default for QueryTest {
@@ -17,6 +18,7 @@ impl QueryTest {
     pub fn new() -> Self {
         Self {
             linter: BrandwatchLinter::new(),
+            last_report: None,
         }
     }
 
@@ -29,10 +31,9 @@ impl QueryTest {
                     query,
                     report.errors
                 );
-                // return reference to the report for potential chaining
-                // this is a bit tricky with borrowing, so we'll return the last report
-                // for now, create a static empty report reference
-                &EMPTY_REPORT
+                // Store the report and return a reference to it
+                self.last_report = Some(report);
+                self.last_report.as_ref().unwrap()
             }
             Err(error) => {
                 panic!("Expected query to be valid but got parse error: {query} - {error}");
@@ -54,7 +55,9 @@ impl QueryTest {
                     report.has_warnings(),
                     "Expected query to have warnings: {query}"
                 );
-                &EMPTY_REPORT
+                // Store the report and return a reference to it
+                self.last_report = Some(report);
+                self.last_report.as_ref().unwrap()
             }
             Err(error) => {
                 panic!("Expected query to be valid but got parse error: {query} - {error}");
@@ -152,12 +155,6 @@ impl QueryTest {
         self.assert_warning_code(&content, expected_code);
     }
 }
-
-// Static empty report for return references (simplified approach)
-static EMPTY_REPORT: LintReport = LintReport {
-    errors: Vec::new(),
-    warnings: Vec::new(),
-};
 
 /// Test expectation for parameterized testing
 #[derive(Debug, Clone)]
