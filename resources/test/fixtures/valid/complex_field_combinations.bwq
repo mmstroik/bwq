@@ -1,0 +1,4 @@
+(((country:usa OR country:gbr) AND (language:en OR language:es)) AND ((authorGender:F AND authorVerified:true) OR authorFollowers:[10000 TO 100000])) OR
+(((continent:europe AND country:gbr) OR (continent:north_america AND country:usa)) AND ((city:"new york" OR city:london) AND language:en)) OR
+(((minuteOfDay:[480 TO 720] OR minuteOfDay:[1080 TO 1320]) AND (engagementType:RETWEET OR engagementType:QUOTE)) AND ((authorFollowers:[1000 TO 50000] AND authorVerified:true) OR rating:[4 TO 5])) OR
+(((subreddit:technology OR subreddit:programming) AND (redditAuthorFlair:developer OR redditAuthorFlair:engineer)) AND ((redditspoiler:false AND subredditNSFW:false) OR authorVerified:true))

@@ -1,0 +1,4 @@
+(apple <<<fruit category>>> AND ((juice <<<beverage>>> OR smoothie <<<drink>>>)) NOT <<<exclude>>> bitter) OR
+(((brand <<<company>>> AND product <<<item>>>) OR (service <<<offering>>> AND quality <<<standard>>>)) AND <<<monitoring>>> positive) OR
+((((#MondayMotivation OR #InspirationalQuote) AND (@company OR @brand)) AND ((positive OR inspiring) NOT (spam OR promotional))) AND ((site:twitter.com OR site:instagram.com) AND language:en)) OR
+(((#technology AND #innovation) OR (@techcompany AND @startup)) AND ((breakthrough OR revolutionary) NEAR/5 (product OR service)))
