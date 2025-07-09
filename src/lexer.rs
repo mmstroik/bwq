@@ -664,8 +664,12 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
 
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[0].token_type, TokenType::QuotedString(ref s) if s == "apple juice"));
-        assert!(matches!(tokens[1].token_type, TokenType::QuotedString(ref s) if s == " phrase with spaces "));
+        assert!(
+            matches!(tokens[0].token_type, TokenType::QuotedString(ref s) if s == "apple juice")
+        );
+        assert!(
+            matches!(tokens[1].token_type, TokenType::QuotedString(ref s) if s == " phrase with spaces ")
+        );
     }
 
     #[test]
