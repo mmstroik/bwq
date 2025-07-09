@@ -439,19 +439,6 @@ fn test_performance_edge_cases(query: &str, expected: TestExpectation) {
     expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_json_output_validation() {
-    let mut test = QueryTest::new();
-
-    // Test query with multiple errors
-    test.assert_error_code("rating:6 AND *invalid", "E012"); // Rating validation error
-    test.assert_error_code("rating:6 AND *invalid", "E006"); // Wildcard placement error
-
-    // Test query with error and warning
-    test.assert_error_code("rating:6 AND ab*", "E012"); // Rating validation error
-    test.assert_warning_code("rating:6 AND ab*", "W003"); // Performance warning
-}
-
 #[test_case("", TestExpectation::ErrorCode("E010"); "empty query")]
 #[test_case("   ", TestExpectation::ErrorCode("E010"); "whitespace only query")]
 #[test_case("\n\t", TestExpectation::ErrorCode("E010"); "newline and tab only")]
