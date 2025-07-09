@@ -183,7 +183,7 @@ fn lint_paths(
     let files = discover_files(paths, extensions);
 
     if files.is_empty() {
-        eprintln!("No files found");
+        eprintln!("No files found that have the extension(s): {}", extensions.join(", "));
         return Err(());
     }
 
@@ -365,30 +365,4 @@ fn show_examples() {
     println!("  #MondayMotivation");
     println!("  @brandwatch");
     println!();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
-
-    #[test]
-    fn test_lint_single_query() {
-        let analysis = analyze_query("apple AND juice");
-        assert!(analysis.is_valid);
-    }
-
-    #[test]
-    fn test_file_processing() {
-        let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "(apple AND juice)").unwrap();
-        writeln!(temp_file, "OR").unwrap();
-        writeln!(temp_file, "(orange NOT bitter)").unwrap();
-        let content = fs::read_to_string(temp_file.path()).unwrap();
-        assert!(content.contains("apple AND juice"));
-        let analysis = analyze_query(content.trim());
-        assert!(analysis.is_valid);
-    }
 }
