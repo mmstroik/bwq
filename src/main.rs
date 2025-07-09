@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand};
 use ignore::WalkBuilder;
 use rayon::prelude::*;
 use std::fs;
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
@@ -44,12 +43,6 @@ enum Commands {
         extensions: Vec<String>,
     },
 
-    /// Run in interactive mode
-    Interactive {
-        #[arg(long)]
-        no_warnings: bool,
-    },
-
     /// Show example queries
     Examples,
 
@@ -85,9 +78,7 @@ fn main() {
                 process_files(&files, !no_warnings, &output_format, &extensions, exit_zero);
             }
         }
-        Some(Commands::Interactive { no_warnings }) => {
-            interactive_mode(!no_warnings);
-        }
+
         Some(Commands::Examples) => {
             show_examples();
         }
@@ -102,7 +93,6 @@ fn main() {
             eprintln!("\nUsage: bwq <COMMAND>");
             eprintln!("\nCommands:");
             eprintln!("  check        Lint files, directories, or queries");
-            eprintln!("  interactive  Run in interactive mode");
             eprintln!("  examples     Show example queries");
             eprintln!("  lsp          Start LSP server");
             eprintln!("\nFor more information, try 'bwq --help'");
@@ -288,53 +278,6 @@ fn lint_paths(
     }
 }
 
-fn interactive_mode(show_warnings: bool) {
-    println!("Brandwatch Query Linter - Interactive Mode");
-    println!("Enter queries to lint (Ctrl+C to exit):");
-    println!();
-
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
-
-    loop {
-        print!("bwq> ");
-        stdout.flush().unwrap();
-
-        let mut line = String::new();
-        match stdin.read_line(&mut line) {
-            Ok(0) => break, // EOF
-            Ok(_) => {
-                let query = line.trim();
-                if query.is_empty() {
-                    continue;
-                }
-
-                if query == "exit" || query == "quit" {
-                    break;
-                }
-
-                if query == "help" {
-                    show_interactive_help();
-                    continue;
-                }
-
-                if query == "examples" {
-                    show_examples();
-                    continue;
-                }
-
-                let analysis = analyze_query(query);
-                output_text(&analysis, show_warnings);
-                println!();
-            }
-            Err(e) => {
-                eprintln!("Error reading input: {e}");
-                break;
-            }
-        }
-    }
-}
-
 fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
     println!("{}", analysis.summary());
 
@@ -364,15 +307,6 @@ fn output_json(analysis: &bwq::AnalysisResult) {
     });
 
     println!("{}", serde_json::to_string_pretty(&json_output).unwrap());
-}
-
-fn show_interactive_help() {
-    println!("Interactive Mode Commands:");
-    println!("  help      - Show this help");
-    println!("  examples  - Show query examples");
-    println!("  exit/quit - Exit interactive mode");
-    println!("  <query>   - Lint a query");
-    println!();
 }
 
 fn show_examples() {
