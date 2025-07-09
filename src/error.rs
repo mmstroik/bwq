@@ -38,58 +38,56 @@ impl Span {
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum LintError {
-    #[error("Lexer error at {position:?}: {message}")]
+    #[error("{message}")]
     LexerError { position: Position, message: String },
 
-    #[error("Parser error at {span:?}: {message}")]
+    #[error("{message}")]
     ParserError { span: Span, message: String },
 
-    #[error("Validation error at {span:?}: {message}")]
+    #[error("{message}")]
     ValidationError { span: Span, message: String },
 
-    #[error("Boolean operator '{operator}' must be capitalized at {span:?}")]
+    #[error("Boolean operator '{operator}' must be capitalized")]
     InvalidBooleanCase { span: Span, operator: String },
 
-    #[error("Unbalanced parentheses at {span:?}")]
+    #[error("Unbalanced parentheses")]
     UnbalancedParentheses { span: Span },
 
-    #[error(
-        "Invalid wildcard placement at {span:?}: wildcards cannot be at the beginning of a word"
-    )]
+    #[error("Invalid wildcard placement: wildcards cannot be at the beginning of a word")]
     InvalidWildcardPlacement { span: Span },
 
-    #[error("Invalid proximity operator syntax at {span:?}: {message}")]
+    #[error("Invalid proximity operator syntax: {message}")]
     InvalidProximityOperator { span: Span, message: String },
 
-    #[error("Invalid field operator syntax at {span:?}: {message}")]
+    #[error("Invalid field operator syntax: {message}")]
     InvalidFieldOperator { span: Span, message: String },
 
-    #[error("Invalid range syntax at {span:?}: expected '[value TO value]'")]
+    #[error("Invalid range syntax: expected '[value TO value]'")]
     InvalidRangeSyntax { span: Span },
 
-    #[error("Unexpected token '{token}' at {span:?}")]
+    #[error("Unexpected token '{token}'")]
     UnexpectedToken { span: Span, token: String },
 
-    #[error("Expected '{expected}' but found '{found}' at {span:?}")]
+    #[error("Expected '{expected}' but found '{found}'")]
     ExpectedToken {
         span: Span,
         expected: String,
         found: String,
     },
 
-    #[error("Field validation error at {span:?}: {message}")]
+    #[error("{message}")]
     FieldValidationError { span: Span, message: String },
 
-    #[error("Proximity operator error at {span:?}: {message}")]
+    #[error("{message}")]
     ProximityOperatorError { span: Span, message: String },
 
-    #[error("Range validation error at {span:?}: {message}")]
+    #[error("{message}")]
     RangeValidationError { span: Span, message: String },
 
-    #[error("Operator mixing error at {span:?}: {message}")]
+    #[error("{message}")]
     OperatorMixingError { span: Span, message: String },
 
-    #[error("Pure negative query error at {span:?}: {message}")]
+    #[error("{message}")]
     PureNegativeQueryError { span: Span, message: String },
 }
 
