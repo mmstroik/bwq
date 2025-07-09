@@ -145,11 +145,6 @@ pub fn lint_query(query: &str) -> LintResult<LintReport> {
     linter.lint(query)
 }
 
-pub fn is_valid_query(query: &str) -> bool {
-    let mut linter = BrandwatchLinter::new();
-    linter.is_valid(query)
-}
-
 pub fn analyze_query(query: &str) -> AnalysisResult {
     let mut linter = BrandwatchLinter::new();
     linter.analyze(query)
@@ -171,16 +166,6 @@ mod tests {
         let mut linter = BrandwatchLinter::new();
         let report = linter.lint("rating:6").unwrap();
         assert!(report.has_errors());
-    }
-
-    #[test]
-    fn test_convenience_functions() {
-        assert!(is_valid_query("apple AND juice"));
-        assert!(!is_valid_query("*invalid"));
-
-        let analysis = analyze_query("apple AND juice");
-        assert!(analysis.is_valid);
-        assert!(!analysis.has_issues());
     }
 
     #[test]
