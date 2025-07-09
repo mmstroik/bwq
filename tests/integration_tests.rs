@@ -233,7 +233,7 @@ impl FileTestExpectation {
 
 #[test_case("apple AND juice", TestExpectation::ValidNoWarnings; "basic AND operation")]
 #[test_case("apple OR orange", TestExpectation::ValidNoWarnings; "basic OR operation")]
-#[test_case("apple NOT bitter", TestExpectation::ValidNoWarnings; "basic NOT operation")]
+#[test_case("apple NOT bitter NOT sour", TestExpectation::ValidNoWarnings; "basic NOT operation")]
 #[test_case("(apple OR orange) AND juice", TestExpectation::ValidNoWarnings; "parenthesized boolean operations")]
 #[test_case("NOT bitter", TestExpectation::ErrorCode("E016"); "pure negative query error")]
 fn test_basic_boolean_syntax(query: &str, expected: TestExpectation) {
