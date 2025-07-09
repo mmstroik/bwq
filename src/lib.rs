@@ -37,13 +37,6 @@ impl BrandwatchLinter {
         Ok(report)
     }
 
-    pub fn is_valid(&mut self, query: &str) -> bool {
-        match self.lint(query) {
-            Ok(report) => !report.has_errors(),
-            Err(_) => false,
-        }
-    }
-
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {
         if query.trim().is_empty() {
             return AnalysisResult {
