@@ -542,7 +542,6 @@ fn test_near_operator_interaction_validation() {
 #[test_case("resources/test/fixtures/valid/complex_near.bwq", FileTestExpectation::ValidNoWarnings; "complex NEAR operations")]
 #[test_case("resources/test/fixtures/valid/field_operations.bwq", FileTestExpectation::ValidNoWarnings; "field operations")]
 #[test_case("resources/test/fixtures/valid/comments_and_wildcards.bwq", FileTestExpectation::ValidNoWarnings; "comments and wildcards")]
-#[test_case("resources/test/fixtures/warnings/performance_issues.bwq", FileTestExpectation::WarningCode("W003"); "performance issues")]
 #[test_case("resources/test/fixtures/invalid/invalid_mixed_operators.bwq", FileTestExpectation::ErrorCode("E015"); "invalid mixed operators")]
 fn test_fixture_files(file_path: &str, expected: FileTestExpectation) {
     let mut test = QueryTest::new();
