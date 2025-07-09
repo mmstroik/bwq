@@ -176,14 +176,37 @@ fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result
 
     match output_format {
         "json" => {
-            let json_analysis = serde_json::json!({
-                "file": path.display().to_string(),
-                "valid": analysis.is_valid,
-                "errors": analysis.errors.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
-                "warnings": analysis.warnings.iter().map(|w| w.to_json()).collect::<Vec<_>>(),
-                "query": query
+            let mut errors = Vec::new();
+            let mut warnings = Vec::new();
+
+            for error in &analysis.errors {
+                let mut error_json = error.to_json();
+                if let Some(obj) = error_json.as_object_mut() {
+                    obj.insert(
+                        "filename".to_string(),
+                        serde_json::Value::String(path.display().to_string()),
+                    );
+                }
+                errors.push(error_json);
+            }
+
+            for warning in &analysis.warnings {
+                let mut warning_json = warning.to_json();
+                if let Some(obj) = warning_json.as_object_mut() {
+                    obj.insert(
+                        "filename".to_string(),
+                        serde_json::Value::String(path.display().to_string()),
+                    );
+                }
+                warnings.push(warning_json);
+            }
+
+            let output = serde_json::json!({
+                "errors": errors,
+                "warnings": warnings
             });
-            println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
+
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         _ => {
             println!("File: {}", path.display());
@@ -271,26 +294,44 @@ fn lint_directory(
     }
     match output_format {
         "json" => {
-            let json_results: Vec<serde_json::Value> = results.into_iter().map(|(file_path, analysis, query)| {
-                serde_json::json!({
-                    "file": file_path.display().to_string(),
-                    "valid": analysis.is_valid,
-                    "errors": analysis.errors.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
-                    "warnings": analysis.warnings.iter().map(|w| w.to_json()).collect::<Vec<_>>(),
-                    "query": query
-                })
-            }).collect();
+            let mut errors = Vec::new();
+            let mut warnings = Vec::new();
 
-            let summary = serde_json::json!({
+            for (file_path, analysis, _) in results {
+                for error in &analysis.errors {
+                    let mut error_json = error.to_json();
+                    if let Some(obj) = error_json.as_object_mut() {
+                        obj.insert(
+                            "filename".to_string(),
+                            serde_json::Value::String(file_path.display().to_string()),
+                        );
+                    }
+                    errors.push(error_json);
+                }
+
+                for warning in &analysis.warnings {
+                    let mut warning_json = warning.to_json();
+                    if let Some(obj) = warning_json.as_object_mut() {
+                        obj.insert(
+                            "filename".to_string(),
+                            serde_json::Value::String(file_path.display().to_string()),
+                        );
+                    }
+                    warnings.push(warning_json);
+                }
+            }
+
+            let output = serde_json::json!({
                 "summary": {
                     "total_files": total_files,
                     "valid_files": valid_files,
                     "invalid_files": total_files - valid_files
                 },
-                "results": json_results
+                "errors": errors,
+                "warnings": warnings
             });
 
-            println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         _ => {
             for (file_path, analysis, _) in results {
@@ -377,23 +418,13 @@ fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
 }
 
 fn output_json(analysis: &bwq::AnalysisResult) {
-    let errors = analysis
-        .errors
-        .iter()
-        .map(|e| e.to_json())
-        .collect::<Vec<_>>();
-    let warnings = analysis
-        .warnings
-        .iter()
-        .map(|w| w.to_json())
-        .collect::<Vec<_>>();
+    let errors: Vec<_> = analysis.errors.iter().map(|e| e.to_json()).collect();
+    let warnings: Vec<_> = analysis.warnings.iter().map(|w| w.to_json()).collect();
 
     let json_output = serde_json::json!({
-        "valid": analysis.is_valid,
-        "summary": analysis.summary(),
+        "query": analysis.query,
         "errors": errors,
-        "warnings": warnings,
-        "query": analysis.query
+        "warnings": warnings
     });
 
     println!("{}", serde_json::to_string_pretty(&json_output).unwrap());
