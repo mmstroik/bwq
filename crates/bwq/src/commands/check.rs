@@ -21,7 +21,7 @@ pub fn run_check(
     let show_warnings = !no_warnings;
 
     if let Some(query_str) = query {
-        Ok(lint_single_query_string(
+        Ok(check_single_query_string(
             &query_str,
             show_warnings,
             &output_format,
@@ -59,13 +59,12 @@ fn check_files(paths: &[PathBuf], extensions: &[String]) -> Result<FileResults, 
 
     if files.is_empty() {
         eprintln!(
-            "No files found that have the extension(s): {}",
+            "Warning: No files found that have the extension(s): {}",
             extensions.join(", ")
         );
-        return Ok(FileResults::new()); // Empty results = success
+        return Ok(FileResults::new());
     }
 
-    // Process files in parallel
     let results: Vec<_> = files
         .par_iter()
         .map(|file_path| match fs::read_to_string(file_path) {
@@ -90,7 +89,7 @@ fn check_files(paths: &[PathBuf], extensions: &[String]) -> Result<FileResults, 
     })
 }
 
-fn lint_single_query_string(
+fn check_single_query_string(
     query: &str,
     show_warnings: bool,
     output_format: &str,
