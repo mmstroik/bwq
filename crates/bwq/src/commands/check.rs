@@ -146,27 +146,31 @@ fn lint_paths(
     // process files in parallel
     let results: Vec<_> = files
         .par_iter()
-        .filter_map(|file_path| {
-            let content = match fs::read_to_string(file_path) {
-                Ok(content) => content,
-                Err(e) => {
-                    eprintln!("Error reading file {}: {}", file_path.display(), e);
-                    return None;
-                }
-            };
-
-            let query = content.trim();
-            let analysis = analyze_query(query);
-            Some((file_path.clone(), analysis, query.to_string()))
+        .map(|file_path| match fs::read_to_string(file_path) {
+            Ok(content) => {
+                let query = content.trim();
+                let analysis = analyze_query(query);
+                Ok((file_path.clone(), analysis, query.to_string()))
+            }
+            Err(e) => {
+                eprintln!("Error reading file {}: {}", file_path.display(), e);
+                Err(file_path.clone())
+            }
         })
         .collect();
 
-    let total_files = results.len();
-    let valid_files = results
+    let successful_results: Vec<_> = results.iter().filter_map(|r| r.as_ref().ok()).collect();
+    let read_errors = results.iter().filter(|r| r.is_err()).count();
+
+    let total_files = successful_results.len();
+    let valid_files = successful_results
         .iter()
         .filter(|(_, analysis, _)| analysis.is_valid)
         .count();
-    let any_errors = results.iter().any(|(_, analysis, _)| !analysis.is_valid);
+    let any_errors = successful_results
+        .iter()
+        .any(|(_, analysis, _)| !analysis.is_valid)
+        || read_errors > 0;
 
     let format = OutputFormat::from(output_format);
     match format {
@@ -174,7 +178,7 @@ fn lint_paths(
             let mut errors = Vec::new();
             let mut warnings = Vec::new();
 
-            for (file_path, analysis, _) in &results {
+            for (file_path, analysis, _) in &successful_results {
                 for error in &analysis.errors {
                     let mut error_json = error.to_json();
                     if let Some(obj) = error_json.as_object_mut() {
@@ -212,7 +216,7 @@ fn lint_paths(
         }
         OutputFormat::Text => {
             let printer = Printer::new(format, show_warnings);
-            for (file_path, analysis, _) in &results {
+            for (file_path, analysis, _) in &successful_results {
                 if !analysis.is_valid || (show_warnings && !analysis.warnings.is_empty()) {
                     println!("File: {}", file_path.display());
                     printer.print_analysis(analysis);
