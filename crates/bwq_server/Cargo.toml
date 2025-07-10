@@ -1,15 +1,12 @@
 [package]
-name = "bwq_server"
+name = "bwq-server"
 version = "0.0.0"
 authors = { workspace = true }
 edition = { workspace = true }
+rust-version = { workspace = true }
 description = "Language server for Brandwatch query files (.bwq)"
 repository = { workspace = true }
 license = { workspace = true }
-publish = false
-
-[package.metadata.release]
-release = false
 
 [dependencies]
 anyhow = { workspace = true }
