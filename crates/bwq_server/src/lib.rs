@@ -56,8 +56,8 @@ impl LspServer {
                 ..Default::default()
             },
             server_info: Some(lsp_types::ServerInfo {
-                name: "bwq-lsp".to_string(),
-                version: Some("0.1.0".to_string()),
+                name: "bwq-server".to_string(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
             }),
         };
 
@@ -71,7 +71,7 @@ impl LspServer {
     }
 
     fn main_loop(&mut self) -> Result<()> {
-        eprintln!("bwq LSP server started");
+        eprintln!("bwq language server started");
 
         while let Ok(msg) = self.connection.receiver.recv() {
             match msg {
@@ -88,7 +88,7 @@ impl LspServer {
             }
         }
 
-        eprintln!("bwq LSP server stopped");
+        eprintln!("bwq language server stopped");
         Ok(())
     }
 

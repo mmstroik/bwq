@@ -1,10 +1,8 @@
-import * as path from "path";
 import { workspace, ExtensionContext } from "vscode";
 import {
   LanguageClient,
   LanguageClientOptions,
   Executable,
-  TransportKind,
 } from "vscode-languageclient/node";
 
 let client: LanguageClient;
@@ -15,7 +13,7 @@ export function activate(context: ExtensionContext) {
 
   const serverOptions: Executable = {
     command: serverPath,
-    args: ["lsp"],
+    args: ["server"],
   };
 
   const clientOptions: LanguageClientOptions = {
