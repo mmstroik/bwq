@@ -1,10 +1,10 @@
 [package]
 name = "bwq_linter"
-version = "0.0.0"
+version = "0.4.1"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
-description = "Core linting library for Brandwatch query files (.bwq)"
+description = "Core linting library for Brandwatch query files (dep of bwq)"
 repository = { workspace = true }
 license = { workspace = true }
 
