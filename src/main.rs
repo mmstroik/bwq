@@ -183,7 +183,10 @@ fn lint_paths(
     let files = discover_files(paths, extensions);
 
     if files.is_empty() {
-        eprintln!("No files found that have the extension(s): {}", extensions.join(", "));
+        eprintln!(
+            "No files found that have the extension(s): {}",
+            extensions.join(", ")
+        );
         return Err(());
     }
 

@@ -254,7 +254,7 @@ impl Lexer {
                         && !self.current_char().is_ascii_digit()
                     {
                         return Err(LintError::LexerError {
-                            position: start_pos,
+                            span: Span::single_character(start_pos),
                             message: "Invalid characters after proximity operator. Tilde operator format should be ~5 (with proper word boundary).".to_string(),
                         });
                     }
@@ -314,7 +314,7 @@ impl Lexer {
                 self.advance();
                 self.column += 1;
                 Err(LintError::LexerError {
-                    position: start_pos,
+                    span: Span::single_character(start_pos),
                     message: format!("Unexpected character '{ch}'"),
                 })
             }
@@ -347,7 +347,7 @@ impl Lexer {
 
         if self.is_at_end() {
             return Err(LintError::LexerError {
-                position: start_pos,
+                span: Span::single_character(start_pos),
                 message: "Unterminated quoted string".to_string(),
             });
         }

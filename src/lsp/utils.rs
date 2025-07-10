@@ -15,24 +15,6 @@ pub fn span_to_range(span: &Span) -> LspRange {
     }
 }
 
-pub fn range_from_coords(
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
-    end_char: u32,
-) -> LspRange {
-    LspRange {
-        start: LspPosition {
-            line: start_line,
-            character: start_char,
-        },
-        end: LspPosition {
-            line: end_line,
-            character: end_char,
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

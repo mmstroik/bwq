@@ -34,12 +34,19 @@ impl Span {
             end: pos,
         }
     }
+
+    pub fn single_character(pos: Position) -> Self {
+        Self {
+            start: pos.clone(),
+            end: Position::new(pos.line, pos.column + 1, pos.offset + 1),
+        }
+    }
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum LintError {
     #[error("{message}")]
-    LexerError { position: Position, message: String },
+    LexerError { span: Span, message: String },
 
     #[error("{message}")]
     ParserError { span: Span, message: String },
@@ -114,12 +121,9 @@ impl LintError {
     }
 
     pub fn span_json(&self) -> serde_json::Value {
-        match self {
-            LintError::LexerError { position, .. } => serde_json::json!({
-                "start": {"line": position.line, "column": position.column, "offset": position.offset},
-                "end": {"line": position.line, "column": position.column + 1, "offset": position.offset + 1}
-            }),
-            LintError::ParserError { span, .. }
+        let span = match self {
+            LintError::LexerError { span, .. }
+            | LintError::ParserError { span, .. }
             | LintError::ValidationError { span, .. }
             | LintError::InvalidBooleanCase { span, .. }
             | LintError::UnbalancedParentheses { span }
@@ -133,11 +137,13 @@ impl LintError {
             | LintError::ProximityOperatorError { span, .. }
             | LintError::RangeValidationError { span, .. }
             | LintError::OperatorMixingError { span, .. }
-            | LintError::PureNegativeQueryError { span, .. } => serde_json::json!({
-                "start": {"line": span.start.line, "column": span.start.column, "offset": span.start.offset},
-                "end": {"line": span.end.line, "column": span.end.column, "offset": span.end.offset}
-            }),
-        }
+            | LintError::PureNegativeQueryError { span, .. } => span,
+        };
+
+        serde_json::json!({
+            "start": {"line": span.start.line, "column": span.start.column, "offset": span.start.offset},
+            "end": {"line": span.end.line, "column": span.end.column, "offset": span.end.offset}
+        })
     }
 
     pub fn to_json(&self) -> serde_json::Value {
