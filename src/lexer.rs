@@ -1,6 +1,6 @@
-use crate::error::{LintError, LintResult, Position, Span};
 use std::fmt;
 
+use crate::error::{LintError, LintResult, Position, Span};
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Word(String),

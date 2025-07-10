@@ -1,10 +1,10 @@
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString};
 
-use super::super::utils::span_to_range;
+use super::utils::span_to_range;
 use crate::{
-    error::{LintError, LintWarning},
     BrandwatchLinter,
+    error::{LintError, LintWarning},
 };
 
 pub struct DiagnosticsHandler;

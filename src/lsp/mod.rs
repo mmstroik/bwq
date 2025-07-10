@@ -1,4 +1,4 @@
-pub mod handlers;
+pub mod diagnostics_handler;
 pub mod server;
 pub mod utils;
 

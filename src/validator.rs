@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::error::{LintError, LintReport};
-use crate::validation::{rules::PureNegativeRule, ValidationEngine};
+use crate::validation::{ValidationEngine, rules::PureNegativeRule};
 
 /// plugin-based query-level validator
 pub struct Validator {

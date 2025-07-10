@@ -1,5 +1,6 @@
-use crate::error::{Position, Span};
 use lsp_types::{Position as LspPosition, Range as LspRange};
+
+use crate::error::{Position, Span};
 
 pub fn position_to_lsp(pos: &Position) -> LspPosition {
     LspPosition {

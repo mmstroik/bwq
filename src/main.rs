@@ -1,9 +1,11 @@
-use bwq::analyze_query;
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use clap::{Parser, Subcommand};
 use ignore::WalkBuilder;
 use rayon::prelude::*;
-use std::fs;
-use std::path::{Path, PathBuf};
+
+use bwq::analyze_query;
 
 #[derive(Parser)]
 #[command(name = "bwq")]
@@ -63,7 +65,7 @@ fn main() {
             exit_zero,
         }) => {
             if let Some(query_str) = query {
-                lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
+                lint_single_query_string(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
                 // Default to current directory when no files specified
                 let default_files = vec![PathBuf::from(".")];
@@ -125,7 +127,12 @@ fn process_files(
     }
 }
 
-fn lint_single_query(query: &str, show_warnings: bool, output_format: &str, exit_zero: bool) {
+fn lint_single_query_string(
+    query: &str,
+    show_warnings: bool,
+    output_format: &str,
+    exit_zero: bool,
+) {
     let analysis = analyze_query(query);
 
     match output_format {
@@ -269,11 +276,7 @@ fn lint_paths(
         }
     }
 
-    if any_errors {
-        Err(())
-    } else {
-        Ok(())
-    }
+    if any_errors { Err(()) } else { Ok(()) }
 }
 
 fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
