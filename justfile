@@ -39,31 +39,31 @@ bwq-check-q-json query:
 
 
 # Compare our linter with Brandwatch API validation
-compare:
+compare query-or-file:
 	@echo "=== Our Linter ==="
-	@just compare-our "$1" || true
+	@just compare-our '{{query-or-file}}' || true
 	@echo ""
 	@echo "=== Brandwatch API ==="
-	@just compare-bw "$1" || true
+	@just compare-bw '{{query-or-file}}' || true
 
-compare-our:
+compare-our query-or-file:
 	#!/usr/bin/env bash
-	if [ -f "$1" ]; then
-		just bwq check "$1"
+	if [ -f "{{query-or-file}}" ]; then
+		just bwq check "{{query-or-file}}"
 	else
-		just bwq check --query "$1"
+		just bwq check --query '{{query-or-file}}'
 	fi
 
-compare-bw:
+compare-bw query-or-file:
 	#!/usr/bin/env bash
-	if [ -f "$1" ]; then
-		just bw-validate "$(cat "$1")"
+	if [ -f "{{query-or-file}}" ]; then
+		just bw-validate '$(cat '{{query-or-file}}')'
 	else
-		just bw-validate "$1"
+		just bw-validate '{{query-or-file}}'
 	fi
 
-bw-validate:
+bw-validate query:
 	curl -X POST https://api.brandwatch.com/query-validation \
 		-H "authorization: bearer $BW_API_KEY" \
 		-H 'Content-Type: application/json' \
-		-d '{"booleanQuery": "'"$1"'","languages": []}'
+		-d '{"booleanQuery": "{{query}}","languages": []}'
