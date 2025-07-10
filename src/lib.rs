@@ -1,3 +1,9 @@
+use error::{LintError, LintReport, LintResult};
+use lexer::Lexer;
+pub use lsp::LspServer;
+use parser::Parser;
+use validator::Validator;
+
 pub mod ast;
 pub mod error;
 pub mod lexer;
@@ -5,14 +11,6 @@ pub mod lsp;
 pub mod parser;
 pub mod validation;
 pub mod validator;
-
-use error::{LintError, LintReport, LintResult};
-use lexer::Lexer;
-use parser::Parser;
-use validator::Validator;
-
-pub use lsp::LspServer;
-
 pub struct BrandwatchLinter {
     validator: Validator,
 }
@@ -37,23 +35,7 @@ impl BrandwatchLinter {
         Ok(report)
     }
 
-    pub fn is_valid(&mut self, query: &str) -> bool {
-        match self.lint(query) {
-            Ok(report) => !report.has_errors(),
-            Err(_) => false,
-        }
-    }
-
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {
-        if query.trim().is_empty() {
-            return AnalysisResult {
-                is_valid: true,
-                errors: Vec::new(),
-                warnings: Vec::new(),
-                query: Some(query.to_string()),
-            };
-        }
-
         match self.lint(query) {
             Ok(report) => AnalysisResult {
                 is_valid: !report.has_errors(),
@@ -68,6 +50,19 @@ impl BrandwatchLinter {
                 query: Some(query.to_string()),
             },
         }
+    }
+
+    pub fn analyze_and_skip_empty(&mut self, query: &str) -> AnalysisResult {
+        if query.trim().is_empty() {
+            return AnalysisResult {
+                is_valid: true,
+                errors: Vec::new(),
+                warnings: Vec::new(),
+                query: Some(query.to_string()),
+            };
+        }
+
+        self.analyze(query)
     }
 }
 
@@ -145,11 +140,6 @@ pub fn lint_query(query: &str) -> LintResult<LintReport> {
     linter.lint(query)
 }
 
-pub fn is_valid_query(query: &str) -> bool {
-    let mut linter = BrandwatchLinter::new();
-    linter.is_valid(query)
-}
-
 pub fn analyze_query(query: &str) -> AnalysisResult {
     let mut linter = BrandwatchLinter::new();
     linter.analyze(query)
@@ -171,16 +161,6 @@ mod tests {
         let mut linter = BrandwatchLinter::new();
         let report = linter.lint("rating:6").unwrap();
         assert!(report.has_errors());
-    }
-
-    #[test]
-    fn test_convenience_functions() {
-        assert!(is_valid_query("apple AND juice"));
-        assert!(!is_valid_query("*invalid"));
-
-        let analysis = analyze_query("apple AND juice");
-        assert!(analysis.is_valid);
-        assert!(!analysis.has_issues());
     }
 
     #[test]

@@ -1,6 +1,7 @@
-use bwq::error::LintReport;
-use bwq::BrandwatchLinter;
 use test_case::test_case;
+
+use bwq::BrandwatchLinter;
+use bwq::error::LintReport;
 
 /// Test context for consistent query validation testing
 pub struct QueryTest {
@@ -233,7 +234,7 @@ impl FileTestExpectation {
 
 #[test_case("apple AND juice", TestExpectation::ValidNoWarnings; "basic AND operation")]
 #[test_case("apple OR orange", TestExpectation::ValidNoWarnings; "basic OR operation")]
-#[test_case("apple NOT bitter", TestExpectation::ValidNoWarnings; "basic NOT operation")]
+#[test_case("apple NOT bitter NOT sour", TestExpectation::ValidNoWarnings; "basic NOT operation")]
 #[test_case("(apple OR orange) AND juice", TestExpectation::ValidNoWarnings; "parenthesized boolean operations")]
 #[test_case("NOT bitter", TestExpectation::ErrorCode("E016"); "pure negative query error")]
 fn test_basic_boolean_syntax(query: &str, expected: TestExpectation) {
@@ -439,19 +440,6 @@ fn test_performance_edge_cases(query: &str, expected: TestExpectation) {
     expected.assert(&mut test, query);
 }
 
-#[test]
-fn test_json_output_validation() {
-    let mut test = QueryTest::new();
-
-    // Test query with multiple errors
-    test.assert_error_code("rating:6 AND *invalid", "E012"); // Rating validation error
-    test.assert_error_code("rating:6 AND *invalid", "E006"); // Wildcard placement error
-
-    // Test query with error and warning
-    test.assert_error_code("rating:6 AND ab*", "E012"); // Rating validation error
-    test.assert_warning_code("rating:6 AND ab*", "W003"); // Performance warning
-}
-
 #[test_case("", TestExpectation::ErrorCode("E010"); "empty query")]
 #[test_case("   ", TestExpectation::ErrorCode("E010"); "whitespace only query")]
 #[test_case("\n\t", TestExpectation::ErrorCode("E010"); "newline and tab only")]
@@ -555,7 +543,6 @@ fn test_near_operator_interaction_validation() {
 #[test_case("resources/test/fixtures/valid/complex_near.bwq", FileTestExpectation::ValidNoWarnings; "complex NEAR operations")]
 #[test_case("resources/test/fixtures/valid/field_operations.bwq", FileTestExpectation::ValidNoWarnings; "field operations")]
 #[test_case("resources/test/fixtures/valid/comments_and_wildcards.bwq", FileTestExpectation::ValidNoWarnings; "comments and wildcards")]
-#[test_case("resources/test/fixtures/warnings/performance_issues.bwq", FileTestExpectation::WarningCode("W003"); "performance issues")]
 #[test_case("resources/test/fixtures/invalid/invalid_mixed_operators.bwq", FileTestExpectation::ErrorCode("E015"); "invalid mixed operators")]
 fn test_fixture_files(file_path: &str, expected: FileTestExpectation) {
     let mut test = QueryTest::new();

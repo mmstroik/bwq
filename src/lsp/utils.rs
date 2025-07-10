@@ -1,5 +1,6 @@
-use crate::error::{Position, Span};
 use lsp_types::{Position as LspPosition, Range as LspRange};
+
+use crate::error::{Position, Span};
 
 pub fn position_to_lsp(pos: &Position) -> LspPosition {
     LspPosition {
@@ -12,24 +13,6 @@ pub fn span_to_range(span: &Span) -> LspRange {
     LspRange {
         start: position_to_lsp(&span.start),
         end: position_to_lsp(&span.end),
-    }
-}
-
-pub fn range_from_coords(
-    start_line: u32,
-    start_char: u32,
-    end_line: u32,
-    end_char: u32,
-) -> LspRange {
-    LspRange {
-        start: LspPosition {
-            line: start_line,
-            character: start_char,
-        },
-        end: LspPosition {
-            line: end_line,
-            character: end_char,
-        },
     }
 }
 

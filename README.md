@@ -1,6 +1,6 @@
 # bwq
 
-brandwatch boolean search query linter and LSP written in rust.
+brandwatch boolean search query linter and language server written in rust.
 
 ## install
 
@@ -20,7 +20,7 @@ bwq check path/to/queries/*.txt  # lint all `.txt` files in `path/to/queries/`
 # lint query strings directly
 bwq check --query "term1 AND wildcardterm*"
 
-# lint both .txt and .bwq files in current directory
+# lint both .txt and .bwq files in current directory (and subdirectories)
 bwq check -e txt -e bwq 
 
 # show all options

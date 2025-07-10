@@ -1,6 +1,6 @@
-use crate::error::{LintError, LintResult, Position, Span};
 use std::fmt;
 
+use crate::error::{LintError, LintResult, Position, Span};
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Word(String),
@@ -254,7 +254,7 @@ impl Lexer {
                         && !self.current_char().is_ascii_digit()
                     {
                         return Err(LintError::LexerError {
-                            position: start_pos,
+                            span: Span::single_character(start_pos),
                             message: "Invalid characters after proximity operator. Tilde operator format should be ~5 (with proper word boundary).".to_string(),
                         });
                     }
@@ -314,7 +314,7 @@ impl Lexer {
                 self.advance();
                 self.column += 1;
                 Err(LintError::LexerError {
-                    position: start_pos,
+                    span: Span::single_character(start_pos),
                     message: format!("Unexpected character '{ch}'"),
                 })
             }
@@ -347,7 +347,7 @@ impl Lexer {
 
         if self.is_at_end() {
             return Err(LintError::LexerError {
-                position: start_pos,
+                span: Span::single_character(start_pos),
                 message: "Unterminated quoted string".to_string(),
             });
         }
@@ -660,12 +660,15 @@ mod tests {
 
     #[test]
     fn test_quoted_string() {
-        let mut lexer = Lexer::new("\"apple juice\"");
+        let mut lexer = Lexer::new("\"apple juice\" \" phrase with spaces \"");
         let tokens = lexer.tokenize().unwrap();
 
-        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.len(), 3);
         assert!(
             matches!(tokens[0].token_type, TokenType::QuotedString(ref s) if s == "apple juice")
+        );
+        assert!(
+            matches!(tokens[1].token_type, TokenType::QuotedString(ref s) if s == " phrase with spaces ")
         );
     }
 

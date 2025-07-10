@@ -1,10 +1,10 @@
 use anyhow::Result;
-use lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range};
+use lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString};
 
-use super::super::utils::{position_to_lsp, span_to_range};
+use super::utils::span_to_range;
 use crate::{
-    error::{LintError, LintWarning},
     BrandwatchLinter,
+    error::{LintError, LintWarning},
 };
 
 pub struct DiagnosticsHandler;
@@ -21,7 +21,7 @@ impl DiagnosticsHandler {
     ) -> Result<Vec<Diagnostic>> {
         let mut diagnostics = Vec::new();
 
-        let analysis = linter.analyze(content);
+        let analysis = linter.analyze_and_skip_empty(content);
 
         for error in &analysis.errors {
             diagnostics.push(self.error_to_diagnostic(error));
@@ -36,17 +36,7 @@ impl DiagnosticsHandler {
 
     fn error_to_diagnostic(&self, error: &LintError) -> Diagnostic {
         let (range, message) = match error {
-            LintError::LexerError { position, message } => {
-                let lsp_pos = position_to_lsp(position);
-                let range = Range {
-                    start: lsp_pos,
-                    end: Position {
-                        line: lsp_pos.line,
-                        character: lsp_pos.character + 1,
-                    },
-                };
-                (range, message.clone())
-            }
+            LintError::LexerError { span, message } => (span_to_range(span), message.clone()),
             LintError::ParserError { span, message } => (span_to_range(span), message.clone()),
             LintError::ValidationError { span, message } => (span_to_range(span), message.clone()),
             LintError::InvalidBooleanCase { span, operator } => (

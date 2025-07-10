@@ -1,9 +1,11 @@
-use bwq::analyze_query;
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use clap::{Parser, Subcommand};
 use ignore::WalkBuilder;
-use std::fs;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use rayon::prelude::*;
+
+use bwq::analyze_query;
 
 #[derive(Parser)]
 #[command(name = "bwq")]
@@ -43,12 +45,6 @@ enum Commands {
         extensions: Vec<String>,
     },
 
-    /// Run in interactive mode
-    Interactive {
-        #[arg(long)]
-        no_warnings: bool,
-    },
-
     /// Show example queries
     Examples,
 
@@ -69,26 +65,22 @@ fn main() {
             exit_zero,
         }) => {
             if let Some(query_str) = query {
-                lint_single_query(&query_str, !no_warnings, &output_format, exit_zero);
+                lint_single_query_string(&query_str, !no_warnings, &output_format, exit_zero);
             } else if files.is_empty() {
-                if lint_directory(
-                    &PathBuf::from("."),
+                // Default to current directory when no files specified
+                let default_files = vec![PathBuf::from(".")];
+                process_files(
+                    &default_files,
                     !no_warnings,
                     &output_format,
                     &extensions,
-                )
-                .is_err()
-                    && !exit_zero
-                {
-                    std::process::exit(1);
-                }
+                    exit_zero,
+                );
             } else {
                 process_files(&files, !no_warnings, &output_format, &extensions, exit_zero);
             }
         }
-        Some(Commands::Interactive { no_warnings }) => {
-            interactive_mode(!no_warnings);
-        }
+
         Some(Commands::Examples) => {
             show_examples();
         }
@@ -103,7 +95,6 @@ fn main() {
             eprintln!("\nUsage: bwq <COMMAND>");
             eprintln!("\nCommands:");
             eprintln!("  check        Lint files, directories, or queries");
-            eprintln!("  interactive  Run in interactive mode");
             eprintln!("  examples     Show example queries");
             eprintln!("  lsp          Start LSP server");
             eprintln!("\nFor more information, try 'bwq --help'");
@@ -119,29 +110,29 @@ fn process_files(
     extensions: &[String],
     exit_zero: bool,
 ) {
-    let mut any_errors = false;
-
+    // Validate that all paths exist
     for file_path in files {
-        if file_path.is_file() {
-            if lint_file(file_path, show_warnings, output_format).is_err() {
-                any_errors = true;
-            }
-        } else if file_path.is_dir() {
-            if lint_directory(file_path, show_warnings, output_format, extensions).is_err() {
-                any_errors = true;
-            }
-        } else {
+        if !file_path.exists() {
             eprintln!("Path does not exist: {}", file_path.display());
-            any_errors = true;
+            if !exit_zero {
+                std::process::exit(1);
+            }
+            return;
         }
     }
 
-    if any_errors && !exit_zero {
+    // Use unified linting approach
+    if lint_paths(files, show_warnings, output_format, extensions).is_err() && !exit_zero {
         std::process::exit(1);
     }
 }
 
-fn lint_single_query(query: &str, show_warnings: bool, output_format: &str, exit_zero: bool) {
+fn lint_single_query_string(
+    query: &str,
+    show_warnings: bool,
+    output_format: &str,
+    exit_zero: bool,
+) {
     let analysis = analyze_query(query);
 
     match output_format {
@@ -158,46 +149,6 @@ fn lint_single_query(query: &str, show_warnings: bool, output_format: &str, exit
     }
 }
 
-fn lint_file(path: &PathBuf, show_warnings: bool, output_format: &str) -> Result<(), ()> {
-    let content = match fs::read_to_string(path) {
-        Ok(content) => content,
-        Err(e) => {
-            eprintln!("Error reading file {}: {}", path.display(), e);
-            return Err(());
-        }
-    };
-    let query = content.trim();
-    if query.is_empty() {
-        eprintln!("File {} is empty", path.display());
-        return Err(());
-    }
-
-    let analysis = analyze_query(query);
-
-    match output_format {
-        "json" => {
-            let json_analysis = serde_json::json!({
-                "file": path.display().to_string(),
-                "valid": analysis.is_valid,
-                "errors": analysis.errors.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
-                "warnings": analysis.warnings.iter().map(|w| w.to_json()).collect::<Vec<_>>(),
-                "query": query
-            });
-            println!("{}", serde_json::to_string_pretty(&json_analysis).unwrap());
-        }
-        _ => {
-            println!("File: {}", path.display());
-            output_text(&analysis, show_warnings);
-            println!();
-        }
-    }
-
-    if !analysis.is_valid {
-        return Err(());
-    }
-    Ok(())
-}
-
 fn matches_extensions(file_path: &Path, extensions: &[String]) -> bool {
     if let Some(file_ext) = file_path.extension().and_then(|ext| ext.to_str()) {
         extensions.iter().any(|ext| ext == file_ext)
@@ -206,97 +157,117 @@ fn matches_extensions(file_path: &Path, extensions: &[String]) -> bool {
     }
 }
 
-fn lint_directory(
-    path: &Path,
-    show_warnings: bool,
-    output_format: &str,
-    extensions: &[String],
-) -> Result<(), ()> {
-    let mut builder = WalkBuilder::new(path);
-    builder.hidden(false);
+fn discover_files(paths: &[PathBuf], extensions: &[String]) -> Vec<PathBuf> {
+    let mut discovered_files = Vec::new();
 
-    let mut total_files = 0;
-    let mut valid_files = 0;
-    let mut any_errors = false;
-    let mut results = Vec::new();
+    for path in paths {
+        if path.is_file() {
+            // For explicit file arguments, include them regardless of extension
+            discovered_files.push(path.clone());
+        } else if path.is_dir() {
+            // For directories, discover files with matching extensions
+            let mut builder = WalkBuilder::new(path);
+            builder.hidden(false);
 
-    for entry in builder.build() {
-        match entry {
-            Ok(dir_entry) => {
+            for dir_entry in builder.build().flatten() {
                 let file_path = dir_entry.path();
-
                 if file_path.is_file() && matches_extensions(file_path, extensions) {
-                    total_files += 1;
-
-                    let content = match fs::read_to_string(file_path) {
-                        Ok(content) => content,
-                        Err(e) => {
-                            eprintln!("Error reading file {}: {}", file_path.display(), e);
-                            any_errors = true;
-                            continue;
-                        }
-                    };
-
-                    let query = content.trim();
-                    if query.is_empty() {
-                        eprintln!("Skipping empty file: {}", file_path.display());
-                        continue;
-                    }
-
-                    let analysis = analyze_query(query);
-
-                    if analysis.is_valid {
-                        valid_files += 1;
-                    } else {
-                        any_errors = true;
-                    }
-
-                    results.push((file_path.to_path_buf(), analysis, query.to_string()));
+                    discovered_files.push(file_path.to_path_buf());
                 }
-            }
-            Err(e) => {
-                eprintln!("Error processing path: {e}");
-                any_errors = true;
             }
         }
     }
 
-    if total_files == 0 {
+    discovered_files
+}
+
+fn lint_paths(
+    paths: &[PathBuf],
+    show_warnings: bool,
+    output_format: &str,
+    extensions: &[String],
+) -> Result<(), ()> {
+    let files = discover_files(paths, extensions);
+
+    if files.is_empty() {
         eprintln!(
-            "No files found with extensions [{}] in directory '{}'",
-            extensions.join(", "),
-            path.display()
+            "No files found that have the extension(s): {}",
+            extensions.join(", ")
         );
         return Err(());
     }
+
+    // process files in parallel
+    let results: Vec<_> = files
+        .par_iter()
+        .filter_map(|file_path| {
+            let content = match fs::read_to_string(file_path) {
+                Ok(content) => content,
+                Err(e) => {
+                    eprintln!("Error reading file {}: {}", file_path.display(), e);
+                    return None;
+                }
+            };
+
+            let query = content.trim();
+            let analysis = analyze_query(query);
+            Some((file_path.clone(), analysis, query.to_string()))
+        })
+        .collect();
+
+    let total_files = results.len();
+    let valid_files = results
+        .iter()
+        .filter(|(_, analysis, _)| analysis.is_valid)
+        .count();
+    let any_errors = results.iter().any(|(_, analysis, _)| !analysis.is_valid);
+
     match output_format {
         "json" => {
-            let json_results: Vec<serde_json::Value> = results.into_iter().map(|(file_path, analysis, query)| {
-                serde_json::json!({
-                    "file": file_path.display().to_string(),
-                    "valid": analysis.is_valid,
-                    "errors": analysis.errors.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
-                    "warnings": analysis.warnings.iter().map(|w| w.to_json()).collect::<Vec<_>>(),
-                    "query": query
-                })
-            }).collect();
+            let mut errors = Vec::new();
+            let mut warnings = Vec::new();
 
-            let summary = serde_json::json!({
+            for (file_path, analysis, _) in &results {
+                for error in &analysis.errors {
+                    let mut error_json = error.to_json();
+                    if let Some(obj) = error_json.as_object_mut() {
+                        obj.insert(
+                            "filename".to_string(),
+                            serde_json::Value::String(file_path.display().to_string()),
+                        );
+                    }
+                    errors.push(error_json);
+                }
+
+                for warning in &analysis.warnings {
+                    let mut warning_json = warning.to_json();
+                    if let Some(obj) = warning_json.as_object_mut() {
+                        obj.insert(
+                            "filename".to_string(),
+                            serde_json::Value::String(file_path.display().to_string()),
+                        );
+                    }
+                    warnings.push(warning_json);
+                }
+            }
+
+            let output = serde_json::json!({
                 "summary": {
                     "total_files": total_files,
                     "valid_files": valid_files,
                     "invalid_files": total_files - valid_files
                 },
-                "results": json_results
+                "errors": errors,
+                "warnings": warnings
             });
 
-            println!("{}", serde_json::to_string_pretty(&summary).unwrap());
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         _ => {
-            for (file_path, analysis, _) in results {
+            for (file_path, analysis, _) in &results {
                 if !analysis.is_valid || (show_warnings && !analysis.warnings.is_empty()) {
                     println!("File: {}", file_path.display());
-                    output_text(&analysis, show_warnings);
+                    output_text(analysis, show_warnings);
                     println!();
                 }
             }
@@ -305,57 +276,7 @@ fn lint_directory(
         }
     }
 
-    if any_errors {
-        return Err(());
-    }
-    Ok(())
-}
-
-fn interactive_mode(show_warnings: bool) {
-    println!("Brandwatch Query Linter - Interactive Mode");
-    println!("Enter queries to lint (Ctrl+C to exit):");
-    println!();
-
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
-
-    loop {
-        print!("bwq> ");
-        stdout.flush().unwrap();
-
-        let mut line = String::new();
-        match stdin.read_line(&mut line) {
-            Ok(0) => break, // EOF
-            Ok(_) => {
-                let query = line.trim();
-                if query.is_empty() {
-                    continue;
-                }
-
-                if query == "exit" || query == "quit" {
-                    break;
-                }
-
-                if query == "help" {
-                    show_interactive_help();
-                    continue;
-                }
-
-                if query == "examples" {
-                    show_examples();
-                    continue;
-                }
-
-                let analysis = analyze_query(query);
-                output_text(&analysis, show_warnings);
-                println!();
-            }
-            Err(e) => {
-                eprintln!("Error reading input: {e}");
-                break;
-            }
-        }
-    }
+    if any_errors { Err(()) } else { Ok(()) }
 }
 
 fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
@@ -377,35 +298,16 @@ fn output_text(analysis: &bwq::AnalysisResult, show_warnings: bool) {
 }
 
 fn output_json(analysis: &bwq::AnalysisResult) {
-    let errors = analysis
-        .errors
-        .iter()
-        .map(|e| e.to_json())
-        .collect::<Vec<_>>();
-    let warnings = analysis
-        .warnings
-        .iter()
-        .map(|w| w.to_json())
-        .collect::<Vec<_>>();
+    let errors: Vec<_> = analysis.errors.iter().map(|e| e.to_json()).collect();
+    let warnings: Vec<_> = analysis.warnings.iter().map(|w| w.to_json()).collect();
 
     let json_output = serde_json::json!({
-        "valid": analysis.is_valid,
-        "summary": analysis.summary(),
+        "query": analysis.query,
         "errors": errors,
-        "warnings": warnings,
-        "query": analysis.query
+        "warnings": warnings
     });
 
     println!("{}", serde_json::to_string_pretty(&json_output).unwrap());
-}
-
-fn show_interactive_help() {
-    println!("Interactive Mode Commands:");
-    println!("  help      - Show this help");
-    println!("  examples  - Show query examples");
-    println!("  exit/quit - Exit interactive mode");
-    println!("  <query>   - Lint a query");
-    println!();
 }
 
 fn show_examples() {
@@ -464,30 +366,4 @@ fn show_examples() {
     println!("  #MondayMotivation");
     println!("  @brandwatch");
     println!();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
-
-    #[test]
-    fn test_lint_single_query() {
-        let analysis = analyze_query("apple AND juice");
-        assert!(analysis.is_valid);
-    }
-
-    #[test]
-    fn test_file_processing() {
-        let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "(apple AND juice)").unwrap();
-        writeln!(temp_file, "OR").unwrap();
-        writeln!(temp_file, "(orange NOT bitter)").unwrap();
-        let content = fs::read_to_string(temp_file.path()).unwrap();
-        assert!(content.contains("apple AND juice"));
-        let analysis = analyze_query(content.trim());
-        assert!(analysis.is_valid);
-    }
 }
