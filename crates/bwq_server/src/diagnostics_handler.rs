@@ -89,6 +89,9 @@ impl DiagnosticsHandler {
             LintError::PureNegativeQueryError { span, message } => {
                 (span_to_range(span), message.clone())
             }
+            LintError::InvalidFieldOperatorSpacing { span, message } => {
+                (span_to_range(span), message.clone())
+            }
         };
 
         Diagnostic {

@@ -96,6 +96,9 @@ pub enum LintError {
 
     #[error("{message}")]
     PureNegativeQueryError { span: Span, message: String },
+
+    #[error("{message}")]
+    InvalidFieldOperatorSpacing { span: Span, message: String },
 }
 
 impl LintError {
@@ -117,6 +120,7 @@ impl LintError {
             LintError::RangeValidationError { .. } => "E014",
             LintError::OperatorMixingError { .. } => "E015",
             LintError::PureNegativeQueryError { .. } => "E016",
+            LintError::InvalidFieldOperatorSpacing { .. } => "E017",
         }
     }
 
@@ -137,7 +141,8 @@ impl LintError {
             | LintError::ProximityOperatorError { span, .. }
             | LintError::RangeValidationError { span, .. }
             | LintError::OperatorMixingError { span, .. }
-            | LintError::PureNegativeQueryError { span, .. } => span,
+            | LintError::PureNegativeQueryError { span, .. }
+            | LintError::InvalidFieldOperatorSpacing { span, .. } => span,
         };
 
         serde_json::json!({

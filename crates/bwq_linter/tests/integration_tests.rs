@@ -346,6 +346,11 @@ fn test_basic_field_operators() {
     test.assert_valid_no_warnings("tags:photography");
 
     test.assert_valid_no_warnings("subreddit:nba");
+
+    // Should fail - space before colon
+    test.assert_error_code("subreddit : nba", "E017");
+    test.assert_error_code("subreddit :nba", "E017");
+    test.assert_error_code("randomword : randomword2", "E017");
 }
 
 // ============================================================================
