@@ -226,19 +226,17 @@ impl PureNegativeRule {
             Expression::BooleanOp {
                 operator: BooleanOperator::Not,
                 left,
-                right: _,
+                right,
                 ..
             } => {
-                // check for dummy left operand
-                if let Expression::Term {
-                    term: Term::Word { value },
-                    ..
-                } = left.as_ref()
-                {
-                    if value.is_empty() {
-                        // any leading NOT is pure negative
-                        return true;
-                    }
+                // leading NOT with no right operand is pure negative
+                if right.is_none() {
+                    return true;
+                }
+                // binary NOT: if left side is pure negative, then the whole operation
+                // is pure negative because the right side is being excluded, not included
+                if let Some(_right_expr) = right {
+                    return self.is_pure_negative_query(left);
                 }
                 false
             }
@@ -280,26 +278,17 @@ impl ValidationRule for BinaryOperatorRule {
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         if let Expression::BooleanOp {
             operator,
-            left,
+            left: _,
             right,
             span,
         } = expr
         {
             if matches!(operator, BooleanOperator::Not) {
-                if let Expression::Term {
-                    term: Term::Word { value },
-                    ..
-                } = left.as_ref()
-                {
-                    if value.is_empty() {
-                        if right.is_none() {
-                            return ValidationResult::with_error(LintError::ValidationError {
-                                span: span.clone(),
-                                message: "NOT operator requires an operand".to_string(),
-                            });
-                        }
-                        return ValidationResult::new();
-                    }
+                // for leading NOT, left contains the operand and right is None
+                // for binary NOT, left and right both contain operands
+                if right.is_none() {
+                    // leading NOT case - left should contain the operand
+                    return ValidationResult::new();
                 }
             }
 
