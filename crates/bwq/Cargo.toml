@@ -1,0 +1,30 @@
+[package]
+name = "bwq"
+version = "0.3.1"
+authors = { workspace = true }
+edition = { workspace = true }
+description = "A linter and parser for Brandwatch query files (.bwq)"
+repository = { workspace = true }
+license = { workspace = true }
+
+[package.metadata.release]
+publish = false
+push = true
+tag-name = "v{{version}}"
+tag-message = "chore: release v{{version}}"
+
+[[bin]]
+name = "bwq"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+bwq_linter = { workspace = true }
+bwq_server = { workspace = true }
+clap = { workspace = true }
+ignore = { workspace = true }
+rayon = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

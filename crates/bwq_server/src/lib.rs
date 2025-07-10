@@ -13,8 +13,11 @@ use lsp_types::{
     request::{Initialize, Request as RequestTrait, Shutdown},
 };
 
-use super::diagnostics_handler::DiagnosticsHandler;
-use crate::BrandwatchLinter;
+mod diagnostics_handler;
+mod utils;
+
+use bwq_linter::BrandwatchLinter;
+use diagnostics_handler::DiagnosticsHandler;
 
 pub struct LspServer {
     connection: Connection,

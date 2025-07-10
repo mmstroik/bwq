@@ -1,16 +1,15 @@
-use error::{LintError, LintReport, LintResult};
-use lexer::Lexer;
-pub use lsp::LspServer;
-use parser::Parser;
-use validator::Validator;
-
 pub mod ast;
 pub mod error;
 pub mod lexer;
-pub mod lsp;
 pub mod parser;
 pub mod validation;
 pub mod validator;
+
+use error::{LintError, LintReport, LintResult};
+use lexer::Lexer;
+use parser::Parser;
+use validator::Validator;
+
 pub struct BrandwatchLinter {
     validator: Validator,
 }

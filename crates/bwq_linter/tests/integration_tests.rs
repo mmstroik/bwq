@@ -1,7 +1,7 @@
 use test_case::test_case;
 
-use bwq::BrandwatchLinter;
-use bwq::error::LintReport;
+use bwq_linter::BrandwatchLinter;
+use bwq_linter::error::LintReport;
 
 /// Test context for consistent query validation testing
 pub struct QueryTest {

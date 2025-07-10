@@ -7,7 +7,7 @@ clean:
 	cargo clean
 
 format:
-	cargo fmt
+	cargo fmt --all
 
 lint:
 	cargo clippy -- -D warnings
@@ -22,7 +22,21 @@ dev:
 	@echo "Development checks passed!"
 
 test:
-	cargo test -q
+	cargo test -q --workspace
+
+
+bwq-check *files:
+	cargo run --bin bwq -- check {{files}}
+
+bwq-check-q query:
+	cargo run --bin bwq -- check --query '{{query}}'
+
+bwq-check-json *files:
+	cargo run --bin bwq -- check --output-format json {{files}}
+
+bwq-check-q-json query:
+	cargo run --bin bwq -- check --output-format json --query '{{query}}'
+
 
 # Compare our linter with Brandwatch API validation
 compare query-or-file:

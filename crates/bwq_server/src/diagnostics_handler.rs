@@ -1,8 +1,8 @@
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString};
 
-use super::utils::span_to_range;
-use crate::{
+use crate::utils::span_to_range;
+use bwq_linter::{
     BrandwatchLinter,
     error::{LintError, LintWarning},
 };
@@ -128,7 +128,7 @@ impl Default for DiagnosticsHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BrandwatchLinter;
+    use bwq_linter::BrandwatchLinter;
 
     #[test]
     fn test_diagnostics_conversion() {
