@@ -49,9 +49,9 @@ compare query-or-file:
 compare-our query-or-file:
 	#!/usr/bin/env bash
 	if [ -f "{{query-or-file}}" ]; then
-		just bwq check "{{query-or-file}}"
+		cargo run -- check "{{query-or-file}}"
 	else
-		just bwq check --query '{{query-or-file}}'
+		cargo run -- check --query '{{query-or-file}}'
 	fi
 
 compare-bw query-or-file:
