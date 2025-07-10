@@ -137,27 +137,21 @@ impl Parser {
     }
 
     fn parse_not_expression(&mut self) -> LintResult<Expression> {
-        // handle leading NOT operator
-        if self.match_token(&TokenType::Not) {
+        let mut left = if self.match_token(&TokenType::Not) {
+            // handle leading NOT operator
             let operator_span = self.previous().span.clone();
-            let dummy_left = Expression::Term {
-                term: Term::Word {
-                    value: "".to_string(),
-                },
-                span: operator_span.clone(),
-            };
             let right = self.parse_proximity_expression()?;
 
             let span = Span::new(operator_span.start.clone(), right.span().end.clone());
-            return Ok(Expression::BooleanOp {
+            Expression::BooleanOp {
                 operator: BooleanOperator::Not,
-                left: Box::new(dummy_left),
-                right: Some(Box::new(right)),
+                left: Box::new(right),
+                right: None,
                 span,
-            });
-        }
-
-        let mut left = self.parse_proximity_expression()?;
+            }
+        } else {
+            self.parse_proximity_expression()?
+        };
 
         while self.match_token(&TokenType::Not) {
             let operator = BooleanOperator::Not;
