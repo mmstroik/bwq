@@ -269,15 +269,57 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> LintResult<Expression> {
-        // parenthesized expressions
-        if self.match_token(&TokenType::LeftParen) {
-            let start_span = self.previous().span.clone();
-            let expr = self.parse_expression()?;
+        // Dispatch to specialized parsing methods based on token type
+        match &self.peek().token_type {
+            TokenType::LeftParen => self.parse_grouped_expression(),
+            TokenType::LeftBrace => self.parse_case_sensitive_term(),
+            TokenType::LeftBracket => {
+                self.match_token(&TokenType::LeftBracket);
+                self.parse_range()
+            }
+            TokenType::Word(_) => {
+                if self.peek_ahead(1).map(|t| &t.token_type) == Some(&TokenType::Colon) {
+                    self.parse_field_operation()
+                } else {
+                    self.parse_term()
+                }
+            }
+            _ => self.parse_term(),
+        }
+    }
 
-            if !self.match_token(&TokenType::RightParen) {
+    fn parse_grouped_expression(&mut self) -> LintResult<Expression> {
+        let start_span = self.advance().span.clone(); // consume '('
+        let expr = self.parse_expression()?;
+
+        if !self.match_token(&TokenType::RightParen) {
+            return Err(LintError::ExpectedToken {
+                span: self.peek().span.clone(),
+                expected: ")".to_string(),
+                found: self.peek().token_type.to_string(),
+            });
+        }
+
+        let end_span = self.previous().span.clone();
+        let span = Span::new(start_span.start, end_span.end);
+
+        Ok(Expression::Group {
+            expression: Box::new(expr),
+            span,
+        })
+    }
+
+    fn parse_case_sensitive_term(&mut self) -> LintResult<Expression> {
+        let start_span = self.advance().span.clone(); // consume '{'
+
+        if let TokenType::Word(word) = &self.peek().token_type {
+            let word = word.clone();
+            self.advance();
+
+            if !self.match_token(&TokenType::RightBrace) {
                 return Err(LintError::ExpectedToken {
                     span: self.peek().span.clone(),
-                    expected: ")".to_string(),
+                    expected: "}".to_string(),
                     found: self.peek().token_type.to_string(),
                 });
             }
@@ -285,116 +327,87 @@ impl Parser {
             let end_span = self.previous().span.clone();
             let span = Span::new(start_span.start, end_span.end);
 
-            return Ok(Expression::Group {
-                expression: Box::new(expr),
+            Ok(Expression::Term {
+                term: Term::CaseSensitive { value: word },
                 span,
+            })
+        } else {
+            Err(LintError::ExpectedToken {
+                span: self.peek().span.clone(),
+                expected: "word".to_string(),
+                found: self.peek().token_type.to_string(),
+            })
+        }
+    }
+
+    fn parse_field_operation(&mut self) -> LintResult<Expression> {
+        let TokenType::Word(word) = &self.peek().token_type else {
+            return Err(LintError::UnexpectedToken {
+                span: self.peek().span.clone(),
+                token: self.peek().token_type.to_string(),
             });
-        }
+        };
 
-        // case-sensitive terms {word}
-        if self.match_token(&TokenType::LeftBrace) {
-            let start_span = self.previous().span.clone();
+        let word = word.clone();
+        let word_span = self.peek().span.clone();
 
-            if let TokenType::Word(word) = &self.peek().token_type {
-                let word = word.clone();
-                self.advance();
-                let _word_span = self.previous().span.clone();
+        self.advance(); // consume field name
+        self.advance(); // consume colon
 
-                if !self.match_token(&TokenType::RightBrace) {
-                    return Err(LintError::ExpectedToken {
-                        span: self.peek().span.clone(),
-                        expected: "}".to_string(),
-                        found: self.peek().token_type.to_string(),
-                    });
-                }
+        let value = Box::new(self.parse_primary()?);
 
-                let end_span = self.previous().span.clone();
-                let span = Span::new(start_span.start, end_span.end);
-
-                return Ok(Expression::Term {
-                    term: Term::CaseSensitive { value: word },
-                    span,
-                });
+        // Handle special case where field value is a range
+        let value = if let Expression::Range {
+            start,
+            end,
+            span: range_span,
+            ..
+        } = value.as_ref()
+        {
+            if let Some(field_type) = FieldType::parse(&word) {
+                Box::new(Expression::Range {
+                    field: Some(field_type),
+                    start: start.clone(),
+                    end: end.clone(),
+                    span: range_span.clone(),
+                })
             } else {
-                return Err(LintError::ExpectedToken {
-                    span: self.peek().span.clone(),
-                    expected: "word".to_string(),
-                    found: self.peek().token_type.to_string(),
-                });
+                value
             }
+        } else {
+            value
+        };
+
+        let span = Span::new(word_span.start, value.span().end.clone());
+
+        if let Some(field_type) = FieldType::parse(&word) {
+            Ok(Expression::Field {
+                field: field_type,
+                value,
+                span,
+            })
+        } else {
+            Ok(Expression::Term {
+                term: Term::Word {
+                    value: format!(
+                        "{}:{}",
+                        word,
+                        match value.as_ref() {
+                            Expression::Term {
+                                term: Term::Word { value },
+                                ..
+                            } => value.clone(),
+                            Expression::Term {
+                                term: Term::Phrase { value },
+                                ..
+                            } => format!("\"{value}\""),
+                            _ => "unknown".to_string(),
+                        }
+                    ),
+                },
+                span,
+            })
         }
-
-        // ranges [x TO y]
-        if self.match_token(&TokenType::LeftBracket) {
-            return self.parse_range();
-        }
-
-        // field operations
-        if let TokenType::Word(word) = &self.peek().token_type {
-            let word = word.clone();
-            let word_span = self.peek().span.clone();
-
-            if self.peek_ahead(1).map(|t| &t.token_type) == Some(&TokenType::Colon) {
-                self.advance(); // consume field name
-                self.advance(); // consume colon
-
-                let value = Box::new(self.parse_primary()?);
-
-                let value = if let Expression::Range {
-                    start,
-                    end,
-                    span: range_span,
-                    ..
-                } = value.as_ref()
-                {
-                    if let Some(field_type) = FieldType::parse(&word) {
-                        Box::new(Expression::Range {
-                            field: Some(field_type),
-                            start: start.clone(),
-                            end: end.clone(),
-                            span: range_span.clone(),
-                        })
-                    } else {
-                        value
-                    }
-                } else {
-                    value
-                };
-
-                let span = Span::new(word_span.start, value.span().end.clone());
-
-                if let Some(field_type) = FieldType::parse(&word) {
-                    return Ok(Expression::Field {
-                        field: field_type,
-                        value,
-                        span,
-                    });
-                } else {
-                    return Ok(Expression::Term {
-                        term: Term::Word {
-                            value: format!(
-                                "{}:{}",
-                                word,
-                                match value.as_ref() {
-                                    Expression::Term {
-                                        term: Term::Word { value },
-                                        ..
-                                    } => value.clone(),
-                                    Expression::Term {
-                                        term: Term::Phrase { value },
-                                        ..
-                                    } => format!("\"{value}\""),
-                                    _ => "unknown".to_string(),
-                                }
-                            ),
-                        },
-                        span,
-                    });
-                }
-            }
-        }
-
-        self.parse_term()
     }
 
     fn parse_range(&mut self) -> LintResult<Expression> {

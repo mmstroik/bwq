@@ -100,6 +100,62 @@ pub struct Lexer {
 }
 
 impl Lexer {
+    /// Character classification helpers
+    fn is_word_char(&self, ch: char) -> bool {
+        ch.is_alphanumeric()
+            || ch == '_'
+            || ch == '.'
+            || ch == '-'
+            || ch == '/'
+            || ch == '*'
+            || ch == '?'
+            || ch == '$'
+            || ch == '&'
+            || ch == '#'
+            || ch == '+'
+            || ch == '%'
+            || ch == '='
+            || ch == '`'
+            || ch == '|'
+            || ch == '@'
+    }
+
+    fn is_word_boundary_char(&self, ch: char) -> bool {
+        ch.is_whitespace()
+            || matches!(
+                ch,
+                '(' | ')' | '[' | ']' | '{' | '}' | ':' | '~' | '"' | '#' | '@' | '<' | '>'
+            )
+    }
+
+    fn handle_comment_transition(&mut self, ch: char) -> LintResult<Option<Token>> {
+        if self.inside_comment {
+            if ch == '>' && self.peek_ahead(2) == ">>" {
+                self.inside_comment = false;
+                return self.read_comment_end();
+            } else {
+                // Skip any character inside comments
+                self.advance_with_position_tracking(ch);
+                return self.next_token();
+            }
+        } else if ch == '<' && self.peek_ahead(2) == "<<" {
+            return self.read_comment_start();
+        } else if ch == '>' && self.peek_ahead(2) == ">>" {
+            return self.read_comment_end();
+        }
+
+        Ok(None)
+    }
+
+    fn advance_with_position_tracking(&mut self, ch: char) {
+        self.advance();
+        if ch == '\n' {
+            self.line += 1;
+            self.column = 1;
+        } else {
+            self.column += 1;
+        }
+    }
     pub fn new(input: &str) -> Self {
         Self {
             input: input.chars().collect(),
@@ -142,21 +198,13 @@ impl Lexer {
         let start_pos = self.current_position();
         let ch = self.current_char();
 
+        if let Some(token) = self.handle_comment_transition(ch)? {
+            return Ok(Some(token));
+        }
+
+        // If we're inside a comment and didn't find an end marker, continue
         if self.inside_comment {
-            if ch == '>' && self.peek_ahead(2) == ">>" {
-                self.inside_comment = false;
-                return self.read_comment_end();
-            } else {
-                // skip any character inside comments (including ! and ^)
-                self.advance();
-                if ch == '\n' {
-                    self.line += 1;
-                    self.column = 1;
-                } else {
-                    self.column += 1;
-                }
-                return self.next_token();
-            }
+            return self.next_token();
         }
 
         match ch {
@@ -287,10 +335,6 @@ impl Lexer {
                 )))
             }
 
-            '<' if self.peek_ahead(2) == "<<" => self.read_comment_start(),
-
-            '>' if self.peek_ahead(2) == ">>" => self.read_comment_end(),
-
             '#' => self.read_hashtag(),
 
             '@' => self.read_mention(),
@@ -376,24 +420,7 @@ impl Lexer {
         let start_pos = self.current_position();
         let mut value = String::new();
 
-        while !self.is_at_end()
-            && (self.current_char().is_alphanumeric()
-                || self.current_char() == '_'
-                || self.current_char() == '.'
-                || self.current_char() == '-'
-                || self.current_char() == '/'
-                || self.current_char() == '*'
-                || self.current_char() == '?'
-                || self.current_char() == '$'
-                || self.current_char() == '&'
-                || self.current_char() == '#'
-                || self.current_char() == '+'
-                || self.current_char() == '%'
-                || self.current_char() == '='
-                || self.current_char() == '`'
-                || self.current_char() == '|'
-                || self.current_char() == '@')
-        {
+        while !self.is_at_end() && self.is_word_char(self.current_char()) {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -467,21 +494,7 @@ impl Lexer {
         self.advance();
         self.column += 1;
 
-        while !self.is_at_end()
-            && (self.current_char().is_alphanumeric()
-                || self.current_char() == '_'
-                || self.current_char() == '*'
-                || self.current_char() == '?'
-                || self.current_char() == '$'
-                || self.current_char() == '&'
-                || self.current_char() == '#'
-                || self.current_char() == '+'
-                || self.current_char() == '%'
-                || self.current_char() == '='
-                || self.current_char() == '`'
-                || self.current_char() == '|'
-                || self.current_char() == '@')
-        {
+        while !self.is_at_end() && self.is_word_char(self.current_char()) {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -502,21 +515,7 @@ impl Lexer {
         self.advance();
         self.column += 1;
 
-        while !self.is_at_end()
-            && (self.current_char().is_alphanumeric()
-                || self.current_char() == '_'
-                || self.current_char() == '*'
-                || self.current_char() == '?'
-                || self.current_char() == '$'
-                || self.current_char() == '&'
-                || self.current_char() == '#'
-                || self.current_char() == '+'
-                || self.current_char() == '%'
-                || self.current_char() == '='
-                || self.current_char() == '`'
-                || self.current_char() == '|'
-                || self.current_char() == '@')
-        {
+        while !self.is_at_end() && self.is_word_char(self.current_char()) {
             value.push(self.current_char());
             self.advance();
             self.column += 1;
@@ -616,30 +615,9 @@ impl Lexer {
             let ch = self.input[pos];
             if ch.is_alphabetic() {
                 return true;
-            } else if ch.is_whitespace()
-                || matches!(
-                    ch,
-                    '(' | ')' | '[' | ']' | '{' | '}' | ':' | '"' | '#' | '@' | '<' | '>' | '~'
-                )
-            {
+            } else if self.is_word_boundary_char(ch) {
                 return false;
-            } else if ch.is_alphanumeric()
-                || ch == '_'
-                || ch == '.'
-                || ch == '-'
-                || ch == '/'
-                || ch == '*'
-                || ch == '?'
-                || ch == '$'
-                || ch == '&'
-                || ch == '#'
-                || ch == '+'
-                || ch == '%'
-                || ch == '='
-                || ch == '`'
-                || ch == '|'
-                || ch == '@'
-            {
+            } else if self.is_word_char(ch) {
                 pos += 1;
             } else {
                 return false;
