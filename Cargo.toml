@@ -29,7 +29,6 @@ thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["full"] }
 
 [workspace.metadata.release]
-publish = false
 push = true
 tag-name = "v{{version}}"
 tag-message = "chore: release v{{version}}"
