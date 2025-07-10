@@ -5,6 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 authors = ["Milo Stroik <mmstroik@gmail.com>"]
 edition = "2024"
+rust-version = "1.88.0"
 repository = "https://github.com/mmstroik/bwq"
 license = "MIT"
 
