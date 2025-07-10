@@ -1,41 +1,28 @@
-[package]
-name = "bwq"
-version = "0.3.1"
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
 authors = ["Milo Stroik <mmstroik@gmail.com>"]
-edition = "2021"
-description = "A linter and parser for Brandwatch query files (.bwq)"
+edition = "2024"
 repository = "https://github.com/mmstroik/bwq"
 license = "MIT"
 
-[package.metadata.release]
-publish = false
-push = true
-tag-name = "v{{version}}"
-tag-message = "chore: release v{{version}}"
-
-[lib]
-name = "bwq"
-path = "src/lib.rs"
-
-[[bin]]
-name = "bwq"
-path = "src/main.rs"
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.98"
+bwq = { path = "crates/bwq" }
+bwq_linter = { path = "crates/bwq_linter" }
+bwq_server = { path = "crates/bwq_server" }
 clap = { version = "4.5.40", features = ["derive"] }
 crossbeam-channel = "0.5.15"
 ignore = "0.4.23"
 lsp-server = "0.7.8"
 lsp-types = "0.97.0"
+pretty_assertions = "1.4.1"
 rayon = "1.10.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
-thiserror = "2.0.12"
-tokio = { version = "1.45.1", features = ["full"] }
-
-[dev-dependencies]
-pretty_assertions = "1.4.1"
 tempfile = "3.20.0"
 test-case = "3.3.1"
-
+thiserror = "2.0.12"
+tokio = { version = "1.45.1", features = ["full"] }

@@ -1,5 +1,9 @@
 set dotenv-load
 
+# Convenient alias for running the CLI during development
+bwq *args:
+	cargo run --bin bwq -- {{args}}
+
 build:
 	cargo build
 
@@ -22,7 +26,7 @@ dev:
 	@echo "Development checks passed!"
 
 test:
-	cargo test -q
+	cargo test -q --workspace
 
 # Compare our linter with Brandwatch API validation
 compare query-or-file:
@@ -35,9 +39,9 @@ compare query-or-file:
 compare-our query-or-file:
 	#!/usr/bin/env bash
 	if [ -f "{{query-or-file}}" ]; then
-		cargo run -- check "{{query-or-file}}"
+		just bwq check "{{query-or-file}}"
 	else
-		cargo run -- check --query '{{query-or-file}}'
+		just bwq check --query '{{query-or-file}}'
 	fi
 
 compare-bw query-or-file:
@@ -53,3 +57,10 @@ bw-validate query:
 		-H "authorization: bearer $BW_API_KEY" \
 		-H 'Content-Type: application/json' \
 		-d '{"booleanQuery": "{{query}}","languages": []}'
+
+# Release commands (only CLI crate is published)
+release level="patch":
+	cd crates/bwq && cargo release {{level}}
+
+release-dry level="patch":
+	cd crates/bwq && cargo release {{level}} --dry-run

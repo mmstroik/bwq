@@ -130,18 +130,36 @@ name = "bwq"
 version = "0.3.1"
 dependencies = [
  "anyhow",
+ "bwq_linter",
+ "bwq_server",
  "clap",
- "crossbeam-channel",
  "ignore",
- "lsp-server",
- "lsp-types",
- "pretty_assertions",
  "rayon",
- "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "bwq_linter"
+version = "0.0.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
  "test-case",
  "thiserror",
+]
+
+[[package]]
+name = "bwq_server"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bwq_linter",
+ "crossbeam-channel",
+ "lsp-server",
+ "lsp-types",
+ "serde_json",
  "tokio",
 ]
 
