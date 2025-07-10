@@ -225,13 +225,18 @@ impl PureNegativeRule {
             // check if we're starting with a NOT operation at the top level
             Expression::BooleanOp {
                 operator: BooleanOperator::Not,
-                left: _,
+                left,
                 right,
                 ..
             } => {
                 // leading NOT with no right operand is pure negative
                 if right.is_none() {
                     return true;
+                }
+                // binary NOT: if left side is pure negative, then the whole operation
+                // is pure negative because the right side is being excluded, not included
+                if let Some(_right_expr) = right {
+                    return self.is_pure_negative_query(left);
                 }
                 false
             }
