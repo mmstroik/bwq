@@ -7,11 +7,10 @@
 **/*.rs.bk
 
 # IDE/Editor files
-.vscode/
+*/.vscode/
 .idea/
 *.swp
 *.swo
-CLAUDE.md
 
 # OS files
 .DS_Store
