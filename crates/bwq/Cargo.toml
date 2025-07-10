@@ -7,11 +7,6 @@ description = "A linter and parser for Brandwatch query files (.bwq)"
 repository = { workspace = true }
 license = { workspace = true }
 
-[package.metadata.release]
-publish = false
-push = true
-tag-name = "v{{version}}"
-tag-message = "chore: release v{{version}}"
 
 [[bin]]
 name = "bwq"
