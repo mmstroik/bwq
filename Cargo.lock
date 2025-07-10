@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "bwq"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "bwq_linter",
@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "bwq_linter"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "bwq_server"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "bwq_linter",
