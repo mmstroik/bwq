@@ -203,11 +203,6 @@ fn lint_paths(
             };
 
             let query = content.trim();
-            if query.is_empty() {
-                eprintln!("Skipping empty file: {}", file_path.display());
-                return None;
-            }
-
             let analysis = analyze_query(query);
             Some((file_path.clone(), analysis, query.to_string()))
         })

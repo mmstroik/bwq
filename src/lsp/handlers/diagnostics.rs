@@ -21,7 +21,7 @@ impl DiagnosticsHandler {
     ) -> Result<Vec<Diagnostic>> {
         let mut diagnostics = Vec::new();
 
-        let analysis = linter.analyze(content);
+        let analysis = linter.analyze_and_skip_empty(content);
 
         for error in &analysis.errors {
             diagnostics.push(self.error_to_diagnostic(error));

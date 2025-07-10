@@ -38,15 +38,6 @@ impl BrandwatchLinter {
     }
 
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {
-        if query.trim().is_empty() {
-            return AnalysisResult {
-                is_valid: true,
-                errors: Vec::new(),
-                warnings: Vec::new(),
-                query: Some(query.to_string()),
-            };
-        }
-
         match self.lint(query) {
             Ok(report) => AnalysisResult {
                 is_valid: !report.has_errors(),
@@ -61,6 +52,19 @@ impl BrandwatchLinter {
                 query: Some(query.to_string()),
             },
         }
+    }
+
+    pub fn analyze_and_skip_empty(&mut self, query: &str) -> AnalysisResult {
+        if query.trim().is_empty() {
+            return AnalysisResult {
+                is_valid: true,
+                errors: Vec::new(),
+                warnings: Vec::new(),
+                query: Some(query.to_string()),
+            };
+        }
+
+        self.analyze(query)
     }
 }
 
