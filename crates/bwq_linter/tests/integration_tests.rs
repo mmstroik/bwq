@@ -237,6 +237,8 @@ impl FileTestExpectation {
 #[test_case("apple NOT bitter NOT sour", TestExpectation::ValidNoWarnings; "basic NOT operation")]
 #[test_case("(apple OR orange) AND juice", TestExpectation::ValidNoWarnings; "parenthesized boolean operations")]
 #[test_case("NOT bitter", TestExpectation::ErrorCode("E016"); "pure negative query error")]
+#[test_case("NOT term1 AND term2", TestExpectation::ValidNoWarnings; "leading NOT with AND")]
+#[test_case("NOT term1 NOT term2", TestExpectation::ErrorCode("E016"); "double NOT pure negative query error")]
 fn test_basic_boolean_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
