@@ -1,8 +1,20 @@
 set dotenv-load
 
-# Convenient alias for running the CLI during development
-bwq *args:
-	cargo run --bin bwq -- {{args}}
+# Check files or query strings with proper argument handling
+bwq-check *files:
+	cargo run --bin bwq -- check {{files}}
+
+# Check a query string directly (handles spaces properly)
+bwq-check-q query:
+	cargo run --bin bwq -- check --query '{{query}}'
+
+# Check with JSON output
+bwq-check-json *files:
+	cargo run --bin bwq -- check --output-format json {{files}}
+
+# Check query string with JSON output
+bwq-check-q-json query:
+	cargo run --bin bwq -- check --output-format json --query '{{query}}'
 
 build:
 	cargo build
@@ -29,34 +41,34 @@ test:
 	cargo test -q --workspace
 
 # Compare our linter with Brandwatch API validation
-compare query-or-file:
+compare:
 	@echo "=== Our Linter ==="
-	@just compare-our '{{query-or-file}}' || true
+	@just compare-our "$1" || true
 	@echo ""
 	@echo "=== Brandwatch API ==="
-	@just compare-bw '{{query-or-file}}' || true
+	@just compare-bw "$1" || true
 
-compare-our query-or-file:
+compare-our:
 	#!/usr/bin/env bash
-	if [ -f "{{query-or-file}}" ]; then
-		just bwq check "{{query-or-file}}"
+	if [ -f "$1" ]; then
+		just bwq check "$1"
 	else
-		just bwq check --query '{{query-or-file}}'
+		just bwq check --query "$1"
 	fi
 
-compare-bw query-or-file:
+compare-bw:
 	#!/usr/bin/env bash
-	if [ -f "{{query-or-file}}" ]; then
-		just bw-validate '$(cat '{{query-or-file}}')'
+	if [ -f "$1" ]; then
+		just bw-validate "$(cat "$1")"
 	else
-		just bw-validate '{{query-or-file}}'
+		just bw-validate "$1"
 	fi
 
-bw-validate query:
+bw-validate:
 	curl -X POST https://api.brandwatch.com/query-validation \
 		-H "authorization: bearer $BW_API_KEY" \
 		-H 'Content-Type: application/json' \
-		-d '{"booleanQuery": "{{query}}","languages": []}'
+		-d '{"booleanQuery": "'"$1"'","languages": []}'
 
 # Release commands (only CLI crate is published)
 release level="patch":
