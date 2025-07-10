@@ -24,7 +24,6 @@ dev:
 test:
 	cargo test -q --workspace
 
-
 bwq-check *files:
 	cargo run --bin bwq -- check {{files}}
 
@@ -36,7 +35,6 @@ bwq-check-json *files:
 
 bwq-check-q-json query:
 	cargo run --bin bwq -- check --output-format json --query '{{query}}'
-
 
 # Compare our linter with Brandwatch API validation
 compare query-or-file:
