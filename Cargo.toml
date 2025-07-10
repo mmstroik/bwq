@@ -31,6 +31,5 @@ tokio = { version = "1.45.1", features = ["full"] }
 push = true
 shared-version = true
 consolidate-commits = true
-publish = false
 tag-name = "v{{version}}"
 tag-message = "chore: release v{{version}}"
