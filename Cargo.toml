@@ -11,8 +11,8 @@ license = "MIT"
 [workspace.dependencies]
 anyhow = "1.0.98"
 bwq = { path = "crates/bwq" }
-bwq_linter = { path = "crates/bwq_linter" }
-bwq_server = { path = "crates/bwq_server" }
+bwq_linter = { version = "0.4.1", path = "crates/bwq_linter" }
+bwq_server = { version = "0.4.1", path = "crates/bwq_server" }
 clap = { version = "4.5.40", features = ["derive"] }
 crossbeam-channel = "0.5.15"
 ignore = "0.4.23"
@@ -30,6 +30,7 @@ tokio = { version = "1.45.1", features = ["full"] }
 [workspace.metadata.release]
 push = true
 shared-version = true
+publish = false
 consolidate-commits = true
 tag-name = "v{{version}}"
 tag-message = "chore: release v{{version}}"
