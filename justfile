@@ -1,21 +1,5 @@
 set dotenv-load
 
-# Check files or query strings with proper argument handling
-bwq-check *files:
-	cargo run --bin bwq -- check {{files}}
-
-# Check a query string directly (handles spaces properly)
-bwq-check-q query:
-	cargo run --bin bwq -- check --query '{{query}}'
-
-# Check with JSON output
-bwq-check-json *files:
-	cargo run --bin bwq -- check --output-format json {{files}}
-
-# Check query string with JSON output
-bwq-check-q-json query:
-	cargo run --bin bwq -- check --output-format json --query '{{query}}'
-
 build:
 	cargo build
 
@@ -23,7 +7,7 @@ clean:
 	cargo clean
 
 format:
-	cargo fmt
+	cargo fmt --all
 
 lint:
 	cargo clippy -- -D warnings
@@ -39,6 +23,20 @@ dev:
 
 test:
 	cargo test -q --workspace
+
+
+bwq-check *files:
+	cargo run --bin bwq -- check {{files}}
+
+bwq-check-q query:
+	cargo run --bin bwq -- check --query '{{query}}'
+
+bwq-check-json *files:
+	cargo run --bin bwq -- check --output-format json {{files}}
+
+bwq-check-q-json query:
+	cargo run --bin bwq -- check --output-format json --query '{{query}}'
+
 
 # Compare our linter with Brandwatch API validation
 compare:
