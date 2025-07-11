@@ -104,7 +104,11 @@ impl Printer {
 
     fn print_json(&self, analysis: &AnalysisResult) {
         let errors: Vec<_> = analysis.errors.iter().map(|e| e.to_json()).collect();
-        let warnings: Vec<_> = analysis.warnings.iter().map(|w| w.to_json()).collect();
+        let warnings: Vec<_> = if self.show_warnings {
+            analysis.warnings.iter().map(|w| w.to_json()).collect()
+        } else {
+            Vec::new()
+        };
 
         let json_output = serde_json::json!({
             "query": analysis.query,
@@ -154,15 +158,17 @@ impl Printer {
                 errors.push(error_json);
             }
 
-            for warning in &analysis.warnings {
-                let mut warning_json = warning.to_json();
-                if let Some(obj) = warning_json.as_object_mut() {
-                    obj.insert(
-                        "filename".to_string(),
-                        serde_json::Value::String(file_path.display().to_string()),
-                    );
+            if self.show_warnings {
+                for warning in &analysis.warnings {
+                    let mut warning_json = warning.to_json();
+                    if let Some(obj) = warning_json.as_object_mut() {
+                        obj.insert(
+                            "filename".to_string(),
+                            serde_json::Value::String(file_path.display().to_string()),
+                        );
+                    }
+                    warnings.push(warning_json);
                 }
-                warnings.push(warning_json);
             }
         }
 
