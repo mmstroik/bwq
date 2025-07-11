@@ -608,6 +608,11 @@ impl Lexer {
             } else if self.is_word_boundary_char(ch) {
                 return false;
             } else if self.is_word_char(ch) {
+                // Also return true if we find non-ASCII word characters
+                // This handles cases like emoji combining characters
+                if !ch.is_ascii() {
+                    return true;
+                }
                 pos += 1;
             } else {
                 return false;
@@ -705,6 +710,20 @@ mod tests {
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "24*"));
         assert!(matches!(tokens[1].token_type, TokenType::Word(ref w) if w == "12?"));
         assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "100*test"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_emoji_keycaps() {
+        let mut lexer = Lexer::new("1️⃣ OR 2️⃣");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // emoji keycaps should be treated as single words, not split into digit + combining chars
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "1️⃣"));
+        assert!(matches!(tokens[1].token_type, TokenType::Or));
+        assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "2️⃣"));
         assert!(matches!(tokens[3].token_type, TokenType::Eof));
     }
 }
