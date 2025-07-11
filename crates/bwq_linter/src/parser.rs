@@ -312,32 +312,59 @@ impl Parser {
     fn parse_case_sensitive_term(&mut self) -> LintResult<Expression> {
         let start_span = self.advance().span.clone(); // consume '{'
 
-        if let TokenType::Word(word) = &self.peek().token_type {
-            let word = word.clone();
-            self.advance();
+        let mut content_tokens = Vec::new();
+        let mut found_closing_brace = false;
 
-            if !self.match_token(&TokenType::RightBrace) {
-                return Err(LintError::ExpectedToken {
-                    span: self.peek().span.clone(),
-                    expected: "}".to_string(),
-                    found: self.peek().token_type.to_string(),
-                });
+        while !self.is_at_end() {
+            if matches!(self.peek().token_type, TokenType::RightBrace) {
+                found_closing_brace = true;
+                break;
             }
-
-            let end_span = self.previous().span.clone();
-            let span = Span::new(start_span.start, end_span.end);
-
-            Ok(Expression::Term {
-                term: Term::CaseSensitive { value: word },
-                span,
-            })
-        } else {
-            Err(LintError::ExpectedToken {
-                span: self.peek().span.clone(),
-                expected: "word".to_string(),
-                found: self.peek().token_type.to_string(),
-            })
+            content_tokens.push(self.advance().clone());
         }
+
+        if !found_closing_brace {
+            return Err(LintError::ExpectedToken {
+                span: self.peek().span.clone(),
+                expected: "}".to_string(),
+                found: self.peek().token_type.to_string(),
+            });
+        }
+
+        let end_span = self.advance().span.clone();
+        let span = Span::new(start_span.start, end_span.end);
+
+        let mut value = String::new();
+        for token in content_tokens.iter() {
+            match &token.token_type {
+                TokenType::Word(word) => {
+                    value.push_str(word);
+                }
+                TokenType::Number(num) => {
+                    value.push_str(num);
+                }
+                TokenType::QuotedString(s) => {
+                    value.push_str(&format!("\"{s}\""));
+                }
+                TokenType::Whitespace => {
+                    value.push(' ');
+                }
+                _ => {
+                    // For other token types, use their raw representation
+                    value.push_str(&token.raw);
+                }
+            }
+        }
+
+        // Allow empty braces syntactically
+        if value.trim().is_empty() {
+            value = " ".to_string();
+        }
+
+        Ok(Expression::Term {
+            term: Term::CaseSensitive { value },
+            span,
+        })
     }
 
     fn parse_field_operation(&mut self) -> LintResult<Expression> {

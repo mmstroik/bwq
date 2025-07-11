@@ -301,6 +301,9 @@ fn test_case_sensitive_matching() {
     test.assert_valid_no_warnings("{BrandWatch}");
 
     test.assert_valid_no_warnings("apple AND {BT}");
+
+    // with spaces
+    test.assert_valid_no_warnings("{Brand Watch}");
 }
 
 #[test]
@@ -358,8 +361,9 @@ fn test_basic_field_operators() {
 #[test_case("🇪🇺 AND europe", TestExpectation::ValidNoWarnings; "flag emoji")]
 #[test_case("€100 OR $50", TestExpectation::ValidNoWarnings; "currency symbols")]
 #[test_case("café AND नमस्ते", TestExpectation::ValidNoWarnings; "mixed unicode")]
+#[test_case("O'Reilly OR McDonald's", TestExpectation::ValidNoWarnings; "names with apostrophes")]
 #[test_case("🎉 celebration", TestExpectation::ValidWithWarning("W001"); "emoji with implicit AND")]
-fn test_unicode_characters(query: &str, expected: TestExpectation) {
+fn test_unicode_and_special_characters(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
 }

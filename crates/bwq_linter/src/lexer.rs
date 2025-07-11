@@ -119,6 +119,7 @@ impl Lexer {
             || ch == '`'
             || ch == '|'
             || ch == '@'
+            || ch == '\''
             // Allow most Unicode characters that are not ASCII control or punctuation
             || (!ch.is_ascii() && !ch.is_control() && !matches!(ch, '(' | ')' | '[' | ']' | '{' | '}' | ':' | '~' | '"' | '<' | '>'))
     }
