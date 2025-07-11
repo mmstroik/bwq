@@ -32,6 +32,7 @@ tracing = { version = "0.1.40" }
 [workspace.metadata.release]
 push = true
 shared-version = true
+pre-release-commmit-message = "chore: release v{{version}}"
 publish = false
 consolidate-commits = true
 tag-name = "v{{version}}"
