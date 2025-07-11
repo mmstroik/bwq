@@ -164,5 +164,14 @@ mod tests {
         let report = validator.validate(&result.query);
         assert!(!report.warnings.is_empty());
         assert!(report.warnings.iter().any(|w| w.code() == "W003"));
+
+        // Test that wildcards with characters after are valid
+        let mut lexer = Lexer::new("t*est");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens).unwrap();
+        let result = parser.parse().unwrap();
+        let mut validator = Validator::new();
+        let report = validator.validate(&result.query);
+        assert!(report.is_clean());
     }
 }

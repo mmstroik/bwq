@@ -23,11 +23,11 @@ impl ValidationRule for WildcardPerformanceRule {
 
                     let parts: Vec<&str> = value.split('*').collect();
                     if let Some(first_part) = parts.first() {
-                        if !first_part.is_empty() && first_part.len() == 1 {
+                        if !first_part.is_empty() && first_part.len() == 1 && value.ends_with('*') {
                             result.errors.push(LintError::ValidationError {
-                                        span: span.clone(),
-                                        message: "This wildcard matches too many unique terms. Please make it more specific.".to_string(),
-                                    });
+                                            span: span.clone(),
+                                            message: "This wildcard matches too many unique terms. Please make it more specific.".to_string(),
+                                        });
                         }
                     }
 

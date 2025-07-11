@@ -345,7 +345,7 @@ impl Lexer {
 
             _ if ch.is_ascii_digit() || ch == '-' => {
                 // look ahead to see if this is actually an alphanumeric word starting with digits
-                if (ch.is_ascii_digit() || ch == '-') && self.has_letters_ahead() {
+                if (ch.is_ascii_digit() || ch == '-') && self.has_word_chars_ahead() {
                     self.read_word_or_operator()
                 } else {
                     self.read_number()
@@ -588,7 +588,7 @@ impl Lexer {
         result
     }
 
-    fn has_letters_ahead(&self) -> bool {
+    fn has_word_chars_ahead(&self) -> bool {
         let mut pos = self.position;
 
         // Skip initial minus sign if present
@@ -601,10 +601,9 @@ impl Lexer {
             pos += 1;
         }
 
-        // check if we find letters before hitting a word boundary
         while pos < self.input.len() {
             let ch = self.input[pos];
-            if ch.is_alphabetic() {
+            if ch.is_alphabetic() || ch == '*' || ch == '?' {
                 return true;
             } else if self.is_word_boundary_char(ch) {
                 return false;
@@ -673,7 +672,7 @@ mod tests {
         assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "3.14"));
         assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-5"));
 
-        // alphanumeric starting with digits (should be words due to has_letters_ahead)
+        // alphanumeric starting with digits (should be words due to has_word_chars_ahead)
         assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
         assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
         assert!(matches!(tokens[5].token_type, TokenType::Word(ref w) if w == "user123"));
@@ -693,5 +692,19 @@ mod tests {
         assert!(matches!(tokens[15].token_type, TokenType::Word(ref w) if w == "test@word"));
 
         assert!(matches!(tokens[16].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_numeric_wildcards() {
+        let mut lexer = Lexer::new("24* 12? 100*test");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // numbers with wildcards should be treated as words
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "24*"));
+        assert!(matches!(tokens[1].token_type, TokenType::Word(ref w) if w == "12?"));
+        assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "100*test"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
     }
 }

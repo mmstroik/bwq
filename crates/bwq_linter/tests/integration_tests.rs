@@ -260,6 +260,7 @@ fn test_quoted_phrase_syntax(query: &str, expected: TestExpectation) {
 #[test_case("@*test", TestExpectation::ValidWithWarning("W003"); "wildcard after @ prefix performance warning")]
 #[test_case("*invalid", TestExpectation::ErrorCode("E006"); "invalid wildcard at beginning")]
 #[test_case("a*", TestExpectation::ErrorCode("E003"); "short wildcard matches too many unique terms")]
+#[test_case("t*est", TestExpectation::ValidNoWarnings; "wildcard in middle with characters after")]
 fn test_wildcard_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -467,6 +468,7 @@ fn test_location_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("apple NEAR/150 juice", TestExpectation::ValidNoWarnings; "NEAR with large distance should not generate warnings")]
 #[test_case("apple* OR juice*", TestExpectation::ValidNoWarnings; "multiple wildcards in OR")]
 #[test_case("a", TestExpectation::ValidNoWarnings; "single character should not generate warnings")]
+#[test_case("42 OR 24*", TestExpectation::ValidNoWarnings; "mixing pure numbers and numeric wildcards")]
 fn test_performance_edge_cases(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
