@@ -739,4 +739,18 @@ mod tests {
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "test;test;test"));
         assert!(matches!(tokens[1].token_type, TokenType::Eof));
     }
+
+    #[test]
+    fn test_colon_in_terms() {
+        let mut lexer = Lexer::new("test:test");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // lexer treats colon as separate token (parser combines into single word)
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "test"));
+        assert!(matches!(tokens[1].token_type, TokenType::Colon));
+        assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "test"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
 }

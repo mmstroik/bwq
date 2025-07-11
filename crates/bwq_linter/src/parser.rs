@@ -723,4 +723,52 @@ mod tests {
 
         assert!(!result.warnings.is_empty());
     }
+
+    #[test]
+    fn test_colon_in_field_vs_non_field_terms() {
+        // valid field operations are parsed as fields
+        let mut lexer = Lexer::new("url:example.com");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens).unwrap();
+        let result = parser.parse().unwrap();
+
+        match result.query.expression {
+            Expression::Field { field, .. } => {
+                assert_eq!(field, FieldType::Url);
+            }
+            _ => panic!("Expected Field operation for valid field type"),
+        }
+
+        // non-field colons get combined into a single term
+        let mut lexer = Lexer::new("test:test");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens).unwrap();
+        let result = parser.parse().unwrap();
+
+        match result.query.expression {
+            Expression::Term {
+                term: Term::Word { value },
+                ..
+            } => {
+                assert_eq!(value, "test:test");
+            }
+            _ => panic!("Expected Term with combined colon value for non-field"),
+        }
+
+        // quoted value after non-field colon
+        let mut lexer = Lexer::new("protocol:\"https\"");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens).unwrap();
+        let result = parser.parse().unwrap();
+
+        match result.query.expression {
+            Expression::Term {
+                term: Term::Word { value },
+                ..
+            } => {
+                assert_eq!(value, "protocol:\"https\"");
+            }
+            _ => panic!("Expected Term with combined colon and quoted value"),
+        }
+    }
 }
