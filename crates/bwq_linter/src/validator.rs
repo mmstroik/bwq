@@ -156,14 +156,12 @@ mod tests {
 
     #[test]
     fn test_performance_warnings() {
-        let mut lexer = Lexer::new("ab*");
+        let mut lexer = Lexer::new("#*test");
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
-
         let mut validator = Validator::new();
         let report = validator.validate(&result.query);
-
         assert!(!report.warnings.is_empty());
         assert!(report.warnings.iter().any(|w| w.code() == "W003"));
     }

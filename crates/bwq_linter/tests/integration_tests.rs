@@ -255,7 +255,7 @@ fn test_quoted_phrase_syntax(query: &str, expected: TestExpectation) {
 #[test_case("appl*", TestExpectation::ValidNoWarnings; "asterisk wildcard at end")]
 #[test_case("tes*t", TestExpectation::ValidNoWarnings; "asterisk wildcard in middle")]
 #[test_case("customi?e", TestExpectation::ValidNoWarnings; "question mark wildcard in middle")]
-#[test_case("ab*", TestExpectation::ValidWithWarning("W003"); "short wildcard performance warning")]
+#[test_case("ab*", TestExpectation::ValidNoWarnings; "two character wildcard no warning")]
 #[test_case("#*test", TestExpectation::ValidWithWarning("W003"); "wildcard after hashtag prefix performance warning")]
 #[test_case("@*test", TestExpectation::ValidWithWarning("W003"); "wildcard after @ prefix performance warning")]
 #[test_case("*invalid", TestExpectation::ErrorCode("E006"); "invalid wildcard at beginning")]
@@ -465,7 +465,7 @@ fn test_location_field_validation(query: &str, expected: TestExpectation) {
 // ============================================================================
 
 #[test_case("apple NEAR/150 juice", TestExpectation::ValidNoWarnings; "NEAR with large distance should not generate warnings")]
-#[test_case("apple* OR juice*", TestExpectation::ValidWithWarning("W003"); "multiple wildcards should generate performance warnings")]
+#[test_case("apple* OR juice*", TestExpectation::ValidNoWarnings; "multiple wildcards in OR")]
 #[test_case("a", TestExpectation::ValidNoWarnings; "single character should not generate warnings")]
 fn test_performance_edge_cases(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();

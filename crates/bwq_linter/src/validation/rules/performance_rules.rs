@@ -23,19 +23,11 @@ impl ValidationRule for WildcardPerformanceRule {
 
                     let parts: Vec<&str> = value.split('*').collect();
                     if let Some(first_part) = parts.first() {
-                        if !first_part.is_empty() {
-                            if first_part.len() == 1 {
-                                result.errors.push(LintError::ValidationError {
+                        if !first_part.is_empty() && first_part.len() == 1 {
+                            result.errors.push(LintError::ValidationError {
                                         span: span.clone(),
                                         message: "This wildcard matches too many unique terms. Please make it more specific.".to_string(),
                                     });
-                            } else if first_part.len() == 2 {
-                                result.warnings.push(LintWarning::PerformanceWarning {
-                                    span: span.clone(),
-                                    message: "Short wildcard terms may impact performance"
-                                        .to_string(),
-                                });
-                            }
                         }
                     }
 
@@ -55,34 +47,7 @@ impl ValidationRule for WildcardPerformanceRule {
                 }
                 _ => ValidationResult::new(),
             },
-            Expression::BooleanOp {
-                operator: BooleanOperator::Or,
-                left,
-                right,
-                span,
-            } => {
-                // warn about multiple wildcards in OR operations
-                if let (
-                    Expression::Term {
-                        term: Term::Wildcard { .. },
-                        ..
-                    },
-                    Some(right_expr),
-                ) = (left.as_ref(), right.as_ref())
-                {
-                    if let Expression::Term {
-                        term: Term::Wildcard { .. },
-                        ..
-                    } = right_expr.as_ref()
-                    {
-                        return ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                            span: span.clone(),
-                            message: "Multiple wildcards in OR operations may significantly impact performance".to_string(),
-                        });
-                    }
-                }
-                ValidationResult::new()
-            }
+
             _ => ValidationResult::new(),
         }
     }
@@ -92,10 +57,7 @@ impl ValidationRule for WildcardPerformanceRule {
             Expression::Term { term, .. } => {
                 matches!(term, Term::Wildcard { .. } | Term::Replacement { .. })
             }
-            Expression::BooleanOp {
-                operator: BooleanOperator::Or,
-                ..
-            } => true,
+
             _ => false,
         }
     }
