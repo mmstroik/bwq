@@ -1,12 +1,7 @@
 use crate::ExitStatus;
-use bwq_server::LspServer;
+use anyhow::Result;
 
-pub fn run_server() -> Result<ExitStatus, anyhow::Error> {
-    match LspServer::run() {
-        Ok(()) => Ok(ExitStatus::Success),
-        Err(e) => {
-            eprintln!("Server error: {e}");
-            Ok(ExitStatus::Error)
-        }
-    }
+pub(crate) fn run_server() -> Result<ExitStatus> {
+    bwq_server::run()?;
+    Ok(ExitStatus::Success)
 }

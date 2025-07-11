@@ -19,12 +19,8 @@ export function activate(context: ExtensionContext) {
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
       { scheme: "file", language: "bwq" },
-      { scheme: "file", pattern: "**/*.bwq" },
+      { scheme: "untitled", language: "bwq" },
     ],
-    synchronize: {
-      configurationSection: "bwq",
-      fileEvents: workspace.createFileSystemWatcher("**/*.bwq"),
-    },
   };
 
   client = new LanguageClient(

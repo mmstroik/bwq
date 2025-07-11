@@ -1,9 +1,8 @@
 pub mod args;
-pub mod commands;
-pub mod output;
+mod commands;
+mod output;
 
 use args::Cli;
-use commands::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitStatus {
@@ -27,7 +26,7 @@ pub fn run(args: Cli) -> Result<ExitStatus, anyhow::Error> {
             output_format,
             extensions,
             exit_zero,
-        }) => run_check(
+        }) => commands::check::run_check(
             files,
             query,
             no_warnings,
@@ -35,8 +34,8 @@ pub fn run(args: Cli) -> Result<ExitStatus, anyhow::Error> {
             extensions,
             exit_zero,
         ),
-        Some(args::Commands::Examples) => run_examples(),
-        Some(args::Commands::Server) => run_server(),
+        Some(args::Commands::Examples) => commands::examples::run_examples(),
+        Some(args::Commands::Server) => commands::server::run_server(),
         None => {
             eprintln!("Error: A subcommand is required");
             eprintln!("\nUsage: bwq <COMMAND>");
