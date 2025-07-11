@@ -102,7 +102,8 @@ pub struct Lexer {
 impl Lexer {
     /// Character classification helpers
     fn is_word_char(&self, ch: char) -> bool {
-        ch.is_alphanumeric()
+        // Allow all Unicode letters and numbers, plus specific ASCII symbols
+        ch.is_alphabetic() || ch.is_numeric()
             || ch == '_'
             || ch == '.'
             || ch == '-'
@@ -118,6 +119,8 @@ impl Lexer {
             || ch == '`'
             || ch == '|'
             || ch == '@'
+            // Allow most Unicode characters that are not ASCII control or punctuation
+            || (!ch.is_ascii() && !ch.is_control() && !matches!(ch, '(' | ')' | '[' | ']' | '{' | '}' | ':' | '~' | '"' | '<' | '>'))
     }
 
     fn is_word_boundary_char(&self, ch: char) -> bool {
@@ -347,20 +350,7 @@ impl Lexer {
                     self.read_number()
                 }
             }
-            _ if ch.is_alphabetic()
-                || ch == '_'
-                || ch == '*'
-                || ch == '?'
-                || ch == '$'
-                || ch == '&'
-                || ch == '+'
-                || ch == '%'
-                || ch == '='
-                || ch == '`'
-                || ch == '|' =>
-            {
-                self.read_word_or_operator()
-            }
+            _ if self.is_word_char(ch) => self.read_word_or_operator(),
 
             _ => {
                 self.advance();

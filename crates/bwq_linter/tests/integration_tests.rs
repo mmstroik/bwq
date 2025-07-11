@@ -353,6 +353,28 @@ fn test_basic_field_operators() {
     test.assert_error_code("randomword : randomword2", "E017");
 }
 
+#[test_case("दुष्प्रचार OR \"नकली खबर\" OR नकलीखबर ", TestExpectation::ValidNoWarnings; "hindi text")]
+#[test_case("नमस्कार AND goodbye", TestExpectation::ValidNoWarnings; "hindi with english")]
+#[test_case("🇪🇺 AND europe", TestExpectation::ValidNoWarnings; "flag emoji")]
+#[test_case("€100 OR $50", TestExpectation::ValidNoWarnings; "currency symbols")]
+#[test_case("café AND नमस्ते", TestExpectation::ValidNoWarnings; "mixed unicode")]
+#[test_case("🎉 celebration", TestExpectation::ValidWithWarning("W001"); "emoji with implicit AND")]
+fn test_unicode_characters(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
+
+#[test_case("https:www.youtube.com/", TestExpectation::ValidNoWarnings; "single slash after colon")]
+#[test_case("https:w/ww.youtube.com/", TestExpectation::ValidNoWarnings; "slash in middle")]
+#[test_case("https:/www.youtube.com/", TestExpectation::ValidNoWarnings; "double slash missing one")]
+#[test_case("https://www.youtube.com/", TestExpectation::ValidNoWarnings; "full URL format")]
+#[test_case("site:reddit.com/r/programming", TestExpectation::ValidNoWarnings; "site operator with path")]
+#[test_case("url:example.com/path/to/page", TestExpectation::ValidNoWarnings; "url with path")]
+fn test_url_like_strings(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
+
 // ============================================================================
 // FIELD OPERATOR VALIDATION
 // Tests for field operator validation
