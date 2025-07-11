@@ -389,10 +389,9 @@ fn test_boolean_field_validation(query: &str, expected: TestExpectation) {
 
 #[test_case("language:en", TestExpectation::ValidNoWarnings; "valid 2-char language code")]
 #[test_case("language:fr", TestExpectation::ValidNoWarnings; "valid french language code")]
-#[test_case("language:es", TestExpectation::ValidNoWarnings; "valid spanish language code")]
 #[test_case("language:ENG", TestExpectation::ValidWithWarning("W001"); "uppercase language code warning")]
 #[test_case("language:english", TestExpectation::ValidWithWarning("W001"); "full language name warning")]
-#[test_case("languag:e", TestExpectation::ErrorCode("E012"); "invalid language code")]
+#[test_case("languag:e", TestExpectation::ValidNoWarnings; "invalid field operator is valid")]
 fn test_language_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);

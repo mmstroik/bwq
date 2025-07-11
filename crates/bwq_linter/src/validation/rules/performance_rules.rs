@@ -123,20 +123,6 @@ impl ValidationRule for ShortTermRule {
                             });
                         }
 
-                        if value.contains(':') {
-                            let parts: Vec<&str> = value.split(':').collect();
-                            if parts.len() == 2 {
-                                let field_part = parts[0];
-                                if !field_part.is_empty() && FieldType::parse(field_part).is_none()
-                                {
-                                    result.errors.push(LintError::FieldValidationError {
-                                        span: span.clone(),
-                                        message: format!("Unknown field type: {field_part}"),
-                                    });
-                                }
-                            }
-                        }
-
                         result
                     }
                     Term::Phrase { value } => {
