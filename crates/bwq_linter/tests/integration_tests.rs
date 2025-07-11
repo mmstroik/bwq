@@ -320,6 +320,7 @@ fn test_comments() {
 #[test_case("#MondayMotivation", TestExpectation::ValidNoWarnings; "hashtag syntax")]
 #[test_case("@brandwatch", TestExpectation::ValidNoWarnings; "mention syntax")]
 #[test_case("#hashtag AND @mention", TestExpectation::ValidNoWarnings; "hashtag and mention combined")]
+#[test_case("test;test;test", TestExpectation::ValidNoWarnings; "semicolons in term")]
 fn test_special_character_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);

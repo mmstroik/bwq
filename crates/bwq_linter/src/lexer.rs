@@ -120,6 +120,7 @@ impl Lexer {
             || ch == '|'
             || ch == '@'
             || ch == '\''
+            || ch == ';'
             // Allow most Unicode characters that are not ASCII control or punctuation
             || (!ch.is_ascii() && !ch.is_control() && !matches!(ch, '(' | ')' | '[' | ']' | '{' | '}' | ':' | '~' | '"' | '<' | '>'))
     }
@@ -666,7 +667,7 @@ mod tests {
     #[test]
     fn test_numbers_vs_words_and_special_chars() {
         let mut lexer = Lexer::new(
-            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
+            "42 3.14 -5 0xcharlie 18Rahul;Joshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
         );
         let tokens = lexer.tokenize().unwrap();
 
@@ -679,7 +680,7 @@ mod tests {
 
         // alphanumeric starting with digits (should be words due to has_word_chars_ahead)
         assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
-        assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
+        assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18Rahul;Joshi"));
         assert!(matches!(tokens[5].token_type, TokenType::Word(ref w) if w == "user123"));
 
         // original special characters
@@ -725,5 +726,17 @@ mod tests {
         assert!(matches!(tokens[1].token_type, TokenType::Or));
         assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "2️⃣"));
         assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_semicolons_in_terms() {
+        let mut lexer = Lexer::new("test;test;test");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2); // 1 token + EOF
+
+        // semicolons should be treated as part of the word
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "test;test;test"));
+        assert!(matches!(tokens[1].token_type, TokenType::Eof));
     }
 }
