@@ -102,7 +102,8 @@ pub struct Lexer {
 impl Lexer {
     /// Character classification helpers
     fn is_word_char(&self, ch: char) -> bool {
-        ch.is_alphanumeric()
+        // Allow all Unicode letters and numbers, plus specific ASCII symbols
+        ch.is_alphabetic() || ch.is_numeric()
             || ch == '_'
             || ch == '.'
             || ch == '-'
@@ -118,6 +119,10 @@ impl Lexer {
             || ch == '`'
             || ch == '|'
             || ch == '@'
+            || ch == '\''
+            || ch == ';'
+            // Allow most Unicode characters that are not ASCII control or punctuation
+            || (!ch.is_ascii() && !ch.is_control() && !matches!(ch, '(' | ')' | '[' | ']' | '{' | '}' | ':' | '~' | '"' | '<' | '>'))
     }
 
     fn is_word_boundary_char(&self, ch: char) -> bool {
@@ -341,26 +346,13 @@ impl Lexer {
 
             _ if ch.is_ascii_digit() || ch == '-' => {
                 // look ahead to see if this is actually an alphanumeric word starting with digits
-                if (ch.is_ascii_digit() || ch == '-') && self.has_letters_ahead() {
+                if (ch.is_ascii_digit() || ch == '-') && self.has_word_chars_ahead() {
                     self.read_word_or_operator()
                 } else {
                     self.read_number()
                 }
             }
-            _ if ch.is_alphabetic()
-                || ch == '_'
-                || ch == '*'
-                || ch == '?'
-                || ch == '$'
-                || ch == '&'
-                || ch == '+'
-                || ch == '%'
-                || ch == '='
-                || ch == '`'
-                || ch == '|' =>
-            {
-                self.read_word_or_operator()
-            }
+            _ if self.is_word_char(ch) => self.read_word_or_operator(),
 
             _ => {
                 self.advance();
@@ -597,7 +589,7 @@ impl Lexer {
         result
     }
 
-    fn has_letters_ahead(&self) -> bool {
+    fn has_word_chars_ahead(&self) -> bool {
         let mut pos = self.position;
 
         // Skip initial minus sign if present
@@ -610,14 +602,18 @@ impl Lexer {
             pos += 1;
         }
 
-        // check if we find letters before hitting a word boundary
         while pos < self.input.len() {
             let ch = self.input[pos];
-            if ch.is_alphabetic() {
+            if ch.is_alphabetic() || ch == '*' || ch == '?' {
                 return true;
             } else if self.is_word_boundary_char(ch) {
                 return false;
             } else if self.is_word_char(ch) {
+                // Also return true if we find non-ASCII word characters
+                // This handles cases like emoji combining characters
+                if !ch.is_ascii() {
+                    return true;
+                }
                 pos += 1;
             } else {
                 return false;
@@ -671,7 +667,7 @@ mod tests {
     #[test]
     fn test_numbers_vs_words_and_special_chars() {
         let mut lexer = Lexer::new(
-            "42 3.14 -5 0xcharlie 18RahulJoshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
+            "42 3.14 -5 0xcharlie 18Rahul;Joshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
         );
         let tokens = lexer.tokenize().unwrap();
 
@@ -682,9 +678,9 @@ mod tests {
         assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "3.14"));
         assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-5"));
 
-        // alphanumeric starting with digits (should be words due to has_letters_ahead)
+        // alphanumeric starting with digits (should be words due to has_word_chars_ahead)
         assert!(matches!(tokens[3].token_type, TokenType::Word(ref w) if w == "0xcharlie"));
-        assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18RahulJoshi"));
+        assert!(matches!(tokens[4].token_type, TokenType::Word(ref w) if w == "18Rahul;Joshi"));
         assert!(matches!(tokens[5].token_type, TokenType::Word(ref w) if w == "user123"));
 
         // original special characters
@@ -702,5 +698,45 @@ mod tests {
         assert!(matches!(tokens[15].token_type, TokenType::Word(ref w) if w == "test@word"));
 
         assert!(matches!(tokens[16].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_numeric_wildcards() {
+        let mut lexer = Lexer::new("24* 12? 100*test");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // numbers with wildcards should be treated as words
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "24*"));
+        assert!(matches!(tokens[1].token_type, TokenType::Word(ref w) if w == "12?"));
+        assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "100*test"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_emoji_keycaps() {
+        let mut lexer = Lexer::new("1️⃣ OR 2️⃣");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // emoji keycaps should be treated as single words, not split into digit + combining chars
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "1️⃣"));
+        assert!(matches!(tokens[1].token_type, TokenType::Or));
+        assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "2️⃣"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_semicolons_in_terms() {
+        let mut lexer = Lexer::new("test;test;test");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2); // 1 token + EOF
+
+        // semicolons should be treated as part of the word
+        assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "test;test;test"));
+        assert!(matches!(tokens[1].token_type, TokenType::Eof));
     }
 }

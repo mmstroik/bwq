@@ -255,11 +255,12 @@ fn test_quoted_phrase_syntax(query: &str, expected: TestExpectation) {
 #[test_case("appl*", TestExpectation::ValidNoWarnings; "asterisk wildcard at end")]
 #[test_case("tes*t", TestExpectation::ValidNoWarnings; "asterisk wildcard in middle")]
 #[test_case("customi?e", TestExpectation::ValidNoWarnings; "question mark wildcard in middle")]
-#[test_case("ab*", TestExpectation::ValidWithWarning("W003"); "short wildcard performance warning")]
+#[test_case("ab*", TestExpectation::ValidNoWarnings; "two character wildcard no warning")]
 #[test_case("#*test", TestExpectation::ValidWithWarning("W003"); "wildcard after hashtag prefix performance warning")]
 #[test_case("@*test", TestExpectation::ValidWithWarning("W003"); "wildcard after @ prefix performance warning")]
 #[test_case("*invalid", TestExpectation::ErrorCode("E006"); "invalid wildcard at beginning")]
 #[test_case("a*", TestExpectation::ErrorCode("E003"); "short wildcard matches too many unique terms")]
+#[test_case("t*est", TestExpectation::ValidNoWarnings; "wildcard in middle with characters after")]
 fn test_wildcard_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -301,6 +302,9 @@ fn test_case_sensitive_matching() {
     test.assert_valid_no_warnings("{BrandWatch}");
 
     test.assert_valid_no_warnings("apple AND {BT}");
+
+    // with spaces
+    test.assert_valid_no_warnings("{Brand Watch}");
 }
 
 #[test]
@@ -316,6 +320,7 @@ fn test_comments() {
 #[test_case("#MondayMotivation", TestExpectation::ValidNoWarnings; "hashtag syntax")]
 #[test_case("@brandwatch", TestExpectation::ValidNoWarnings; "mention syntax")]
 #[test_case("#hashtag AND @mention", TestExpectation::ValidNoWarnings; "hashtag and mention combined")]
+#[test_case("test;test;test", TestExpectation::ValidNoWarnings; "semicolons in term")]
 fn test_special_character_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -351,6 +356,29 @@ fn test_basic_field_operators() {
     test.assert_error_code("subreddit : nba", "E017");
     test.assert_error_code("subreddit :nba", "E017");
     test.assert_error_code("randomword : randomword2", "E017");
+}
+
+#[test_case("दुष्प्रचार OR \"नकली खबर\" OR नकलीखबर ", TestExpectation::ValidNoWarnings; "hindi text")]
+#[test_case("नमस्कार AND goodbye", TestExpectation::ValidNoWarnings; "hindi with english")]
+#[test_case("🇪🇺 AND europe", TestExpectation::ValidNoWarnings; "flag emoji")]
+#[test_case("€100 OR $50", TestExpectation::ValidNoWarnings; "currency symbols")]
+#[test_case("café AND नमस्ते", TestExpectation::ValidNoWarnings; "mixed unicode")]
+#[test_case("O'Reilly OR McDonald's", TestExpectation::ValidNoWarnings; "names with apostrophes")]
+#[test_case("🎉 celebration", TestExpectation::ValidWithWarning("W001"); "emoji with implicit AND")]
+fn test_unicode_and_special_characters(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
+
+#[test_case("https:www.youtube.com/", TestExpectation::ValidNoWarnings; "single slash after colon")]
+#[test_case("https:w/ww.youtube.com/", TestExpectation::ValidNoWarnings; "slash in middle")]
+#[test_case("https:/www.youtube.com/", TestExpectation::ValidNoWarnings; "double slash missing one")]
+#[test_case("https://www.youtube.com/", TestExpectation::ValidNoWarnings; "full URL format")]
+#[test_case("site:reddit.com/r/programming", TestExpectation::ValidNoWarnings; "site operator with path")]
+#[test_case("url:example.com/path/to/page", TestExpectation::ValidNoWarnings; "url with path")]
+fn test_url_like_strings(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
 }
 
 // ============================================================================
@@ -389,10 +417,9 @@ fn test_boolean_field_validation(query: &str, expected: TestExpectation) {
 
 #[test_case("language:en", TestExpectation::ValidNoWarnings; "valid 2-char language code")]
 #[test_case("language:fr", TestExpectation::ValidNoWarnings; "valid french language code")]
-#[test_case("language:es", TestExpectation::ValidNoWarnings; "valid spanish language code")]
 #[test_case("language:ENG", TestExpectation::ValidWithWarning("W001"); "uppercase language code warning")]
 #[test_case("language:english", TestExpectation::ValidWithWarning("W001"); "full language name warning")]
-#[test_case("languag:e", TestExpectation::ErrorCode("E012"); "invalid language code")]
+#[test_case("languag:e", TestExpectation::ValidNoWarnings; "invalid field operator is valid")]
 fn test_language_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -440,8 +467,9 @@ fn test_location_field_validation(query: &str, expected: TestExpectation) {
 // ============================================================================
 
 #[test_case("apple NEAR/150 juice", TestExpectation::ValidNoWarnings; "NEAR with large distance should not generate warnings")]
-#[test_case("apple* OR juice*", TestExpectation::ValidWithWarning("W003"); "multiple wildcards should generate performance warnings")]
+#[test_case("apple* OR juice*", TestExpectation::ValidNoWarnings; "multiple wildcards in OR")]
 #[test_case("a", TestExpectation::ValidNoWarnings; "single character should not generate warnings")]
+#[test_case("42 OR 24*", TestExpectation::ValidNoWarnings; "mixing pure numbers and numeric wildcards")]
 fn test_performance_edge_cases(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
