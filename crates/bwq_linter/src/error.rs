@@ -165,15 +165,15 @@ impl LintError {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LintWarning {
-    PotentialTypo { span: Span, suggestion: String },
+    PotentialTypo { span: Span, message: String },
     PerformanceWarning { span: Span, message: String },
 }
 
 impl std::fmt::Display for LintWarning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LintWarning::PotentialTypo { suggestion, .. } => {
-                write!(f, "Potential typo. Did you mean '{suggestion}'?")
+            LintWarning::PotentialTypo { message, .. } => {
+                write!(f, "Potential typo: {message}")
             }
             LintWarning::PerformanceWarning { message, .. } => {
                 write!(f, "Performance warning: {message}")
