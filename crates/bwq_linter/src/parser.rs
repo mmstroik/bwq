@@ -505,12 +505,8 @@ impl Parser {
         match &token.token_type {
             TokenType::Word(word) => {
                 self.advance();
-                let term = if word.contains('*') {
+                let term = if word.contains('*') || word.contains('?') {
                     Term::Wildcard {
-                        value: word.clone(),
-                    }
-                } else if word.contains('?') {
-                    Term::Replacement {
                         value: word.clone(),
                     }
                 } else {

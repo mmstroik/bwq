@@ -58,10 +58,11 @@ pub enum LintError {
     InvalidBooleanCase { span: Span, operator: String },
 
     #[error("Unbalanced parentheses")]
+    // TODO: this is currently not used - reserving for more specific error code
     UnbalancedParentheses { span: Span },
 
-    #[error("Invalid wildcard placement: wildcards cannot be at the beginning of a word")]
-    InvalidWildcardPlacement { span: Span },
+    #[error("Invalid wildcard placement: {message}")]
+    InvalidWildcardPlacement { span: Span, message: String },
 
     #[error("Invalid proximity operator syntax: {message}")]
     InvalidProximityOperator { span: Span, message: String },
@@ -88,7 +89,7 @@ pub enum LintError {
     #[error("{message}")]
     ProximityOperatorError { span: Span, message: String },
 
-    #[error("{message}")]
+    #[error("Invalid field range: {message}")]
     RangeValidationError { span: Span, message: String },
 
     #[error("{message}")]
@@ -131,7 +132,7 @@ impl LintError {
             | LintError::ValidationError { span, .. }
             | LintError::InvalidBooleanCase { span, .. }
             | LintError::UnbalancedParentheses { span }
-            | LintError::InvalidWildcardPlacement { span }
+            | LintError::InvalidWildcardPlacement { span, .. }
             | LintError::InvalidProximityOperator { span, .. }
             | LintError::InvalidFieldOperator { span, .. }
             | LintError::InvalidRangeSyntax { span }

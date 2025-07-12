@@ -241,7 +241,6 @@ pub enum Term {
     Word { value: String },
     Phrase { value: String },
     Wildcard { value: String },
-    Replacement { value: String },
     CaseSensitive { value: String },
     Hashtag { value: String },
     Mention { value: String },

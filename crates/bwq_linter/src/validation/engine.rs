@@ -28,8 +28,8 @@ impl ValidationEngine {
                 Box::new(PureNegativeRule),
                 Box::new(BinaryOperatorRule),
                 Box::new(TildeUsageRule),
+                Box::new(WildcardPlacementRule),
                 // performance validation rules
-                Box::new(WildcardPerformanceRule),
                 Box::new(ShortTermRule),
                 Box::new(RangePerformanceRule),
             ],

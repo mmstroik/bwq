@@ -46,10 +46,9 @@ impl DiagnosticsHandler {
             LintError::UnbalancedParentheses { span } => {
                 (span_to_range(span), "Unbalanced parentheses".to_string())
             }
-            LintError::InvalidWildcardPlacement { span } => (
+            LintError::InvalidWildcardPlacement { span, message } => (
                 span_to_range(span),
-                "Invalid wildcard placement: wildcards cannot be at the beginning of a word"
-                    .to_string(),
+                format!("Invalid wildcard placement: {message}"),
             ),
             LintError::InvalidProximityOperator { span, message } => (
                 span_to_range(span),

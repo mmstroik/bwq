@@ -2,52 +2,39 @@ use crate::ast::*;
 use crate::error::{LintError, LintWarning};
 use crate::validation::{ValidationContext, ValidationResult, ValidationRule};
 
-pub struct WildcardPerformanceRule;
+pub struct WildcardPlacementRule;
 
-impl ValidationRule for WildcardPerformanceRule {
+impl ValidationRule for WildcardPlacementRule {
     fn name(&self) -> &'static str {
-        "wildcard-performance"
+        "wildcard-placement"
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         match expr {
-            Expression::Term { term, span } => match term {
-                Term::Wildcard { value } => {
-                    let mut result = ValidationResult::new();
+            Expression::Term {
+                term: Term::Wildcard { value },
+                span,
+            } => {
+                let mut result = ValidationResult::new();
 
-                    if value.starts_with('*') {
-                        result
-                            .errors
-                            .push(LintError::InvalidWildcardPlacement { span: span.clone() });
-                    }
-
-                    let parts: Vec<&str> = value.split('*').collect();
-                    if let Some(first_part) = parts.first() {
-                        if !first_part.is_empty() && first_part.len() == 1 && value.ends_with('*') {
-                            result.errors.push(LintError::ValidationError {
-                                            span: span.clone(),
-                                            message: "This wildcard matches too many unique terms. Please make it more specific.".to_string(),
-                                        });
-                        }
-                    }
-
+                if value.starts_with('*') || value.starts_with('?') {
                     result
+                        .errors
+                        .push(LintError::InvalidWildcardPlacement { span: span.clone(), message: "Wildcard operators (* and ?) cannot be used at the start of a search term. They're used within or at the end of a word to find any possible match.".to_string() });
                 }
-                Term::Replacement { value } => {
-                    let question_count = value.chars().filter(|&c| c == '?').count();
-                    if question_count > 3 {
-                        ValidationResult::with_warning(LintWarning::PerformanceWarning {
-                            span: span.clone(),
-                            message: "Multiple replacement characters may impact performance"
-                                .to_string(),
-                        })
-                    } else {
-                        ValidationResult::new()
+
+                let parts: Vec<&str> = value.split('*').collect();
+                if let Some(first_part) = parts.first() {
+                    if !first_part.is_empty() && first_part.len() == 1 && value.ends_with('*') {
+                        result.errors.push(LintError::InvalidWildcardPlacement {
+                                        span: span.clone(),
+                                        message: "This wildcard matches too many unique terms. Use at least two letters with the wildcard. For example, d*g matches terms like dog, dig, and Doug.".to_string(),
+                                    });
                     }
                 }
-                _ => ValidationResult::new(),
-            },
 
+                result
+            }
             _ => ValidationResult::new(),
         }
     }
@@ -55,7 +42,7 @@ impl ValidationRule for WildcardPerformanceRule {
     fn can_validate(&self, expr: &Expression) -> bool {
         match expr {
             Expression::Term { term, .. } => {
-                matches!(term, Term::Wildcard { .. } | Term::Replacement { .. })
+                matches!(term, Term::Wildcard { .. })
             }
 
             _ => false,
@@ -165,10 +152,10 @@ impl ValidationRule for RangePerformanceRule {
                     });
                 }
 
-                if end_num > 1_000_000_000 {
-                    result.warnings.push(LintWarning::PerformanceWarning {
+                if end_num.to_string().len() > 10 {
+                    result.errors.push(LintError::RangeValidationError {
                         span: span.clone(),
-                        message: "Very large follower counts may not match any results".to_string(),
+                        message: "Follower counts cannot exceed 10 digits".to_string(),
                     });
                 }
 

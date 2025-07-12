@@ -259,7 +259,7 @@ fn test_quoted_phrase_syntax(query: &str, expected: TestExpectation) {
 #[test_case("#*test", TestExpectation::ValidWithWarning("W003"); "wildcard after hashtag prefix performance warning")]
 #[test_case("@*test", TestExpectation::ValidWithWarning("W003"); "wildcard after @ prefix performance warning")]
 #[test_case("*invalid", TestExpectation::ErrorCode("E006"); "invalid wildcard at beginning")]
-#[test_case("a*", TestExpectation::ErrorCode("E003"); "short wildcard matches too many unique terms")]
+#[test_case("a*", TestExpectation::ErrorCode("E006"); "short wildcard matches too many unique terms")]
 #[test_case("t*est", TestExpectation::ValidNoWarnings; "wildcard in middle with characters after")]
 fn test_wildcard_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
@@ -449,6 +449,15 @@ fn test_verified_type_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("minuteOfDay:[-1 TO 100]", TestExpectation::ErrorCode("E012"); "minute of day with negative")]
 #[test_case("minuteOfDay:[0 TO 1440]", TestExpectation::ErrorCode("E012"); "minute of day over max")]
 fn test_minute_of_day_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
+
+#[test_case("authorFollowers:[0 TO 5000]", TestExpectation::ValidNoWarnings; "valid author followers full range")]
+#[test_case("authorFollowers:[-100 TO 10000]", TestExpectation::ErrorCode("E014"); "invalid author followers negative")]
+#[test_case("authorFollowers:[100000 TO 1000]", TestExpectation::ErrorCode("E014"); "invalid author followers start greater than end")]
+#[test_case("authorFollowers:[0 TO 10000000000]", TestExpectation::ErrorCode("E014"); "invalid author followers over max digits")]
+fn test_author_followers_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
 }
