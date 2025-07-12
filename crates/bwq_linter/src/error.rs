@@ -163,7 +163,6 @@ impl LintError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum LintWarning {
     PotentialTypo { span: Span, suggestion: String },
-    DeprecatedOperator { span: Span, replacement: String },
     PerformanceWarning { span: Span, message: String },
 }
 
@@ -172,9 +171,6 @@ impl std::fmt::Display for LintWarning {
         match self {
             LintWarning::PotentialTypo { suggestion, .. } => {
                 write!(f, "Potential typo. Did you mean '{suggestion}'?")
-            }
-            LintWarning::DeprecatedOperator { replacement, .. } => {
-                write!(f, "Deprecated operator. Consider using '{replacement}'")
             }
             LintWarning::PerformanceWarning { message, .. } => {
                 write!(f, "Performance warning: {message}")
@@ -187,15 +183,13 @@ impl LintWarning {
     pub fn code(&self) -> &'static str {
         match self {
             LintWarning::PotentialTypo { .. } => "W001",
-            LintWarning::DeprecatedOperator { .. } => "W002",
-            LintWarning::PerformanceWarning { .. } => "W003",
+            LintWarning::PerformanceWarning { .. } => "W002",
         }
     }
 
     pub fn span(&self) -> &Span {
         match self {
             LintWarning::PotentialTypo { span, .. }
-            | LintWarning::DeprecatedOperator { span, .. }
             | LintWarning::PerformanceWarning { span, .. } => span,
         }
     }
