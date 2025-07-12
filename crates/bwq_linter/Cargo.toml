@@ -1,9 +1,9 @@
 [package]
 name = "bwq_linter"
-version = "0.4.3"
-authors = { workspace = true }
-edition = { workspace = true }
-rust-version = { workspace = true }
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Core linting library for bwq (Brandwatch query linter and language server)"
 repository = { workspace = true }
 license = { workspace = true }
@@ -14,10 +14,10 @@ tag = false
 [lib]
 
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
-pretty_assertions = { workspace = true }
-test-case = { workspace = true }
+pretty_assertions.workspace = true
+test-case.workspace = true

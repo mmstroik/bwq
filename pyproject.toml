@@ -1,0 +1,13 @@
+[project]
+name = "bwq"
+version = "0.0.0-dev"
+description = "A linter and language server for Brandwatch query files (.bwq)"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "bin"
