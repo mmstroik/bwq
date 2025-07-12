@@ -1,0 +1,42 @@
+<<<COMPETITIVE SET>>>
+(Microsoft* OR マイクロソフト OR @mskkpr OR MSFT* OR {Windows} OR mscloud OR Azure* OR {Bing} OR {Copilot} OR "Satya Nadella" OR satyanadella OR "Brad Smith" OR BradSmi OR OpenAI OR "Sam Altman" OR @sama OR "Ilya Sutskever" OR @ilyasut OR {Apple} OR @Apple OR iphone OR {AAPL} OR "Tim Cook" OR @tim_cook OR Meta OR Zuckerberg OR Instagram* OR Threads OR facebook* OR {FB} OR "Adam Mosseri" OR @mosseri OR {Alphabet} OR Google* OR @google OR @GoogleEnFrance OR @GoogleFR OR @GoogleUK OR @GoogleIndia OR @googlejapan OR "Sundar Pichai" OR @sundarpichai OR ((Amazon) NOT ("the amazon" OR "brazillian amazon" OR (Amazon* AND (rainforest* OR drought* OR forest* OR deforest* OR species* OR reforest*)))) OR @AmazonUK OR @amazonIN OR {AWS} OR @AWS OR {AMZN} OR Bezos OR @JeffBezos OR "Andy Jassy" OR @ajassy OR TikTok OR @tiktok_us OR @tiktok_uk OR @tiktok_France OR @TikTok_IN OR @TikTok_IN OR ByteDance OR "Shou Zi Chew" OR "Chew Shou Zi" OR @shouchew OR "周受资" OR "Liang Rubo") OR
+
+<<<Other Tech companies>>>
+(George_Kurtz OR "george kurtz" OR (crowd NEAR/0f strike*) OR crowdstrike* OR anthropic OR AnthropicAI OR jackclarkSF OR "Dario Amodei" OR YouTube OR {IBM} OR {Intel} OR {Adobe} OR Nvidia* OR @NVIDIAJapan OR "Jensen Huang" OR {TSMC} OR {Waymo} OR {Android} OR samsung OR Alibaba OR Huawei OR metaverse OR ByteDance OR github) OR
+
+<<<Branded AI>>>
+(   "claude sonnet" OR 
+    ((sonnet OR claude) NEAR/1 ("3.5" OR opus)) OR 
+    o3 OR o1-preview OR ChatGPT* OR Sora OR gpt OR gpt4* OR {LLaMA} OR "llama 3" OR "apple intelligence" OR xAI
+) OR
+
+<<<Tech>>>
+<<<English>>>
+(
+    {AI} OR "A.I." OR artificialintelligence* OR "artificial intelligence" OR {LLMs} OR {LLM} OR internet* OR broadband OR 
+    (cloud* NEAR/5 (comput* OR data* OR daten* OR app* OR infra* OR provider OR storage OR dev*)) OR 
+    "social media" OR socialmedia OR online OR tech* OR {IoT} OR semiconductor* OR GAFAM OR FAANG OR bigtech OR "silicon valley" OR (Quantum NEAR/2 Comput*) OR siliconvalley OR digital* OR disinfo* OR (deep NEAR/0f fake*) OR deepfake* OR "virtual reality" OR "edge computing" OR fintech OR "information security" OR algorithm* OR fintech OR adtech OR "cloud providers" OR "cloud provider" OR "open source" OR {SaaS} OR 
+    (
+        cyber* NOT ((cyber NEAR/0f (taxi* OR cab* OR punk)) 
+    OR cybercab* OR cyberpunk* OR cybertaxi* OR cybertruck* OR cybernetic*)
+    )
+) OR
+<<<French>>>
+(({IA} NOT language:en) OR "intelligence artificielle" OR "réseaux sociaux" OR "en ligne" OR "vallée de silicium" OR informatique OR numérique OR numérisation OR "large bande" OR ((nuage OR cloud) NEAR/4 (informatique* OR donnée*)) OR semi-conducteur*) OR 
+<<<German>>> 
+({KI} OR "K.I." OR "künstliche Intelligenz" OR "soziale Medien" OR Breitband OR Desinformation OR Halbleiter*) OR
+<<<Spanish>>>
+("inteligencia artificial" OR "banda ancha" OR (nube NEAR/5 (comput* OR dat* OR aplic* OR infra* OR proveed* OR almacen* OR contened* OR desarroll*)) OR "redes sociales" OR "valle del silicio") OR
+
+<<<Privacy (shortened)>>>
+((data* NEAR/5 (priva* OR track* OR sensitiv* OR collect* OR store OR protect* OR consent* OR digit* OR regulat* OR legislat* OR user* OR scrape OR scraping)) OR (privacy OR trackingfree* OR surveillance* OR "vie privée" OR Privatsphäre OR confidentialité) OR (données NEAR/5 (privées OR sensibles OR protection OR protéger)) OR {GDPR} OR privacidad OR (datos NEAR/5 (privados OR usuario))) OR
+
+<<<Cybersecurity (shortened)>>>
+<<<English>>>
+(hacked OR hacker* OR spyware* OR malware* OR phish* OR server OR servers OR software OR database OR encrypt* OR authenticat* OR firewall OR ransomware OR biometric*) OR
+<<<French>>>
+("logiciel espion" OR "logiciel malveillant" OR hameçonnage OR serveur* OR logiciel OR "base de données" OR authentifi* OR pare-feu OR biométrique*) OR
+<<<German>>> 
+(Datenbank OR verschlüssel* OR authentifizier* OR Erpressungssoftware OR biometrisch*) OR
+<<<Spanish>>>
+("software espía" OR servidor* OR "base de datos" OR cifrad* OR encript* OR autentic* OR cortafuegos)
