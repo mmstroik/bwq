@@ -102,6 +102,28 @@ pub enum LintError {
 }
 
 impl LintError {
+    pub fn span(&self) -> &Span {
+        match self {
+            LintError::LexerError { span, .. }
+            | LintError::ParserError { span, .. }
+            | LintError::ValidationError { span, .. }
+            | LintError::InvalidBooleanCase { span, .. }
+            | LintError::UnbalancedParentheses { span }
+            | LintError::InvalidWildcardPlacement { span }
+            | LintError::InvalidProximityOperator { span, .. }
+            | LintError::InvalidFieldOperator { span, .. }
+            | LintError::InvalidRangeSyntax { span }
+            | LintError::UnexpectedToken { span, .. }
+            | LintError::ExpectedToken { span, .. }
+            | LintError::FieldValidationError { span, .. }
+            | LintError::ProximityOperatorError { span, .. }
+            | LintError::RangeValidationError { span, .. }
+            | LintError::OperatorMixingError { span, .. }
+            | LintError::PureNegativeQueryError { span, .. }
+            | LintError::InvalidFieldOperatorSpacing { span, .. } => span,
+        }
+    }
+
     pub fn code(&self) -> &'static str {
         match self {
             LintError::LexerError { .. } => "E001",
@@ -125,26 +147,7 @@ impl LintError {
     }
 
     pub fn span_json(&self) -> serde_json::Value {
-        let span = match self {
-            LintError::LexerError { span, .. }
-            | LintError::ParserError { span, .. }
-            | LintError::ValidationError { span, .. }
-            | LintError::InvalidBooleanCase { span, .. }
-            | LintError::UnbalancedParentheses { span }
-            | LintError::InvalidWildcardPlacement { span }
-            | LintError::InvalidProximityOperator { span, .. }
-            | LintError::InvalidFieldOperator { span, .. }
-            | LintError::InvalidRangeSyntax { span }
-            | LintError::UnexpectedToken { span, .. }
-            | LintError::ExpectedToken { span, .. }
-            | LintError::FieldValidationError { span, .. }
-            | LintError::ProximityOperatorError { span, .. }
-            | LintError::RangeValidationError { span, .. }
-            | LintError::OperatorMixingError { span, .. }
-            | LintError::PureNegativeQueryError { span, .. }
-            | LintError::InvalidFieldOperatorSpacing { span, .. } => span,
-        };
-
+        let span = self.span();
         serde_json::json!({
             "start": {"line": span.start.line, "column": span.start.column, "offset": span.start.offset},
             "end": {"line": span.end.line, "column": span.end.column, "offset": span.end.offset}
