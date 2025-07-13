@@ -3,4 +3,5 @@
         "--all-features"
     ],
     "rust-analyzer.check.command": "clippy",
+    "typescript.tsdk": "./vscode-extension/node_modules/typescript/lib",
 }
