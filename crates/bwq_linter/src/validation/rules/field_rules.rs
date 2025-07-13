@@ -480,48 +480,111 @@ impl ValidationRule for FollowerCountFieldRule {
     }
 
     fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
-        if let Expression::Range {
-            field: Some(FieldType::AuthorFollowers),
-            start,
-            end,
-            span,
-        } = expr
-        {
-            match (start.parse::<i64>(), end.parse::<i64>()) {
-                (Ok(start_num), Ok(end_num)) => {
-                    let mut result = ValidationResult::new();
+        match expr {
+            Expression::Field {
+                field: FieldType::AuthorFollowers,
+                value,
+                span,
+            } => {
+                // Check if the value is a range (valid) or a term (invalid)
+                if let Expression::Range { start, end, .. } = value.as_ref() {
+                    match (start.parse::<i64>(), end.parse::<i64>()) {
+                        (Ok(start_num), Ok(end_num)) => {
+                            let mut result = ValidationResult::new();
 
-                    if start_num < 0 || end_num < 0 {
-                        result.errors.push(LintError::InvalidFieldRange {
+                            if start_num < 0 || end_num < 0 {
+                                result.errors.push(LintError::InvalidFieldRange {
+                                    span: span.clone(),
+                                    message: "Follower counts cannot be negative".to_string(),
+                                });
+                            }
+
+                            if end_num.to_string().len() > 10 {
+                                result.errors.push(LintError::InvalidFieldRange {
+                                    span: span.clone(),
+                                    message: "Follower counts cannot exceed 10 digits".to_string(),
+                                });
+                            }
+
+                            result
+                        }
+                        _ => ValidationResult::with_error(LintError::FieldValidationError {
                             span: span.clone(),
-                            message: "Follower counts cannot be negative".to_string(),
-                        });
+                            message: "authorFollowers range values must be numbers".to_string(),
+                        }),
                     }
-
-                    if end_num.to_string().len() > 10 {
-                        result.errors.push(LintError::InvalidFieldRange {
-                            span: span.clone(),
-                            message: "Follower counts cannot exceed 10 digits".to_string(),
-                        });
-                    }
-
-                    result
+                } else {
+                    ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: "authorFollowers must be used with a range (e.g., authorFollowers:[100 TO 1000])".to_string(),
+                    })
                 }
-                _ => ValidationResult::with_error(LintError::FieldValidationError {
-                    span: span.clone(),
-                    message: "authorFollowers range values must be numbers".to_string(),
-                }),
             }
-        } else {
-            ValidationResult::new()
+            _ => ValidationResult::new(),
         }
     }
 
     fn can_validate(&self, expr: &Expression) -> bool {
         matches!(
             expr,
-            Expression::Range {
-                field: Some(FieldType::AuthorFollowers),
+            Expression::Field {
+                field: FieldType::AuthorFollowers,
+                ..
+            }
+        )
+    }
+}
+
+pub struct GuidFieldRule;
+
+impl ValidationRule for GuidFieldRule {
+    fn name(&self) -> &'static str {
+        "guid-field"
+    }
+
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        if let Expression::Field {
+            field: FieldType::Guid,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word { value: guid_value },
+                ..
+            } = value.as_ref()
+            {
+                // GUID should be digits only or digits with underscores (for Facebook post IDs)
+                if !guid_value.chars().all(|c| c.is_ascii_digit() || c == '_') {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: "guid must contain only digits or digits with underscores (e.g., '123456789' or '123_456_789')".to_string(),
+                    });
+                }
+
+                // Should not be all underscores or start/end with underscore
+                if guid_value.is_empty()
+                    || guid_value.chars().all(|c| c == '_')
+                    || guid_value.starts_with('_')
+                    || guid_value.ends_with('_')
+                {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message:
+                            "guid must contain digits and cannot start or end with underscores"
+                                .to_string(),
+                    });
+                }
+            }
+        }
+        ValidationResult::new()
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::Guid,
                 ..
             }
         )

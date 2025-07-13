@@ -461,6 +461,7 @@ fn test_minute_of_day_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("authorFollowers:[100000 TO 1000]", TestExpectation::ErrorCode("E011"); "invalid author followers start greater than end")]
 #[test_case("authorFollowers:[0 TO 10000000000]", TestExpectation::ErrorCode("E011"); "invalid author followers over max digits")]
 #[test_case("authorFollowers:[x TO y]", TestExpectation::ErrorCode("E009"); "invalid author followers with literal letters")]
+#[test_case("authorFollowers:term", TestExpectation::ErrorCode("E009"); "authorFollowers requires range not term")]
 fn test_author_followers_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -470,6 +471,16 @@ fn test_author_followers_field_validation(query: &str, expected: TestExpectation
 #[test_case("region:usa.fl", TestExpectation::ValidNoWarnings; "valid region code")]
 #[test_case("city:\"deu.berlin.berlin\"", TestExpectation::ValidNoWarnings; "valid city code")]
 fn test_location_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
+
+#[test_case("guid:123456789", TestExpectation::ValidNoWarnings; "valid guid digits only")]
+#[test_case("guid:123_456_789", TestExpectation::ValidNoWarnings; "valid guid with underscores")]
+#[test_case("guid:term", TestExpectation::ErrorCode("E009"); "guid should be digits or digits with underscores")]
+#[test_case("guid:123abc", TestExpectation::ErrorCode("E009"); "guid should not contain letters")]
+#[test_case("guid:123-456", TestExpectation::ErrorCode("E009"); "guid should not contain dashes")]
+fn test_guid_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
 }
