@@ -33,18 +33,16 @@ special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 - E001: lexer errors (invalid characters, malformed tokens)
 - E002: parser errors (syntax issues, parsing failures)  
 - E003: validation errors (general validation issues)
-- E004: invalid boolean case
-- E005: unbalanced parentheses
-- E006: invalid wildcard placement
-- E007: invalid proximity operator syntax
-- E008: invalid field operator syntax
-- E009: unexpected token
-- E010: expected token but found something else
-- E011: field validation errors
-- E012: proximity operator errors
-- E013: range validation errors
-- E014: operator mixing errors
-- E015: pure negative query errors
+- E004: invalid wildcard placement
+- E005: invalid proximity operator syntax
+- E006: invalid field operator syntax
+- E007: unexpected token
+- E008: expected token but found something else
+- E009: field validation errors
+- E010: proximity operator errors
+- E011: range validation errors
+- E012: operator mixing errors
+- E013: pure negative query errors
 
 **warnings (W001-W002):**
 
