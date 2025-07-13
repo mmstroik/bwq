@@ -146,14 +146,14 @@ impl ValidationRule for RangePerformanceRule {
                 let mut result = ValidationResult::new();
 
                 if start_num < 0 || end_num < 0 {
-                    result.errors.push(LintError::RangeValidationError {
+                    result.errors.push(LintError::InvalidFieldRange {
                         span: span.clone(),
                         message: "Follower counts cannot be negative".to_string(),
                     });
                 }
 
                 if end_num.to_string().len() > 10 {
-                    result.errors.push(LintError::RangeValidationError {
+                    result.errors.push(LintError::InvalidFieldRange {
                         span: span.clone(),
                         message: "Follower counts cannot exceed 10 digits".to_string(),
                     });

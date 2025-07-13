@@ -429,7 +429,7 @@ fn test_language_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("engagementType:REPLY", TestExpectation::ValidNoWarnings; "valid engagement reply")]
 #[test_case("engagementType:RETWEET", TestExpectation::ValidNoWarnings; "valid engagement retweet")]
 #[test_case("engagementType:QUOTE", TestExpectation::ValidNoWarnings; "valid engagement quote")]
-#[test_case("engagementType:LIKE", TestExpectation::ValidNoWarnings; "valid engagement like")]
+#[test_case("engagementType:LIKE", TestExpectation::ErrorCode("E012"); "invalid engagement like")]
 fn test_engagement_type_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);

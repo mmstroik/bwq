@@ -229,9 +229,9 @@ impl ValidationRule for AuthorGenderFieldRule {
             } = value.as_ref()
             {
                 if !matches!(gender.as_str(), "F" | "M") {
-                    return ValidationResult::with_warning(LintWarning::PotentialTypo {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
-                        message: "Common gender values are 'F' or 'M'".to_string(),
+                        message: "authorGender must be 'F' or 'M'".to_string(),
                     });
                 }
             }
@@ -322,13 +322,12 @@ impl ValidationRule for EngagementTypeFieldRule {
                 ..
             } = value.as_ref()
             {
-                let common_types = [
-                    "COMMENT", "REPLY", "RETWEET", "QUOTE", "LIKE", "SHARE", "MENTION",
-                ];
-                if !common_types.contains(&engagement_type.as_str()) {
-                    return ValidationResult::with_warning(LintWarning::PotentialTypo {
+                let valid_types = ["COMMENT", "REPLY", "RETWEET", "QUOTE"];
+                if !valid_types.contains(&engagement_type.as_str()) {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
-                        message: "Common engagement types are 'COMMENT', 'REPLY', 'RETWEET', 'QUOTE', 'LIKE'".to_string(),
+                        message: "engagementType must be 'COMMENT', 'REPLY', 'RETWEET', or 'QUOTE'"
+                            .to_string(),
                     });
                 }
             }
@@ -443,7 +442,7 @@ impl ValidationRule for RangeFieldRule {
         {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
                 if start_num > end_num {
-                    return ValidationResult::with_error(LintError::RangeValidationError {
+                    return ValidationResult::with_error(LintError::InvalidFieldRange {
                         span: span.clone(),
                         message: "Range start value cannot be greater than end value".to_string(),
                     });

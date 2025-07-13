@@ -90,7 +90,7 @@ pub enum LintError {
     ProximityOperatorError { span: Span, message: String },
 
     #[error("Invalid field range: {message}")]
-    RangeValidationError { span: Span, message: String },
+    InvalidFieldRange { span: Span, message: String },
 
     #[error("{message}")]
     OperatorMixingError { span: Span, message: String },
@@ -118,7 +118,7 @@ impl LintError {
             | LintError::ExpectedToken { span, .. }
             | LintError::FieldValidationError { span, .. }
             | LintError::ProximityOperatorError { span, .. }
-            | LintError::RangeValidationError { span, .. }
+            | LintError::InvalidFieldRange { span, .. }
             | LintError::OperatorMixingError { span, .. }
             | LintError::PureNegativeQueryError { span, .. }
             | LintError::InvalidFieldOperatorSpacing { span, .. } => span,
@@ -140,7 +140,7 @@ impl LintError {
             LintError::ExpectedToken { .. } => "E011",
             LintError::FieldValidationError { .. } => "E012",
             LintError::ProximityOperatorError { .. } => "E013",
-            LintError::RangeValidationError { .. } => "E014",
+            LintError::InvalidFieldRange { .. } => "E014",
             LintError::OperatorMixingError { .. } => "E015",
             LintError::PureNegativeQueryError { .. } => "E016",
             LintError::InvalidFieldOperatorSpacing { .. } => "E017",
