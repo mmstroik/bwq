@@ -236,9 +236,9 @@ impl FileTestExpectation {
 #[test_case("apple OR orange", TestExpectation::ValidNoWarnings; "basic OR operation")]
 #[test_case("apple NOT bitter NOT sour", TestExpectation::ValidNoWarnings; "basic NOT operation")]
 #[test_case("(apple OR orange) AND juice", TestExpectation::ValidNoWarnings; "parenthesized boolean operations")]
-#[test_case("NOT bitter", TestExpectation::ErrorCode("E015"); "pure negative query error")]
+#[test_case("NOT bitter", TestExpectation::ErrorCode("E013"); "pure negative query error")]
 #[test_case("NOT term1 AND term2", TestExpectation::ValidNoWarnings; "leading NOT with AND")]
-#[test_case("NOT term1 NOT term2", TestExpectation::ErrorCode("E015"); "double NOT pure negative query error")]
+#[test_case("NOT term1 NOT term2", TestExpectation::ErrorCode("E013"); "double NOT pure negative query error")]
 fn test_basic_boolean_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -258,8 +258,8 @@ fn test_quoted_phrase_syntax(query: &str, expected: TestExpectation) {
 #[test_case("ab*", TestExpectation::ValidNoWarnings; "two character wildcard no warning")]
 #[test_case("#*test", TestExpectation::ValidWithWarning("W002"); "wildcard after hashtag prefix performance warning")]
 #[test_case("@*test", TestExpectation::ValidWithWarning("W002"); "wildcard after @ prefix performance warning")]
-#[test_case("*invalid", TestExpectation::ErrorCode("E006"); "invalid wildcard at beginning")]
-#[test_case("a*", TestExpectation::ErrorCode("E006"); "short wildcard matches too many unique terms")]
+#[test_case("*invalid", TestExpectation::ErrorCode("E004"); "invalid wildcard at beginning")]
+#[test_case("a*", TestExpectation::ErrorCode("E004"); "short wildcard matches too many unique terms")]
 #[test_case("t*est", TestExpectation::ValidNoWarnings; "wildcard in middle with characters after")]
 fn test_wildcard_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
@@ -327,10 +327,10 @@ fn test_special_character_syntax(query: &str, expected: TestExpectation) {
 }
 
 // Common invalid query patterns
-#[test_case("apple AND", TestExpectation::ErrorCode("E009"); "missing right operand")]
-#[test_case("OR juice", TestExpectation::ErrorCode("E009"); "missing left operand")]
-#[test_case("apple AND ()", TestExpectation::ErrorCode("E009"); "empty parentheses")]
-#[test_case("NOT bitter", TestExpectation::ErrorCode("E015"); "pure negative query")]
+#[test_case("apple AND", TestExpectation::ErrorCode("E007"); "missing right operand")]
+#[test_case("OR juice", TestExpectation::ErrorCode("E007"); "missing left operand")]
+#[test_case("apple AND ()", TestExpectation::ErrorCode("E007"); "empty parentheses")]
+#[test_case("NOT bitter", TestExpectation::ErrorCode("E013"); "pure negative query")]
 fn test_invalid_query_patterns(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -389,10 +389,10 @@ fn test_url_like_strings(query: &str, expected: TestExpectation) {
 #[test_case("rating:3", TestExpectation::ValidNoWarnings; "valid rating 3")]
 #[test_case("rating:0", TestExpectation::ValidNoWarnings; "valid rating 0")]
 #[test_case("rating:[2 TO 4]", TestExpectation::ValidNoWarnings; "valid rating range")]
-#[test_case("rating:6", TestExpectation::ErrorCode("E011"); "rating too high")]
-#[test_case("rating:[-1 TO 3]", TestExpectation::ErrorCode("E011"); "rating range with negative")]
-#[test_case("rating:[x TO y]", TestExpectation::ErrorCode("E011"); "invalid rating with literal letters")]
-#[test_case("rating:[1 to 5]", TestExpectation::ErrorCode("E010"); "invalid rating with lowercase to")]
+#[test_case("rating:6", TestExpectation::ErrorCode("E009"); "rating too high")]
+#[test_case("rating:[-1 TO 3]", TestExpectation::ErrorCode("E009"); "rating range with negative")]
+#[test_case("rating:[x TO y]", TestExpectation::ErrorCode("E009"); "invalid rating with literal letters")]
+#[test_case("rating:[1 to 5]", TestExpectation::ErrorCode("E008"); "invalid rating with lowercase to")]
 fn test_rating_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -401,9 +401,9 @@ fn test_rating_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("latitude:[40 TO 42]", TestExpectation::ValidNoWarnings; "valid latitude range")]
 #[test_case("longitude:[-73 TO -69]", TestExpectation::ValidNoWarnings; "valid longitude range")]
 #[test_case("continent:europe", TestExpectation::ValidNoWarnings; "valid continent")]
-#[test_case("latitude:[100 TO 110]", TestExpectation::ErrorCode("E011"); "latitude out of range")]
-#[test_case("longitude:[-200 TO -150]", TestExpectation::ErrorCode("E011"); "longitude out of range")]
-#[test_case("latitude:[x TO y]", TestExpectation::ErrorCode("E011"); "invalid latitude with literal letters")]
+#[test_case("latitude:[100 TO 110]", TestExpectation::ErrorCode("E009"); "latitude out of range")]
+#[test_case("longitude:[-200 TO -150]", TestExpectation::ErrorCode("E009"); "longitude out of range")]
+#[test_case("latitude:[x TO y]", TestExpectation::ErrorCode("E009"); "invalid latitude with literal letters")]
 fn test_coordinate_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -411,8 +411,8 @@ fn test_coordinate_field_validation(query: &str, expected: TestExpectation) {
 
 #[test_case("authorVerified:true", TestExpectation::ValidNoWarnings; "valid boolean true")]
 #[test_case("authorVerified:false", TestExpectation::ValidNoWarnings; "valid boolean false")]
-#[test_case("authorVerified:yes", TestExpectation::ErrorCode("E011"); "invalid boolean yes")]
-#[test_case("authorVerified:1", TestExpectation::ErrorCode("E011"); "invalid boolean number")]
+#[test_case("authorVerified:yes", TestExpectation::ErrorCode("E009"); "invalid boolean yes")]
+#[test_case("authorVerified:1", TestExpectation::ErrorCode("E009"); "invalid boolean number")]
 fn test_boolean_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -432,7 +432,7 @@ fn test_language_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("engagementType:REPLY", TestExpectation::ValidNoWarnings; "valid engagement reply")]
 #[test_case("engagementType:RETWEET", TestExpectation::ValidNoWarnings; "valid engagement retweet")]
 #[test_case("engagementType:QUOTE", TestExpectation::ValidNoWarnings; "valid engagement quote")]
-#[test_case("engagementType:LIKE", TestExpectation::ErrorCode("E011"); "invalid engagement like")]
+#[test_case("engagementType:LIKE", TestExpectation::ErrorCode("E009"); "invalid engagement like")]
 fn test_engagement_type_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -441,7 +441,7 @@ fn test_engagement_type_field_validation(query: &str, expected: TestExpectation)
 #[test_case("authorVerifiedType:blue", TestExpectation::ValidNoWarnings; "valid verified type blue")]
 #[test_case("authorVerifiedType:business", TestExpectation::ValidNoWarnings; "valid verified type business")]
 #[test_case("authorVerifiedType:government", TestExpectation::ValidNoWarnings; "valid verified type government")]
-#[test_case("authorVerifiedType:gold", TestExpectation::ErrorCode("E011"); "invalid verified type gold")]
+#[test_case("authorVerifiedType:gold", TestExpectation::ErrorCode("E009"); "invalid verified type gold")]
 fn test_verified_type_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -449,18 +449,18 @@ fn test_verified_type_field_validation(query: &str, expected: TestExpectation) {
 
 #[test_case("minuteOfDay:[0 TO 1439]", TestExpectation::ValidNoWarnings; "valid minute of day full range")]
 #[test_case("minuteOfDay:[720 TO 780]", TestExpectation::ValidNoWarnings; "valid minute of day noon to 1pm")]
-#[test_case("minuteOfDay:[-1 TO 100]", TestExpectation::ErrorCode("E011"); "minute of day with negative")]
-#[test_case("minuteOfDay:[0 TO 1440]", TestExpectation::ErrorCode("E011"); "minute of day over max")]
+#[test_case("minuteOfDay:[-1 TO 100]", TestExpectation::ErrorCode("E009"); "minute of day with negative")]
+#[test_case("minuteOfDay:[0 TO 1440]", TestExpectation::ErrorCode("E009"); "minute of day over max")]
 fn test_minute_of_day_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
 }
 
 #[test_case("authorFollowers:[0 TO 5000]", TestExpectation::ValidNoWarnings; "valid author followers full range")]
-#[test_case("authorFollowers:[-100 TO 10000]", TestExpectation::ErrorCode("E013"); "invalid author followers negative")]
-#[test_case("authorFollowers:[100000 TO 1000]", TestExpectation::ErrorCode("E013"); "invalid author followers start greater than end")]
-#[test_case("authorFollowers:[0 TO 10000000000]", TestExpectation::ErrorCode("E013"); "invalid author followers over max digits")]
-#[test_case("authorFollowers:[x TO y]", TestExpectation::ErrorCode("E011"); "invalid author followers with literal letters")]
+#[test_case("authorFollowers:[-100 TO 10000]", TestExpectation::ErrorCode("E011"); "invalid author followers negative")]
+#[test_case("authorFollowers:[100000 TO 1000]", TestExpectation::ErrorCode("E011"); "invalid author followers start greater than end")]
+#[test_case("authorFollowers:[0 TO 10000000000]", TestExpectation::ErrorCode("E011"); "invalid author followers over max digits")]
+#[test_case("authorFollowers:[x TO y]", TestExpectation::ErrorCode("E009"); "invalid author followers with literal letters")]
 fn test_author_followers_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -488,9 +488,9 @@ fn test_performance_edge_cases(query: &str, expected: TestExpectation) {
     expected.assert(&mut test, query);
 }
 
-#[test_case("", TestExpectation::ErrorCode("E009"); "empty query")]
-#[test_case("   ", TestExpectation::ErrorCode("E009"); "whitespace only query")]
-#[test_case("\n\t", TestExpectation::ErrorCode("E009"); "newline and tab only")]
+#[test_case("", TestExpectation::ErrorCode("E007"); "empty query")]
+#[test_case("   ", TestExpectation::ErrorCode("E007"); "whitespace only query")]
+#[test_case("\n\t", TestExpectation::ErrorCode("E007"); "newline and tab only")]
 fn test_empty_and_whitespace_queries(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -510,7 +510,7 @@ fn test_implicit_and_behavior() {
     test.assert_warning_code("apple banana", "W001");
 
     // Mixed implicit AND with OR should fail without parentheses
-    test.assert_error_code("apple banana OR cherry", "E014");
+    test.assert_error_code("apple banana OR cherry", "E012");
 
     // Properly parenthesized implicit AND should be valid
     test.assert_valid("(apple banana) OR cherry");
@@ -543,9 +543,9 @@ fn test_operators_on_groupings() {
     );
 }
 
-#[test_case("apple OR banana AND juice", TestExpectation::ErrorCode("E014"); "mixed OR AND without parentheses")]
-#[test_case("apple AND banana OR juice AND smoothie", TestExpectation::ErrorCode("E014"); "mixed AND OR without parentheses")]
-#[test_case("apple NOT bitter AND sweet OR sour", TestExpectation::ErrorCode("E014"); "mixed NOT AND OR without parentheses")]
+#[test_case("apple OR banana AND juice", TestExpectation::ErrorCode("E012"); "mixed OR AND without parentheses")]
+#[test_case("apple AND banana OR juice AND smoothie", TestExpectation::ErrorCode("E012"); "mixed AND OR without parentheses")]
+#[test_case("apple NOT bitter AND sweet OR sour", TestExpectation::ErrorCode("E012"); "mixed NOT AND OR without parentheses")]
 #[test_case("(apple OR banana) AND juice", TestExpectation::ValidNoWarnings; "properly parenthesized OR AND")]
 #[test_case("(apple AND banana) OR (juice AND smoothie)", TestExpectation::ValidNoWarnings; "properly parenthesized AND OR")]
 #[test_case("apple NOT (bitter AND sweet) OR sour", TestExpectation::ValidNoWarnings; "properly parenthesized NOT AND OR")]
@@ -564,7 +564,7 @@ fn test_near_operator_interaction_validation() {
     ];
 
     for query in mixed_near_boolean_cases {
-        test.assert_error_code(query, "E012");
+        test.assert_error_code(query, "E010");
     }
     // proper parentheses
     let valid_near_cases = vec![
@@ -591,7 +591,7 @@ fn test_near_operator_interaction_validation() {
 #[test_case("resources/test/fixtures/valid/complex_near.bwq", FileTestExpectation::ValidNoWarnings; "complex NEAR operations")]
 #[test_case("resources/test/fixtures/valid/field_operations.bwq", FileTestExpectation::ValidNoWarnings; "field operations")]
 #[test_case("resources/test/fixtures/valid/comments_and_wildcards.bwq", FileTestExpectation::ValidNoWarnings; "comments and wildcards")]
-#[test_case("resources/test/fixtures/invalid/invalid_mixed_operators.bwq", FileTestExpectation::ErrorCode("E014"); "invalid mixed operators")]
+#[test_case("resources/test/fixtures/invalid/invalid_mixed_operators.bwq", FileTestExpectation::ErrorCode("E012"); "invalid mixed operators")]
 fn test_fixture_files(file_path: &str, expected: FileTestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, file_path);

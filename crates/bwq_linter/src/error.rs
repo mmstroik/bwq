@@ -54,13 +54,6 @@ pub enum LintError {
     #[error("{message}")]
     ValidationError { span: Span, message: String },
 
-    #[error("Boolean operator '{operator}' must be capitalized")]
-    InvalidBooleanCase { span: Span, operator: String },
-
-    #[error("Unbalanced parentheses")]
-    // TODO: this is currently not used - reserving for more specific error code
-    UnbalancedParentheses { span: Span },
-
     #[error("Invalid wildcard placement: {message}")]
     InvalidWildcardPlacement { span: Span, message: String },
 
@@ -102,8 +95,6 @@ impl LintError {
             LintError::LexerError { span, .. }
             | LintError::ParserError { span, .. }
             | LintError::ValidationError { span, .. }
-            | LintError::InvalidBooleanCase { span, .. }
-            | LintError::UnbalancedParentheses { span }
             | LintError::InvalidWildcardPlacement { span, .. }
             | LintError::InvalidProximityOperator { span, .. }
             | LintError::InvalidFieldOperator { span, .. }
@@ -122,18 +113,16 @@ impl LintError {
             LintError::LexerError { .. } => "E001",
             LintError::ParserError { .. } => "E002",
             LintError::ValidationError { .. } => "E003",
-            LintError::InvalidBooleanCase { .. } => "E004",
-            LintError::UnbalancedParentheses { .. } => "E005",
-            LintError::InvalidWildcardPlacement { .. } => "E006",
-            LintError::InvalidProximityOperator { .. } => "E007",
-            LintError::InvalidFieldOperator { .. } => "E008",
-            LintError::UnexpectedToken { .. } => "E009",
-            LintError::ExpectedToken { .. } => "E010",
-            LintError::FieldValidationError { .. } => "E011",
-            LintError::ProximityOperatorError { .. } => "E012",
-            LintError::InvalidFieldRange { .. } => "E013",
-            LintError::OperatorMixingError { .. } => "E014",
-            LintError::PureNegativeQueryError { .. } => "E015",
+            LintError::InvalidWildcardPlacement { .. } => "E004",
+            LintError::InvalidProximityOperator { .. } => "E005",
+            LintError::InvalidFieldOperator { .. } => "E006",
+            LintError::UnexpectedToken { .. } => "E007",
+            LintError::ExpectedToken { .. } => "E008",
+            LintError::FieldValidationError { .. } => "E009",
+            LintError::ProximityOperatorError { .. } => "E010",
+            LintError::InvalidFieldRange { .. } => "E011",
+            LintError::OperatorMixingError { .. } => "E012",
+            LintError::PureNegativeQueryError { .. } => "E013",
         }
     }
 
