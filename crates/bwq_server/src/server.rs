@@ -176,10 +176,6 @@ impl Server {
     fn handle_did_open(&mut self, params: DidOpenTextDocumentParams) -> Result<()> {
         let doc = params.text_document;
 
-        if !is_bwq_file(&doc.uri) {
-            return Ok(());
-        }
-
         let document_state = DocumentState {
             content: doc.text.clone(),
             version: doc.version,
@@ -194,10 +190,6 @@ impl Server {
 
     fn handle_did_change(&mut self, params: DidChangeTextDocumentParams) -> Result<()> {
         let uri = params.text_document.uri;
-
-        if !is_bwq_file(&uri) {
-            return Ok(());
-        }
 
         if let Some(document) = self.documents.get_mut(&uri) {
             if let Some(change) = params.content_changes.into_iter().next() {
@@ -273,7 +265,3 @@ impl Server {
     }
 }
 
-fn is_bwq_file(uri: &Uri) -> bool {
-    let path = uri.path().as_str();
-    path.ends_with(".bwq") || path.ends_with(".txt")
-}
