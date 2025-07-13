@@ -75,6 +75,11 @@
           ],
           "default": "off",
           "description": "Traces the communication between VS Code and the language server."
+        },
+        "bwq.wikidata.enableHover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable WikiData entity hover information for entityId fields"
         }
       }
     }

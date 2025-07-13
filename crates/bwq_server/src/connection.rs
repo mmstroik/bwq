@@ -1,7 +1,8 @@
 use anyhow::Result;
 use lsp_server::{self as lsp, Connection};
 use lsp_types::{
-    InitializeParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    HoverProviderCapability, InitializeParams, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind,
 };
 
 pub(crate) struct ConnectionInitializer {
@@ -40,9 +41,14 @@ impl ConnectionInitializer {
     }
 }
 
-pub(crate) fn server_capabilities() -> ServerCapabilities {
+pub(crate) fn server_capabilities(enable_hover: bool) -> ServerCapabilities {
     ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        hover_provider: if enable_hover {
+            Some(HoverProviderCapability::Simple(true))
+        } else {
+            None
+        },
         ..Default::default()
     }
 }

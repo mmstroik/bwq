@@ -62,6 +62,9 @@ export async function activate(
           { scheme: "untitled", language: "bwq" },
         ],
         outputChannel: outputChannel,
+        initializationOptions: {
+          wikidataHoverEnabled: config.get<boolean>("wikidata.enableHover", true),
+        },
       };
 
       client = new LanguageClient(
@@ -130,7 +133,8 @@ export async function activate(
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (
         event.affectsConfiguration("bwq.serverPath") ||
-        event.affectsConfiguration("bwq.trace.server")
+        event.affectsConfiguration("bwq.trace.server") ||
+        event.affectsConfiguration("bwq.wikidata.enableHover")
       ) {
         vscode.window
           .showInformationMessage(

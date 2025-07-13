@@ -4,6 +4,7 @@ mod request_queue;
 mod server;
 pub mod task;
 mod utils;
+mod wikidata;
 
 use crate::connection::ConnectionInitializer;
 use crate::server::Server;

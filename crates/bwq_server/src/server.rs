@@ -5,18 +5,20 @@ use anyhow::Result;
 use crossbeam_channel::Receiver;
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    PublishDiagnosticsParams, Uri,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover,
+    HoverContents, HoverParams, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams,
+    Range, Uri,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
         Notification as NotificationTrait, PublishDiagnostics,
     },
-    request::{Initialize, Request as RequestTrait, Shutdown},
+    request::{HoverRequest, Initialize, Request as RequestTrait, Shutdown},
 };
 
 use crate::connection::{ConnectionInitializer, server_capabilities};
 use crate::request_queue::RequestQueue;
 use crate::task::{TaskExecutor, TaskResponse};
+use crate::wikidata::{EntityInfo, WikiDataClient};
 
 pub struct Server {
     connection: Connection,
@@ -24,6 +26,7 @@ pub struct Server {
     request_queue: RequestQueue,
     task_executor: TaskExecutor,
     task_response_receiver: Receiver<TaskResponse>,
+    hover_enabled: bool,
 }
 #[derive(Debug, Clone)]
 struct DocumentState {
@@ -35,9 +38,17 @@ impl Server {
         worker_threads: NonZeroUsize,
         connection_initializer: ConnectionInitializer,
     ) -> Result<Self> {
-        let (id, _init_params) = connection_initializer.initialize_start()?;
+        let (id, init_params) = connection_initializer.initialize_start()?;
 
-        let capabilities = server_capabilities();
+        // Extract WikiData hover setting from initialization options
+        let enable_hover = init_params
+            .initialization_options
+            .as_ref()
+            .and_then(|opts| opts.get("wikidataHoverEnabled"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true); // Default to enabled
+
+        let capabilities = server_capabilities(enable_hover);
 
         let connection = connection_initializer.initialize_finish(
             id,
@@ -55,6 +66,7 @@ impl Server {
             request_queue: RequestQueue::new(),
             task_executor,
             task_response_receiver,
+            hover_enabled: enable_hover,
         })
     }
 
@@ -120,6 +132,9 @@ impl Server {
                         Ok(TaskResponse::Diagnostics(params)) => {
                             self.send_diagnostics(params)?;
                         }
+                        Ok(TaskResponse::EntityInfo { request_id, entity_info }) => {
+                            self.send_entity_info_response(request_id, entity_info)?;
+                        }
                         Err(_) => {
                             tracing::info!("Task response channel closed - exiting");
                             break;
@@ -137,6 +152,9 @@ impl Server {
         match req.method.as_str() {
             <Initialize as RequestTrait>::METHOD => {}
             <Shutdown as RequestTrait>::METHOD => {}
+            <HoverRequest as RequestTrait>::METHOD => {
+                self.handle_hover_request(req)?;
+            }
             _ => {
                 let response = Response::new_err(
                     req.id,
@@ -262,5 +280,180 @@ impl Server {
         }
 
         Ok(())
+    }
+
+    fn handle_hover_request(&mut self, req: Request) -> Result<()> {
+        if !self.hover_enabled {
+            let response = Response::new_ok(req.id, serde_json::Value::Null);
+            self.connection.sender.send(Message::Response(response))?;
+            return Ok(());
+        }
+
+        let params: HoverParams = match serde_json::from_value(req.params) {
+            Ok(params) => params,
+            Err(e) => {
+                let response = Response::new_err(
+                    req.id,
+                    lsp_server::ErrorCode::InvalidParams as i32,
+                    format!("Invalid hover params: {e}"),
+                );
+                self.connection.sender.send(Message::Response(response))?;
+                return Ok(());
+            }
+        };
+
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let document_content = match self.documents.get(&uri) {
+            Some(doc) => &doc.content,
+            None => {
+                let response = Response::new_ok(req.id, serde_json::Value::Null);
+                self.connection.sender.send(Message::Response(response))?;
+                return Ok(());
+            }
+        };
+
+        let byte_position = self.lsp_position_to_byte_position(document_content, position);
+
+        if let Some(entity_id) =
+            WikiDataClient::extract_entity_id_from_text(document_content, byte_position)
+        {
+            self.task_executor
+                .schedule_entity_lookup(req.id, entity_id)?;
+        } else {
+            let response = Response::new_ok(req.id, serde_json::Value::Null);
+            self.connection.sender.send(Message::Response(response))?;
+        }
+
+        Ok(())
+    }
+
+    fn send_entity_info_response(
+        &mut self,
+        request_id: lsp_server::RequestId,
+        entity_info: Option<EntityInfo>,
+    ) -> Result<()> {
+        let response = match entity_info {
+            Some(info) => {
+                let hover_content = format!(
+                    "**{}** ({})\n\n{}\n\n[View on WikiData]({})",
+                    info.label,
+                    info.id,
+                    info.description
+                        .unwrap_or_else(|| "No description available.".to_string()),
+                    info.url
+                );
+
+                let hover = Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: hover_content,
+                    }),
+                    range: None, // We'll simplify this for now
+                };
+
+                Response::new_ok(request_id, serde_json::to_value(hover)?)
+            }
+            None => Response::new_ok(request_id, serde_json::Value::Null),
+        };
+
+        self.connection.sender.send(Message::Response(response))?;
+        Ok(())
+    }
+
+    fn lsp_position_to_byte_position(&self, text: &str, position: Position) -> usize {
+        let line_offset = position.line as usize;
+        let char_offset = position.character as usize;
+
+        let lines: Vec<&str> = text.lines().collect();
+        if line_offset >= lines.len() {
+            return text.len();
+        }
+
+        let line = lines[line_offset];
+        if char_offset > line.len() {
+            let mut byte_position = 0;
+            for (i, line) in lines.iter().enumerate() {
+                if i == line_offset {
+                    byte_position += line.len();
+                    break;
+                }
+                byte_position += line.len() + 1; // +1 for newline
+            }
+            return byte_position;
+        }
+
+        // Calculate byte position in the document
+        let mut byte_position = 0;
+        for (i, line) in lines.iter().enumerate() {
+            if i == line_offset {
+                byte_position += char_offset;
+                break;
+            }
+            byte_position += line.len() + 1; // +1 for newline
+        }
+
+        byte_position
+    }
+
+    fn calculate_entity_id_range(&self, text: &str, position: usize, entity_id: &str) -> Range {
+        // Find the entityId: field around the position
+        let start = position.saturating_sub(20);
+        let end = (position + 20).min(text.len());
+        let search_text = &text[start..end];
+
+        for (i, _) in search_text.match_indices("entityId:") {
+            let field_start = start + i;
+            let value_start = field_start + 9;
+            let value_end = value_start + entity_id.len();
+
+            if value_start <= position && position <= value_end {
+                // Convert byte positions back to line/character positions
+                let start_pos = self.byte_position_to_lsp_position(text, field_start);
+                let end_pos = self.byte_position_to_lsp_position(text, value_end);
+
+                return Range {
+                    start: start_pos,
+                    end: end_pos,
+                };
+            }
+        }
+
+        // Fallback to single character range
+        let pos = self.byte_position_to_lsp_position(text, position);
+        Range {
+            start: pos,
+            end: Position {
+                line: pos.line,
+                character: pos.character + 1,
+            },
+        }
+    }
+
+    fn byte_position_to_lsp_position(&self, text: &str, byte_position: usize) -> Position {
+        let mut line = 0;
+        let mut character = 0;
+        let mut current_byte = 0;
+
+        for ch in text.chars() {
+            if current_byte >= byte_position {
+                break;
+            }
+
+            if ch == '\n' {
+                line += 1;
+                character = 0;
+            } else {
+                character += 1;
+            }
+
+            current_byte += ch.len_utf8();
+        }
+
+        Position {
+            line: line as u32,
+            character: character as u32,
+        }
     }
 }
