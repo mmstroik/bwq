@@ -128,6 +128,7 @@ pub enum FieldType {
     SubredditTopics,
     TopLevelDomain,
     WeblogTitle,
+    EntityId,
 }
 
 impl FieldType {
@@ -178,6 +179,7 @@ impl FieldType {
             "subreddittopics" => Some(Self::SubredditTopics),
             "topleveldomain" => Some(Self::TopLevelDomain),
             "weblogtitle" => Some(Self::WeblogTitle),
+            "entityid" => Some(Self::EntityId),
             _ => None,
         }
     }
@@ -229,6 +231,7 @@ impl FieldType {
             Self::SubredditTopics => "subredditTopics",
             Self::TopLevelDomain => "topLevelDomain",
             Self::WeblogTitle => "weblogTitle",
+            Self::EntityId => "entityId",
         }
     }
 }
