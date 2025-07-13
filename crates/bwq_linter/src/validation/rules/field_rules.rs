@@ -619,7 +619,7 @@ impl ValidationRule for EntityIdFieldRule {
                 }
 
                 // Should not be empty or start with 0 (WikiData IDs don't start with 0)
-                if entity_id.is_empty() || (entity_id.len() > 1 && entity_id.starts_with('0')) {
+                if entity_id.is_empty() || entity_id.starts_with('0') {
                     return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
                         message: "entityId must be a valid positive number (WikiData IDs don't start with 0)".to_string(),

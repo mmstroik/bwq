@@ -492,6 +492,7 @@ fn test_guid_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("entityId:123abc", TestExpectation::ErrorCode("E009"); "entityId should not contain letters")]
 #[test_case("entityId:123-456", TestExpectation::ErrorCode("E009"); "entityId should not contain dashes")]
 #[test_case("entityId:123_456", TestExpectation::ErrorCode("E009"); "entityId should not contain underscores")]
+#[test_case("entityId:0", TestExpectation::ErrorCode("E009"); "entityId should not be 0")]
 #[test_case("entityId:0123", TestExpectation::ErrorCode("E009"); "entityId should not start with 0")]
 fn test_entity_id_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
