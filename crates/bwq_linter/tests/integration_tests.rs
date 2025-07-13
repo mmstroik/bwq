@@ -577,6 +577,21 @@ fn test_near_operator_interaction_validation() {
     for query in mixed_near_boolean_cases {
         test.assert_error_code(query, "E010");
     }
+
+    // Test AND within NEAR operands (should fail)
+    let near_with_and_cases = vec![
+        "(test AND test) NEAR/5 (test)",
+        "(apple AND juice) NEAR/3 drink",
+        "test NEAR/5 (apple AND orange)",
+        "(foo AND bar) NEAR/2 (baz AND qux)",
+        "((term1 AND term2) OR term3) NEAR/5 test",
+        "(term1 OR (term2 AND term3)) NEAR/5 test",
+    ];
+
+    for query in near_with_and_cases {
+        test.assert_error_code(query, "E010");
+    }
+
     // proper parentheses
     let valid_near_cases = vec![
         "((apple OR orange) NEAR/5 (juice OR drink)) AND fresh",
