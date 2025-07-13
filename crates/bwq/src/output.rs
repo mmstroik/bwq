@@ -6,7 +6,7 @@ use bwq_linter::{
 };
 
 #[derive(Debug)]
-struct ContextWindow {
+struct LineContextWindow {
     start_line: usize,
     end_line: usize,
 }
@@ -77,6 +77,104 @@ impl From<&str> for OutputFormat {
             _ => OutputFormat::Text,
         }
     }
+}
+
+/// Display width calculation utilities
+mod width_utils {
+    use unicode_width::UnicodeWidthChar;
+
+    /// Calculate the display width of a character, handling tabs and Unicode properly
+    pub fn char_width(c: char) -> usize {
+        if c == '\t' {
+            4
+        } else {
+            UnicodeWidthChar::width(c).unwrap_or(0)
+        }
+    }
+
+    /// Calculate the display width of a string
+    pub fn str_width(s: &str) -> usize {
+        s.chars().map(char_width).sum()
+    }
+}
+
+use width_utils::{char_width, str_width};
+
+#[derive(Debug)]
+struct ContextWindow {
+    start_char: usize,
+    end_char: usize,
+}
+
+/// Find the optimal context window around an error span for truncation
+fn find_context_window(
+    chars: &[char],
+    span_start: usize,
+    span_end: usize,
+    span_width: usize,
+    available_width: usize,
+) -> ContextWindow {
+    let remaining_width = available_width - span_width;
+    let context_width_per_side = remaining_width / 2;
+
+    // Find how many characters we can include before the span
+    let mut before_width = 0;
+    let mut window_start = span_start;
+
+    for i in (0..span_start).rev() {
+        let ch_width = char_width(chars[i]);
+        if before_width + ch_width > context_width_per_side {
+            break;
+        }
+        before_width += ch_width;
+        window_start = i;
+    }
+
+    // Find how many characters we can include after the span
+    let mut after_width = 0;
+    let mut window_end = span_end;
+
+    for (offset, &ch) in chars.iter().enumerate().skip(span_end) {
+        let ch_width = char_width(ch);
+        if after_width + ch_width > context_width_per_side {
+            break;
+        }
+        after_width += ch_width;
+        window_end = offset + 1;
+    }
+
+    ContextWindow {
+        start_char: window_start,
+        end_char: window_end,
+    }
+}
+
+/// Build the truncated display string with ellipses
+fn build_truncated_display(
+    chars: &[char],
+    window: ContextWindow,
+    ellipsis: &str,
+) -> (String, usize) {
+    let mut result = String::new();
+
+    // Add left ellipsis if needed and determine character offset
+    let char_offset = if window.start_char > 0 {
+        result.push_str(ellipsis);
+        window.start_char
+    } else {
+        0
+    };
+
+    for &ch in &chars[window.start_char..window.end_char] {
+        result.push(ch);
+    }
+
+    // Add right ellipsis if needed
+    if window.end_char < chars.len() {
+        result.push_str(ellipsis);
+    }
+
+    (result, char_offset)
 }
 
 impl Printer {
@@ -160,7 +258,7 @@ impl Printer {
 
         let style = UnderlineStyle {
             underline_char: '^',
-            pipe_indent: String::new(), // Will be calculated in the function
+            pipe_indent: String::new(),
             color_start: "\x1b[1;31m".to_string(),
             color_end: "\x1b[0m".to_string(),
         };
@@ -191,7 +289,7 @@ impl Printer {
 
         let style = UnderlineStyle {
             underline_char: '^',
-            pipe_indent: String::new(), // Will be calculated in the function
+            pipe_indent: String::new(),
             color_start: "\x1b[1;33m".to_string(),
             color_end: "\x1b[0m".to_string(),
         };
@@ -214,9 +312,8 @@ impl Printer {
             return;
         }
 
-        // Determine context window
-        let max_chars_per_context = 200; // Max chars to show per context line
-        let max_total_context_chars = 800; // Max total chars in entire display
+        let max_chars_per_context = 200;
+        let max_total_context_chars = 800;
 
         let context_result = self.calculate_context_window(
             &lines,
@@ -226,12 +323,10 @@ impl Printer {
             max_total_context_chars,
         );
 
-        // Calculate the width needed for line numbers
         let max_line_num = context_result.end_line + 1; // Convert to 1-based
         let line_num_width = max_line_num.to_string().len();
         style.pipe_indent = " ".repeat(line_num_width); // Align with line number column
 
-        // Print context lines with line numbers
         println!("{} |", style.pipe_indent);
 
         let mut current_chars = 0;
@@ -243,10 +338,8 @@ impl Printer {
             let line = lines[line_idx];
             let line_num = line_idx + 1; // Convert back to 1-based
 
-            // Check if this line contains the error
             let is_error_line = line_idx >= start_line_idx && line_idx <= end_line_idx;
 
-            // Truncate line if too long
             let display_line = if line.len() > max_chars_per_context {
                 self.truncate_line_for_span(
                     line,
@@ -268,7 +361,6 @@ impl Printer {
                 width = line_num_width
             );
 
-            // Print underline if this is an error line
             if is_error_line {
                 self.print_underline_for_line(
                     line_idx,
@@ -296,7 +388,7 @@ impl Printer {
         end_line_idx: usize,
         max_chars_per_line: usize,
         max_total_chars: usize,
-    ) -> ContextWindow {
+    ) -> LineContextWindow {
         let mut start_line = start_line_idx;
         let mut end_line = end_line_idx;
 
@@ -341,7 +433,7 @@ impl Printer {
             }
         }
 
-        ContextWindow {
+        LineContextWindow {
             start_line,
             end_line,
         }
@@ -351,63 +443,106 @@ impl Printer {
         &self,
         line: &str,
         span_cols: Option<(usize, usize)>,
-        max_chars: usize,
+        max_width: usize,
     ) -> (String, usize) {
-        if line.len() <= max_chars {
+        let line_width = str_width(line);
+        if line_width <= max_width {
             return (line.to_string(), 0);
         }
 
         let ellipsis = "…";
-        let available_chars = max_chars - (ellipsis.len() * 2); // Reserve space for ellipsis on both sides
+        let ellipsis_width = str_width(ellipsis);
+
+        // Prevent integer underflow - need at least space for two ellipses plus one character
+        if max_width < ellipsis_width * 2 + 1 {
+            // If max_width is too small, just return the ellipsis
+            return (ellipsis.to_string(), 0);
+        }
+
+        let available_width = max_width.saturating_sub(ellipsis_width * 2);
+        let chars: Vec<char> = line.chars().collect();
 
         if let Some((start_col, end_col)) = span_cols {
-            // Center around the error span
-            let span_start = start_col.saturating_sub(1); // Convert to 0-based
-            let span_end = end_col.saturating_sub(1).min(line.len());
-            let span_len = span_end.saturating_sub(span_start);
+            // Convert to 0-based character indices
+            let span_start_char = start_col.saturating_sub(1);
+            let span_end_char = end_col.saturating_sub(1);
 
-            // If the span itself is too long, just show the span
-            if span_len >= available_chars {
-                let truncated = line
-                    .chars()
-                    .skip(span_start)
-                    .take(available_chars)
-                    .collect::<String>();
-                return (format!("{ellipsis}{truncated}…"), span_start);
+            let span_start_char = span_start_char.min(chars.len());
+            let span_end_char = span_end_char.min(chars.len());
+
+            let span_width: usize = chars[span_start_char..span_end_char]
+                .iter()
+                .map(|&c| char_width(c))
+                .sum();
+
+            // If the span itself is too wide, just show what we can of the span
+            if span_width >= available_width {
+                return self.truncate_span_only(
+                    &chars,
+                    span_start_char,
+                    span_end_char,
+                    available_width,
+                    ellipsis,
+                );
             }
 
-            // Try to center around the span
-            let context_per_side = (available_chars - span_len) / 2;
-            let window_start = span_start.saturating_sub(context_per_side);
-            let window_end = (span_end + context_per_side).min(line.len());
-
-            let mut result = String::new();
-            let mut actual_start = window_start;
-
-            if window_start > 0 {
-                result.push_str(ellipsis);
-            } else {
-                actual_start = 0;
-            }
-
-            result.push_str(
-                &line
-                    .chars()
-                    .skip(window_start)
-                    .take(window_end - window_start)
-                    .collect::<String>(),
+            let window = find_context_window(
+                &chars,
+                span_start_char,
+                span_end_char,
+                span_width,
+                available_width,
             );
 
-            if window_end < line.len() {
-                result.push_str(ellipsis);
-            }
-
-            (result, actual_start)
+            build_truncated_display(&chars, window, ellipsis)
         } else {
             // No specific span, just truncate from the beginning
-            let truncated = line.chars().take(available_chars).collect::<String>();
-            (format!("{truncated}…"), 0)
+            self.truncate_from_start(&chars, available_width, ellipsis)
         }
+    }
+
+    fn truncate_span_only(
+        &self,
+        chars: &[char],
+        span_start: usize,
+        span_end: usize,
+        available_width: usize,
+        ellipsis: &str,
+    ) -> (String, usize) {
+        let mut result_width = 0;
+        let mut truncated = String::new();
+
+        for &ch in &chars[span_start..span_end] {
+            let ch_width = char_width(ch);
+            if result_width + ch_width > available_width {
+                break;
+            }
+            result_width += ch_width;
+            truncated.push(ch);
+        }
+
+        (format!("{ellipsis}{truncated}{ellipsis}"), span_start)
+    }
+
+    fn truncate_from_start(
+        &self,
+        chars: &[char],
+        available_width: usize,
+        ellipsis: &str,
+    ) -> (String, usize) {
+        let mut result_width = 0;
+        let mut truncated = String::new();
+
+        for &ch in chars {
+            let ch_width = char_width(ch);
+            if result_width + ch_width > available_width {
+                break;
+            }
+            result_width += ch_width;
+            truncated.push(ch);
+        }
+
+        (format!("{truncated}{ellipsis}"), 0)
     }
 
     fn print_underline_for_line(
@@ -415,7 +550,7 @@ impl Printer {
         line_idx: usize,
         span: &bwq_linter::error::Span,
         display_line: &str,
-        start_offset: usize,
+        char_offset: usize,
         style: &UnderlineStyle,
     ) {
         let start_line_idx = span.start.line.saturating_sub(1);
@@ -425,44 +560,54 @@ impl Printer {
             return;
         }
 
-        // Calculate column positions (convert from 1-based to 0-based)
-        let line_start_col = if line_idx == start_line_idx {
+        // Convert display line to character vector for easier manipulation
+        let display_chars: Vec<char> = display_line.chars().collect();
+
+        // Calculate column positions (convert from 1-based to 0-based character indices)
+        let line_start_char = if line_idx == start_line_idx {
             span.start.column.saturating_sub(1)
         } else {
             0
         };
 
-        let line_end_col = if line_idx == end_line_idx {
+        let line_end_char = if line_idx == end_line_idx {
             span.end.column.saturating_sub(1)
         } else {
-            display_line.chars().count()
+            // For multiline spans, underline to the end of the visible line
+            display_chars.len()
         };
 
-        // Adjust for truncation offset
-        let display_start_col = line_start_col.saturating_sub(start_offset);
-        let display_end_col = line_end_col.saturating_sub(start_offset);
+        // Adjust for truncation - char_offset is how many characters were removed from the left
+        let display_start_char = line_start_char.saturating_sub(char_offset);
+        let display_end_char = line_end_char.saturating_sub(char_offset);
 
-        if display_start_col >= display_line.chars().count() {
+        // Check if the span is visible in the truncated line
+        if display_start_char >= display_chars.len() {
             return;
         }
 
-        let actual_end_col = display_end_col.min(display_line.chars().count());
+        let actual_end_char = display_end_char.min(display_chars.len());
 
-        if actual_end_col <= display_start_col {
+        if actual_end_char <= display_start_char {
             return;
         }
 
-        // Build underline string
         let mut underline = String::new();
 
-        // Add spaces before the underline
-        for _ in 0..display_start_col {
-            underline.push(' ');
+        // Add spaces for characters before the underline
+        for &ch in &display_chars[0..display_start_char] {
+            let ch_width = char_width(ch);
+            for _ in 0..ch_width {
+                underline.push(' ');
+            }
         }
 
-        // Add underline characters
-        for _ in display_start_col..actual_end_col {
-            underline.push(style.underline_char);
+        // Add underline characters for the span
+        for &ch in &display_chars[display_start_char..actual_end_char] {
+            let ch_width = char_width(ch);
+            for _ in 0..ch_width {
+                underline.push(style.underline_char);
+            }
         }
 
         if !underline.trim().is_empty() {
@@ -493,13 +638,11 @@ impl Printer {
     fn print_file_results_text(&self, results: &FileResults) {
         for (file_path, analysis, query) in &results.successful {
             if !analysis.is_valid || (self.show_warnings && !analysis.warnings.is_empty()) {
-                // Print errors with file context
                 for error in &analysis.errors {
                     self.print_error_with_context(query, error, Some(file_path));
                     println!();
                 }
 
-                // Print warnings with file context
                 if self.show_warnings {
                     for warning in &analysis.warnings {
                         self.print_warning_with_context(query, warning, Some(file_path));
