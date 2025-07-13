@@ -332,6 +332,7 @@ fn test_special_character_syntax(query: &str, expected: TestExpectation) {
 #[test_case("OR juice", TestExpectation::ErrorCode("E007"); "missing left operand")]
 #[test_case("apple AND ()", TestExpectation::ErrorCode("E007"); "empty parentheses")]
 #[test_case("NOT bitter", TestExpectation::ErrorCode("E013"); "pure negative query")]
+#[test_case("(apple", TestExpectation::ErrorCode("E001"); "unterminated parentheses")]
 fn test_invalid_query_patterns(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
