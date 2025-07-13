@@ -456,3 +456,55 @@ impl ValidationRule for RangeFieldRule {
         matches!(expr, Expression::Range { .. })
     }
 }
+
+pub struct FollowerCountFieldRule;
+
+impl ValidationRule for FollowerCountFieldRule {
+    fn name(&self) -> &'static str {
+        "follower-count-field"
+    }
+
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        if let Expression::Range {
+            field: Some(FieldType::AuthorFollowers),
+            start,
+            end,
+            span,
+        } = expr
+        {
+            if let (Ok(start_num), Ok(end_num)) = (start.parse::<i64>(), end.parse::<i64>()) {
+                let mut result = ValidationResult::new();
+
+                if start_num < 0 || end_num < 0 {
+                    result.errors.push(LintError::InvalidFieldRange {
+                        span: span.clone(),
+                        message: "Follower counts cannot be negative".to_string(),
+                    });
+                }
+
+                if end_num.to_string().len() > 10 {
+                    result.errors.push(LintError::InvalidFieldRange {
+                        span: span.clone(),
+                        message: "Follower counts cannot exceed 10 digits".to_string(),
+                    });
+                }
+
+                result
+            } else {
+                ValidationResult::new()
+            }
+        } else {
+            ValidationResult::new()
+        }
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::Range {
+                field: Some(FieldType::AuthorFollowers),
+                ..
+            }
+        )
+    }
+}

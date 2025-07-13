@@ -33,7 +33,7 @@ impl Parser {
                     comment_start_span = None;
                 }
                 TokenType::Eof if inside_comment => {
-                    return Err(LintError::ValidationError {
+                    return Err(LintError::ParserError {
                         span: comment_start_span.unwrap(),
                         message: "Please add a >>> mark to close this commented text.".to_string(),
                     });
@@ -179,7 +179,7 @@ impl Parser {
             let distance;
 
             if left.span().end.offset != tilde_span.start.offset {
-                return Err(LintError::ValidationError {
+                return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator must be immediately attached to the preceding term (e.g., apple~5, not apple ~5).".to_string(),
                 });
@@ -192,7 +192,7 @@ impl Parser {
                     distance = num_str.parse::<u32>().ok();
                     self.advance();
                     if distance.is_none() {
-                        return Err(LintError::ValidationError {
+                        return Err(LintError::ParserError {
                             span: tilde_span,
                             message:
                                 "Invalid proximity distance. Distance must be a positive number."
@@ -200,13 +200,13 @@ impl Parser {
                         });
                     }
                 } else {
-                    return Err(LintError::ValidationError {
+                    return Err(LintError::ParserError {
                         span: tilde_span,
                         message: "The ~ operator requires a distance number immediately after it (e.g., ~5 for proximity within 5 words).".to_string(),
                     });
                 }
             } else {
-                return Err(LintError::ValidationError {
+                return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator requires a distance number (e.g., ~5 for proximity within 5 words).".to_string(),
                 });
@@ -217,7 +217,7 @@ impl Parser {
                 matches!(&left, Expression::Term { .. } | Expression::Group { .. });
 
             if !is_valid_tilde_context {
-                return Err(LintError::ValidationError {
+                return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator should be used after a search term, quoted phrase, or grouped expression. If this should be part of a search term, it must be quoted (or escaped using the \\ character).".to_string(),
                 });

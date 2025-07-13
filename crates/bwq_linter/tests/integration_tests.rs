@@ -284,11 +284,11 @@ fn test_near_proximity_operator_syntax(query: &str, expected: TestExpectation) {
 #[test_case("apple~5", TestExpectation::ValidWithWarning("W001"); "single term with tilde warning")]
 #[test_case("\"apple\"~5", TestExpectation::ValidWithWarning("W001"); "single quoted word with tilde warning")]
 #[test_case("apple~5 juice", TestExpectation::ValidWithWarning("W001"); "tilde with implicit AND warning")]
-#[test_case("\"apple juice\"~", TestExpectation::ErrorCode("E003"); "tilde without distance number on phrase")]
-#[test_case("apple~", TestExpectation::ErrorCode("E003"); "tilde without distance number on term")]
-#[test_case("apple ~ juice", TestExpectation::ErrorCode("E003"); "tilde with spaces")]
-#[test_case("apple~ 5", TestExpectation::ErrorCode("E003"); "space between tilde and number")]
-#[test_case("apple ~5", TestExpectation::ErrorCode("E003"); "space before tilde")]
+#[test_case("\"apple juice\"~", TestExpectation::ErrorCode("E002"); "tilde without distance number on phrase")]
+#[test_case("apple~", TestExpectation::ErrorCode("E002"); "tilde without distance number on term")]
+#[test_case("apple ~ juice", TestExpectation::ErrorCode("E002"); "tilde with spaces")]
+#[test_case("apple~ 5", TestExpectation::ErrorCode("E002"); "space between tilde and number")]
+#[test_case("apple ~5", TestExpectation::ErrorCode("E002"); "space before tilde")]
 #[test_case("apple~5t", TestExpectation::ErrorCode("E001"); "invalid characters after number")]
 fn test_tilde_proximity_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
