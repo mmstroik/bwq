@@ -134,11 +134,6 @@ impl AnalysisResult {
     }
 }
 
-pub fn lint_query(query: &str) -> LintResult<LintReport> {
-    let mut linter = BrandwatchLinter::new();
-    linter.lint(query)
-}
-
 pub fn analyze_query(query: &str) -> AnalysisResult {
     let mut linter = BrandwatchLinter::new();
     linter.analyze(query)
