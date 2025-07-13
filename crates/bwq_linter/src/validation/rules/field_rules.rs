@@ -190,7 +190,7 @@ impl ValidationRule for LanguageFieldRule {
                 if lang_code.len() != 2 || !lang_code.chars().all(|c| c.is_ascii_lowercase()) {
                     return ValidationResult::with_warning(LintWarning::PotentialTypo {
                         span: span.clone(),
-                        suggestion: "Language codes should be 2-character ISO 639-1 codes (e.g., 'en', 'es')".to_string(),
+                        message: "Language codes should be 2-character ISO 639-1 codes (e.g., 'en', 'es')".to_string(),
                     });
                 }
             }
@@ -228,13 +228,10 @@ impl ValidationRule for AuthorGenderFieldRule {
                 ..
             } = value.as_ref()
             {
-                if !matches!(
-                    gender.as_str(),
-                    "F" | "M" | "f" | "m" | "X" | "x" | "U" | "u"
-                ) {
+                if !matches!(gender.as_str(), "F" | "M") {
                     return ValidationResult::with_warning(LintWarning::PotentialTypo {
                         span: span.clone(),
-                        suggestion: "Common gender values are 'F', 'M', 'X', or 'U'".to_string(),
+                        message: "Common gender values are 'F' or 'M'".to_string(),
                     });
                 }
             }
@@ -331,7 +328,7 @@ impl ValidationRule for EngagementTypeFieldRule {
                 if !common_types.contains(&engagement_type.as_str()) {
                     return ValidationResult::with_warning(LintWarning::PotentialTypo {
                         span: span.clone(),
-                        suggestion: "Common engagement types are 'COMMENT', 'REPLY', 'RETWEET', 'QUOTE', 'LIKE'".to_string(),
+                        message: "Common engagement types are 'COMMENT', 'REPLY', 'RETWEET', 'QUOTE', 'LIKE'".to_string(),
                     });
                 }
             }

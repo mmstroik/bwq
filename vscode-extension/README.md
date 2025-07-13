@@ -48,11 +48,10 @@ special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 - E016: pure negative query errors
 - E017: invalid field operator spacing
 
-**warnings (W001-W003):**
+**warnings (W001-W002):**
 
 - W001: potential typo (suggestions, implicit AND usage)
-- W002: deprecated operator
-- W003: performance warning (short wildcards)
+- W002: performance warning (short wildcards)
 
 ## config
 

@@ -10,7 +10,8 @@
 			],
 			"outFiles": [
 				"${workspaceFolder}/vscode-extension/out/**/*.js"
-			]
+			],
+			"preLaunchTask": "compile-extension"
 		}
 	]
 }

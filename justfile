@@ -1,5 +1,7 @@
 set dotenv-load
 
+alias fmt := format
+
 build:
 	cargo build
 
@@ -22,7 +24,7 @@ dev:
 	@echo "Development checks passed!"
 
 test:
-	cargo test -q --workspace
+	cargo nextest run --workspace --status-level slow
 
 bwq-check *files:
 	cargo run --bin bwq -- check {{files}}

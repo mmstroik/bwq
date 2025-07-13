@@ -35,71 +35,13 @@ impl DiagnosticsHandler {
     }
 
     fn error_to_diagnostic(&self, error: &LintError) -> Diagnostic {
-        let (range, message) = match error {
-            LintError::LexerError { span, message } => (span_to_range(span), message.clone()),
-            LintError::ParserError { span, message } => (span_to_range(span), message.clone()),
-            LintError::ValidationError { span, message } => (span_to_range(span), message.clone()),
-            LintError::InvalidBooleanCase { span, operator } => (
-                span_to_range(span),
-                format!("Boolean operator '{operator}' must be capitalized"),
-            ),
-            LintError::UnbalancedParentheses { span } => {
-                (span_to_range(span), "Unbalanced parentheses".to_string())
-            }
-            LintError::InvalidWildcardPlacement { span, message } => (
-                span_to_range(span),
-                format!("Invalid wildcard placement: {message}"),
-            ),
-            LintError::InvalidProximityOperator { span, message } => (
-                span_to_range(span),
-                format!("Invalid proximity operator syntax: {message}"),
-            ),
-            LintError::InvalidFieldOperator { span, message } => (
-                span_to_range(span),
-                format!("Invalid field operator syntax: {message}"),
-            ),
-            LintError::InvalidRangeSyntax { span } => (
-                span_to_range(span),
-                "Invalid range syntax: expected '[value TO value]'".to_string(),
-            ),
-            LintError::UnexpectedToken { span, token } => {
-                (span_to_range(span), format!("Unexpected token '{token}'"))
-            }
-            LintError::ExpectedToken {
-                span,
-                expected,
-                found,
-            } => (
-                span_to_range(span),
-                format!("Expected '{expected}' but found '{found}'"),
-            ),
-            LintError::FieldValidationError { span, message } => {
-                (span_to_range(span), message.clone())
-            }
-            LintError::ProximityOperatorError { span, message } => {
-                (span_to_range(span), message.clone())
-            }
-            LintError::RangeValidationError { span, message } => {
-                (span_to_range(span), message.clone())
-            }
-            LintError::OperatorMixingError { span, message } => {
-                (span_to_range(span), message.clone())
-            }
-            LintError::PureNegativeQueryError { span, message } => {
-                (span_to_range(span), message.clone())
-            }
-            LintError::InvalidFieldOperatorSpacing { span, message } => {
-                (span_to_range(span), message.clone())
-            }
-        };
-
         Diagnostic {
-            range,
+            range: span_to_range(error.span()),
             severity: Some(DiagnosticSeverity::ERROR),
             code: Some(NumberOrString::String(error.code().to_string())),
             code_description: None,
             source: Some("bwq".to_string()),
-            message,
+            message: error.to_string(),
             related_information: None,
             tags: None,
             data: None,
