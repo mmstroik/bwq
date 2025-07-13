@@ -28,6 +28,7 @@ test-case = "3.3.1"
 thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["full"] }
 tracing = { version = "0.1.40" }
+unicode-width = "0.2.1"
 
 [workspace.metadata.release]
 push = true
