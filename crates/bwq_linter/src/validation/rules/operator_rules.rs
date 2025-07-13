@@ -131,7 +131,7 @@ impl ValidationRule for MixedNearRule {
                 ) {
                     for term in terms {
                         if self.contains_or_at_top_level(term)
-                            || self.contains_and_at_top_level(term)
+                            || self.contains_and_recursively(term)
                         {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
@@ -158,8 +158,8 @@ impl ValidationRule for MixedNearRule {
 }
 
 impl MixedNearRule {
-    fn contains_and_at_top_level(&self, expr: &Expression) -> bool {
-        self.contains_and_recursively(expr)
+    fn contains_and_recursively(&self, expr: &Expression) -> bool {
+        Self::contains_and_recursively_impl(expr)
     }
 
     fn contains_or_at_top_level(&self, expr: &Expression) -> bool {
@@ -170,10 +170,6 @@ impl MixedNearRule {
                 ..
             }
         )
-    }
-
-    fn contains_and_recursively(&self, expr: &Expression) -> bool {
-        Self::contains_and_recursively_impl(expr)
     }
 
     fn contains_and_recursively_impl(expr: &Expression) -> bool {
