@@ -110,7 +110,8 @@ impl Server {
                             self.send_diagnostics(params)?;
                         }
                         Err(_) => {
-                            tracing::debug!("Task response channel closed");
+                            tracing::info!("Task response channel closed - exiting");
+                            break;
                         }
                     }
                 }
@@ -229,7 +230,7 @@ impl Server {
         self.task_executor.schedule_diagnostics(
             uri.clone(),
             content.to_string(),
-            None, // No cancellation for notifications
+            None,
         )?;
 
         Ok(())
