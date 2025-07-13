@@ -159,6 +159,7 @@ dependencies = [
  "crossbeam-channel",
  "lsp-server",
  "lsp-types",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",

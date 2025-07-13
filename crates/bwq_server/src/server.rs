@@ -1,11 +1,12 @@
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
 use anyhow::Result;
+use crossbeam_channel::Receiver;
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    InitializeParams, InitializeResult, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
+    PublishDiagnosticsParams, Uri,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
         Notification as NotificationTrait, PublishDiagnostics,
@@ -13,79 +14,110 @@ use lsp_types::{
     request::{Initialize, Request as RequestTrait, Shutdown},
 };
 
-use crate::diagnostics_handler::DiagnosticsHandler;
-use bwq_linter::BrandwatchLinter;
+use crate::connection::{ConnectionInitializer, server_capabilities};
+use crate::request_queue::RequestQueue;
+use crate::task::{TaskExecutor, TaskResponse};
 
 pub struct Server {
     connection: Connection,
-    linter: BrandwatchLinter,
     documents: HashMap<Uri, DocumentState>,
-    diagnostics_handler: DiagnosticsHandler,
+    request_queue: RequestQueue,
+    task_executor: TaskExecutor,
+    task_response_receiver: Receiver<TaskResponse>,
 }
-
 #[derive(Debug, Clone)]
 struct DocumentState {
     content: String,
     version: i32,
 }
-
 impl Server {
-    pub fn new(connection: Connection) -> Self {
-        Self {
+    pub fn new(
+        worker_threads: NonZeroUsize,
+        connection_initializer: ConnectionInitializer,
+    ) -> Result<Self> {
+        let (id, _init_params) = connection_initializer.initialize_start()?;
+
+        let capabilities = server_capabilities();
+
+        let connection = connection_initializer.initialize_finish(
+            id,
+            capabilities,
+            "bwq-server",
+            env!("CARGO_PKG_VERSION"),
+        )?;
+
+        let (task_response_sender, task_response_receiver) = crossbeam_channel::bounded(16);
+        let task_executor = TaskExecutor::new(worker_threads, task_response_sender);
+
+        Ok(Self {
             connection,
-            linter: BrandwatchLinter::new(),
             documents: HashMap::new(),
-            diagnostics_handler: DiagnosticsHandler::new(),
-        }
+            request_queue: RequestQueue::new(),
+            task_executor,
+            task_response_receiver,
+        })
     }
 
-    pub fn run() -> Result<()> {
-        let (connection, io_threads) = Connection::stdio();
-
-        let (initialize_id, initialize_params) = connection.initialize_start()?;
-        let _initialize_params: InitializeParams = serde_json::from_value(initialize_params)?;
-
-        let initialize_result = InitializeResult {
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::FULL,
-                )),
-                ..Default::default()
-            },
-            server_info: Some(lsp_types::ServerInfo {
-                name: "bwq-server".to_string(),
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            }),
-        };
-
-        connection.initialize_finish(initialize_id, serde_json::to_value(initialize_result)?)?;
-
-        let mut server = Server::new(connection);
-        server.main_loop()?;
-
-        io_threads.join()?;
-        Ok(())
+    pub fn run(mut self) -> Result<()> {
+        self.main_loop()
     }
 
     fn main_loop(&mut self) -> Result<()> {
-        eprintln!("bwq language server started");
+        tracing::info!("bwq language server started");
 
-        while let Ok(msg) = self.connection.receiver.recv() {
-            match msg {
-                Message::Request(req) => {
-                    if self.connection.handle_shutdown(&req)? {
-                        break;
+        loop {
+            crossbeam_channel::select! {
+                // Handle incoming LSP messages
+                recv(self.connection.receiver) -> msg => {
+                    match msg {
+                        Ok(msg) => {
+                            match msg {
+                                Message::Request(req) => {
+                                    self.request_queue.register(req.id.clone(), req.method.clone());
+
+                                    if self.connection.handle_shutdown(&req)? {
+                                        if let Some((start_time, method)) = self.request_queue.complete(&req.id) {
+                                            let duration = start_time.elapsed();
+                                            tracing::trace!("Request completed: {} ({}μs)", method, duration.as_micros());
+                                        }
+                                        break;
+                                    }
+
+                                    let result = self.handle_request(req.clone());
+
+                                    if let Some((start_time, method)) = self.request_queue.complete(&req.id) {
+                                        let duration = start_time.elapsed();
+                                        tracing::trace!("Request completed: {} ({}μs)", method, duration.as_micros());
+                                    }
+
+                                    result?;
+                                }
+                                Message::Notification(not) => {
+                                    self.handle_notification(not)?;
+                                }
+                                Message::Response(_) => {}
+                            }
+                        }
+                        Err(_) => {
+                            tracing::info!("LSP connection closed");
+                            break;
+                        }
                     }
-                    self.handle_request(req)?;
                 }
-                Message::Notification(not) => {
-                    self.handle_notification(not)?;
+                recv(self.task_response_receiver) -> response => {
+                    match response {
+                        Ok(TaskResponse::Diagnostics(params)) => {
+                            self.send_diagnostics(params)?;
+                        }
+                        Err(_) => {
+                            tracing::debug!("Task response channel closed");
+                        }
+                    }
                 }
-                Message::Response(_) => {}
             }
         }
 
-        eprintln!("bwq language server stopped");
+        tracing::info!("bwq language server stopped");
         Ok(())
     }
 
@@ -119,8 +151,11 @@ impl Server {
                 let params: DidCloseTextDocumentParams = serde_json::from_value(not.params)?;
                 self.handle_did_close(params)?;
             }
+            "$/cancelRequest" => {
+                self.handle_cancel_request(not.params)?;
+            }
             _ => {
-                eprintln!("Unknown notification: {}", not.method);
+                tracing::debug!("Unknown notification: {}", not.method);
             }
         }
         Ok(())
@@ -139,9 +174,9 @@ impl Server {
         };
 
         self.documents.insert(doc.uri.clone(), document_state);
-        self.publish_diagnostics(&doc.uri, &doc.text)?;
+        self.schedule_diagnostics(&doc.uri, &doc.text)?;
 
-        eprintln!("Opened document: {:?}", doc.uri);
+        tracing::debug!("Opened document: {:?}", doc.uri);
         Ok(())
     }
 
@@ -157,7 +192,7 @@ impl Server {
                 document.content = change.text.clone();
                 document.version = params.text_document.version;
 
-                self.publish_diagnostics(&uri, &change.text)?;
+                self.schedule_diagnostics(&uri, &change.text)?;
             }
         }
 
@@ -183,29 +218,48 @@ impl Server {
             .sender
             .send(Message::Notification(notification))?;
 
-        eprintln!("Closed document: {uri:?}");
+        tracing::debug!("Closed document: {uri:?}");
         Ok(())
     }
 
-    fn publish_diagnostics(&mut self, uri: &Uri, content: &str) -> Result<()> {
-        let diagnostics = self
-            .diagnostics_handler
-            .analyze_content(content, &mut self.linter)?;
+    /// Schedule diagnostics processing in the background
+    fn schedule_diagnostics(&mut self, uri: &Uri, content: &str) -> Result<()> {
+        // Notifications like didChange/didOpen don't have request IDs,
+        // so they cannot be cancelled - pass None for cancellation token
+        self.task_executor.schedule_diagnostics(
+            uri.clone(),
+            content.to_string(),
+            None, // No cancellation for notifications
+        )?;
 
-        let publish_diagnostics = PublishDiagnosticsParams {
-            uri: uri.clone(),
-            diagnostics,
-            version: None,
-        };
+        Ok(())
+    }
 
+    /// Send diagnostics notification to client (called from background task results)
+    fn send_diagnostics(&mut self, params: PublishDiagnosticsParams) -> Result<()> {
         let notification = Notification::new(
             <PublishDiagnostics as NotificationTrait>::METHOD.to_string(),
-            serde_json::to_value(publish_diagnostics)?,
+            serde_json::to_value(params)?,
         );
 
         self.connection
             .sender
             .send(Message::Notification(notification))?;
+        Ok(())
+    }
+
+    fn handle_cancel_request(&mut self, params: serde_json::Value) -> Result<()> {
+        #[derive(serde::Deserialize)]
+        struct CancelParams {
+            id: lsp_server::RequestId,
+        }
+
+        if let Ok(cancel_params) = serde_json::from_value::<CancelParams>(params) {
+            if let Some(method) = self.request_queue.cancel(&cancel_params.id) {
+                tracing::debug!("Cancelled request: {} (id: {:?})", method, cancel_params.id);
+            }
+        }
+
         Ok(())
     }
 }
