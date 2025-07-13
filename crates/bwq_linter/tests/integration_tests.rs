@@ -247,6 +247,7 @@ fn test_basic_boolean_syntax(query: &str, expected: TestExpectation) {
 #[test_case("\"apple juice\"", TestExpectation::ValidNoWarnings; "basic quoted phrase")]
 #[test_case("\"organic fruit\" AND healthy", TestExpectation::ValidNoWarnings; "quoted phrase with AND")]
 #[test_case("\"multi word phrase\" OR simple", TestExpectation::ValidNoWarnings; "quoted phrase with OR")]
+#[test_case("\"unterminated", TestExpectation::ErrorCode("E001"); "unterminated quoted phrase")]
 fn test_quoted_phrase_syntax(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
