@@ -227,11 +227,8 @@ impl Server {
     fn schedule_diagnostics(&mut self, uri: &Uri, content: &str) -> Result<()> {
         // Notifications like didChange/didOpen don't have request IDs,
         // so they cannot be cancelled - pass None for cancellation token
-        self.task_executor.schedule_diagnostics(
-            uri.clone(),
-            content.to_string(),
-            None,
-        )?;
+        self.task_executor
+            .schedule_diagnostics(uri.clone(), content.to_string(), None)?;
 
         Ok(())
     }
