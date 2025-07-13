@@ -391,6 +391,7 @@ fn test_url_like_strings(query: &str, expected: TestExpectation) {
 #[test_case("rating:[2 TO 4]", TestExpectation::ValidNoWarnings; "valid rating range")]
 #[test_case("rating:6", TestExpectation::ErrorCode("E012"); "rating too high")]
 #[test_case("rating:[-1 TO 3]", TestExpectation::ErrorCode("E012"); "rating range with negative")]
+#[test_case("rating:[x TO y]", TestExpectation::ErrorCode("E012"); "invalid rating with literal letters")]
 fn test_rating_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -401,6 +402,7 @@ fn test_rating_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("continent:europe", TestExpectation::ValidNoWarnings; "valid continent")]
 #[test_case("latitude:[100 TO 110]", TestExpectation::ErrorCode("E012"); "latitude out of range")]
 #[test_case("longitude:[-200 TO -150]", TestExpectation::ErrorCode("E012"); "longitude out of range")]
+#[test_case("latitude:[x TO y]", TestExpectation::ErrorCode("E012"); "invalid latitude with literal letters")]
 fn test_coordinate_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);
@@ -457,6 +459,7 @@ fn test_minute_of_day_field_validation(query: &str, expected: TestExpectation) {
 #[test_case("authorFollowers:[-100 TO 10000]", TestExpectation::ErrorCode("E014"); "invalid author followers negative")]
 #[test_case("authorFollowers:[100000 TO 1000]", TestExpectation::ErrorCode("E014"); "invalid author followers start greater than end")]
 #[test_case("authorFollowers:[0 TO 10000000000]", TestExpectation::ErrorCode("E014"); "invalid author followers over max digits")]
+#[test_case("authorFollowers:[x TO y]", TestExpectation::ErrorCode("E012"); "invalid author followers with literal letters")]
 fn test_author_followers_field_validation(query: &str, expected: TestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, query);

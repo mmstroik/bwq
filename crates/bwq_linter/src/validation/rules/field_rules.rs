@@ -37,17 +37,21 @@ impl ValidationRule for RatingFieldRule {
                 start,
                 end,
                 span,
-            } => {
-                if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
+            } => match (start.parse::<i32>(), end.parse::<i32>()) {
+                (Ok(start_num), Ok(end_num)) => {
                     if !(0..=5).contains(&start_num) || !(0..=5).contains(&end_num) {
                         return ValidationResult::with_error(LintError::FieldValidationError {
                             span: span.clone(),
                             message: "Rating values must be between 0 and 5".to_string(),
                         });
                     }
+                    ValidationResult::new()
                 }
-                ValidationResult::new()
-            }
+                _ => ValidationResult::with_error(LintError::FieldValidationError {
+                    span: span.clone(),
+                    message: "Rating range values must be numbers".to_string(),
+                }),
+            },
             _ => ValidationResult::new(),
         }
     }
@@ -116,8 +120,8 @@ impl ValidationRule for CoordinateFieldRule {
                 start,
                 end,
                 span,
-            } => {
-                if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
+            } => match (start.parse::<f64>(), end.parse::<f64>()) {
+                (Ok(start_num), Ok(end_num)) => {
                     match field {
                         FieldType::Latitude => {
                             if !(-90.0..=90.0).contains(&start_num)
@@ -147,9 +151,20 @@ impl ValidationRule for CoordinateFieldRule {
                         }
                         _ => {}
                     }
+                    ValidationResult::new()
                 }
-                ValidationResult::new()
-            }
+                _ => {
+                    let field_name = match field {
+                        FieldType::Latitude => "Latitude",
+                        FieldType::Longitude => "Longitude",
+                        _ => "Coordinate",
+                    };
+                    ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: format!("{field_name} range values must be numbers"),
+                    })
+                }
+            },
             _ => ValidationResult::new(),
         }
     }
@@ -472,26 +487,30 @@ impl ValidationRule for FollowerCountFieldRule {
             span,
         } = expr
         {
-            if let (Ok(start_num), Ok(end_num)) = (start.parse::<i64>(), end.parse::<i64>()) {
-                let mut result = ValidationResult::new();
+            match (start.parse::<i64>(), end.parse::<i64>()) {
+                (Ok(start_num), Ok(end_num)) => {
+                    let mut result = ValidationResult::new();
 
-                if start_num < 0 || end_num < 0 {
-                    result.errors.push(LintError::InvalidFieldRange {
-                        span: span.clone(),
-                        message: "Follower counts cannot be negative".to_string(),
-                    });
+                    if start_num < 0 || end_num < 0 {
+                        result.errors.push(LintError::InvalidFieldRange {
+                            span: span.clone(),
+                            message: "Follower counts cannot be negative".to_string(),
+                        });
+                    }
+
+                    if end_num.to_string().len() > 10 {
+                        result.errors.push(LintError::InvalidFieldRange {
+                            span: span.clone(),
+                            message: "Follower counts cannot exceed 10 digits".to_string(),
+                        });
+                    }
+
+                    result
                 }
-
-                if end_num.to_string().len() > 10 {
-                    result.errors.push(LintError::InvalidFieldRange {
-                        span: span.clone(),
-                        message: "Follower counts cannot exceed 10 digits".to_string(),
-                    });
-                }
-
-                result
-            } else {
-                ValidationResult::new()
+                _ => ValidationResult::with_error(LintError::FieldValidationError {
+                    span: span.clone(),
+                    message: "authorFollowers range values must be numbers".to_string(),
+                }),
             }
         } else {
             ValidationResult::new()
