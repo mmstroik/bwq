@@ -464,7 +464,9 @@ impl Lexer {
         }
 
         while !self.is_at_end()
-            && (self.current_char().is_ascii_digit() || self.current_char() == '.')
+            && (self.current_char().is_ascii_digit()
+                || self.current_char() == '.'
+                || self.current_char() == '_')
         {
             value.push(self.current_char());
             self.advance();
@@ -751,6 +753,20 @@ mod tests {
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "test"));
         assert!(matches!(tokens[1].token_type, TokenType::Colon));
         assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "test"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_numbers_with_underscores() {
+        let mut lexer = Lexer::new("123_456 1_000_000.50 -42_195");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // numbers with underscores should be treated as single number tokens
+        assert!(matches!(tokens[0].token_type, TokenType::Number(ref n) if n == "123_456"));
+        assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "1_000_000.50"));
+        assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-42_195"));
         assert!(matches!(tokens[3].token_type, TokenType::Eof));
     }
 }
