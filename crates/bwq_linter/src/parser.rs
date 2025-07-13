@@ -119,15 +119,20 @@ impl Parser {
                 // warn on implicit AND (space-separated terms)
                 let right = self.parse_not_expression()?;
 
-                let span = Span::new(left.span().start.clone(), right.span().end.clone());
+                // Create span for the gap between terms (for the warning)
+                let gap_span = Span::new(left.span().end.clone(), right.span().start.clone());
+                
+                // Create span for the full expression (for the AST node)
+                let full_span = Span::new(left.span().start.clone(), right.span().end.clone());
+                
                 left = Expression::BooleanOp {
                     operator: BooleanOperator::And,
                     left: Box::new(left),
                     right: Some(Box::new(right)),
-                    span: span.clone(),
+                    span: full_span,
                 };
 
-                self.implicit_and_spans.push(span);
+                self.implicit_and_spans.push(gap_span);
             } else {
                 break;
             }
