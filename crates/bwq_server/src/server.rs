@@ -67,7 +67,6 @@ impl Server {
 
         loop {
             crossbeam_channel::select! {
-                // Handle incoming LSP messages
                 recv(self.connection.receiver) -> msg => {
                     match msg {
                         Ok(msg) => {
@@ -75,22 +74,34 @@ impl Server {
                                 Message::Request(req) => {
                                     self.request_queue.register(req.id.clone(), req.method.clone());
 
-                                    if self.connection.handle_shutdown(&req)? {
-                                        if let Some((start_time, method)) = self.request_queue.complete(&req.id) {
-                                            let duration = start_time.elapsed();
-                                            tracing::trace!("Request completed: {} ({}μs)", method, duration.as_micros());
+
+                                    let mut request_completed = false;
+
+                                    let handle_result = (|| -> Result<bool> {
+                                        if self.connection.handle_shutdown(&req)? {
+                                            return Ok(true);
                                         }
-                                        break;
-                                    }
+                                        self.handle_request(req.clone())?;
+                                        Ok(false)
+                                    })();
 
-                                    let result = self.handle_request(req.clone());
-
+                                    // always complete the request in our tracking
                                     if let Some((start_time, method)) = self.request_queue.complete(&req.id) {
                                         let duration = start_time.elapsed();
                                         tracing::trace!("Request completed: {} ({}μs)", method, duration.as_micros());
+                                        request_completed = true;
                                     }
 
-                                    result?;
+                                    match handle_result {
+                                        Ok(true) => break,
+                                        Ok(false) => {},
+                                        Err(e) => {
+                                            if !request_completed {
+                                                tracing::warn!("Request {} failed but was not tracked", req.id);
+                                            }
+                                            return Err(e);
+                                        }
+                                    }
                                 }
                                 Message::Notification(not) => {
                                     self.handle_notification(not)?;
