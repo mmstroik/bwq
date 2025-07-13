@@ -121,10 +121,10 @@ impl Parser {
 
                 // Create span for the gap between terms (for the warning)
                 let gap_span = Span::new(left.span().end.clone(), right.span().start.clone());
-                
+
                 // Create span for the full expression (for the AST node)
                 let full_span = Span::new(left.span().start.clone(), right.span().end.clone());
-                
+
                 left = Expression::BooleanOp {
                     operator: BooleanOperator::And,
                     left: Box::new(left),
