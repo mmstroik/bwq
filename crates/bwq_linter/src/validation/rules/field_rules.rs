@@ -37,17 +37,21 @@ impl ValidationRule for RatingFieldRule {
                 start,
                 end,
                 span,
-            } => {
-                if let (Ok(start_num), Ok(end_num)) = (start.parse::<i32>(), end.parse::<i32>()) {
+            } => match (start.parse::<i32>(), end.parse::<i32>()) {
+                (Ok(start_num), Ok(end_num)) => {
                     if !(0..=5).contains(&start_num) || !(0..=5).contains(&end_num) {
                         return ValidationResult::with_error(LintError::FieldValidationError {
                             span: span.clone(),
                             message: "Rating values must be between 0 and 5".to_string(),
                         });
                     }
+                    ValidationResult::new()
                 }
-                ValidationResult::new()
-            }
+                _ => ValidationResult::with_error(LintError::FieldValidationError {
+                    span: span.clone(),
+                    message: "Rating range values must be numbers".to_string(),
+                }),
+            },
             _ => ValidationResult::new(),
         }
     }
@@ -116,8 +120,8 @@ impl ValidationRule for CoordinateFieldRule {
                 start,
                 end,
                 span,
-            } => {
-                if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
+            } => match (start.parse::<f64>(), end.parse::<f64>()) {
+                (Ok(start_num), Ok(end_num)) => {
                     match field {
                         FieldType::Latitude => {
                             if !(-90.0..=90.0).contains(&start_num)
@@ -147,9 +151,20 @@ impl ValidationRule for CoordinateFieldRule {
                         }
                         _ => {}
                     }
+                    ValidationResult::new()
                 }
-                ValidationResult::new()
-            }
+                _ => {
+                    let field_name = match field {
+                        FieldType::Latitude => "Latitude",
+                        FieldType::Longitude => "Longitude",
+                        _ => "Coordinate",
+                    };
+                    ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: format!("{field_name} range values must be numbers"),
+                    })
+                }
+            },
             _ => ValidationResult::new(),
         }
     }
@@ -229,9 +244,9 @@ impl ValidationRule for AuthorGenderFieldRule {
             } = value.as_ref()
             {
                 if !matches!(gender.as_str(), "F" | "M") {
-                    return ValidationResult::with_warning(LintWarning::PotentialTypo {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
-                        message: "Common gender values are 'F' or 'M'".to_string(),
+                        message: "authorGender must be 'F' or 'M'".to_string(),
                     });
                 }
             }
@@ -322,13 +337,12 @@ impl ValidationRule for EngagementTypeFieldRule {
                 ..
             } = value.as_ref()
             {
-                let common_types = [
-                    "COMMENT", "REPLY", "RETWEET", "QUOTE", "LIKE", "SHARE", "MENTION",
-                ];
-                if !common_types.contains(&engagement_type.as_str()) {
-                    return ValidationResult::with_warning(LintWarning::PotentialTypo {
+                let valid_types = ["COMMENT", "REPLY", "RETWEET", "QUOTE"];
+                if !valid_types.contains(&engagement_type.as_str()) {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
                         span: span.clone(),
-                        message: "Common engagement types are 'COMMENT', 'REPLY', 'RETWEET', 'QUOTE', 'LIKE'".to_string(),
+                        message: "engagementType must be 'COMMENT', 'REPLY', 'RETWEET', or 'QUOTE'"
+                            .to_string(),
                     });
                 }
             }
@@ -443,7 +457,7 @@ impl ValidationRule for RangeFieldRule {
         {
             if let (Ok(start_num), Ok(end_num)) = (start.parse::<f64>(), end.parse::<f64>()) {
                 if start_num > end_num {
-                    return ValidationResult::with_error(LintError::RangeValidationError {
+                    return ValidationResult::with_error(LintError::InvalidFieldRange {
                         span: span.clone(),
                         message: "Range start value cannot be greater than end value".to_string(),
                     });
@@ -455,5 +469,124 @@ impl ValidationRule for RangeFieldRule {
 
     fn can_validate(&self, expr: &Expression) -> bool {
         matches!(expr, Expression::Range { .. })
+    }
+}
+
+pub struct FollowerCountFieldRule;
+
+impl ValidationRule for FollowerCountFieldRule {
+    fn name(&self) -> &'static str {
+        "follower-count-field"
+    }
+
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        match expr {
+            Expression::Field {
+                field: FieldType::AuthorFollowers,
+                value,
+                span,
+            } => {
+                // Check if the value is a range (valid) or a term (invalid)
+                if let Expression::Range { start, end, .. } = value.as_ref() {
+                    match (start.parse::<i64>(), end.parse::<i64>()) {
+                        (Ok(start_num), Ok(end_num)) => {
+                            let mut result = ValidationResult::new();
+
+                            if start_num < 0 || end_num < 0 {
+                                result.errors.push(LintError::InvalidFieldRange {
+                                    span: span.clone(),
+                                    message: "Follower counts cannot be negative".to_string(),
+                                });
+                            }
+
+                            if end_num.to_string().len() > 10 {
+                                result.errors.push(LintError::InvalidFieldRange {
+                                    span: span.clone(),
+                                    message: "Follower counts cannot exceed 10 digits".to_string(),
+                                });
+                            }
+
+                            result
+                        }
+                        _ => ValidationResult::with_error(LintError::FieldValidationError {
+                            span: span.clone(),
+                            message: "authorFollowers range values must be numbers".to_string(),
+                        }),
+                    }
+                } else {
+                    ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: "authorFollowers must be used with a range (e.g., authorFollowers:[100 TO 1000])".to_string(),
+                    })
+                }
+            }
+            _ => ValidationResult::new(),
+        }
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::AuthorFollowers,
+                ..
+            }
+        )
+    }
+}
+
+pub struct GuidFieldRule;
+
+impl ValidationRule for GuidFieldRule {
+    fn name(&self) -> &'static str {
+        "guid-field"
+    }
+
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        if let Expression::Field {
+            field: FieldType::Guid,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word { value: guid_value },
+                ..
+            } = value.as_ref()
+            {
+                // GUID should be digits only or digits with underscores (for Facebook post IDs)
+                if !guid_value.chars().all(|c| c.is_ascii_digit() || c == '_') {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: "guid must contain only digits or digits with underscores (e.g., '123456789' or '123_456_789')".to_string(),
+                    });
+                }
+
+                // Should not be all underscores or start/end with underscore
+                if guid_value.is_empty()
+                    || guid_value.chars().all(|c| c == '_')
+                    || guid_value.starts_with('_')
+                    || guid_value.ends_with('_')
+                {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message:
+                            "guid must contain digits and cannot start or end with underscores"
+                                .to_string(),
+                    });
+                }
+            }
+        }
+        ValidationResult::new()
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::Guid,
+                ..
+            }
+        )
     }
 }

@@ -54,23 +54,14 @@ pub enum LintError {
     #[error("{message}")]
     ValidationError { span: Span, message: String },
 
-    #[error("Boolean operator '{operator}' must be capitalized")]
-    InvalidBooleanCase { span: Span, operator: String },
-
-    #[error("Unbalanced parentheses")]
-    UnbalancedParentheses { span: Span },
-
-    #[error("Invalid wildcard placement: wildcards cannot be at the beginning of a word")]
-    InvalidWildcardPlacement { span: Span },
+    #[error("Invalid wildcard placement: {message}")]
+    InvalidWildcardPlacement { span: Span, message: String },
 
     #[error("Invalid proximity operator syntax: {message}")]
     InvalidProximityOperator { span: Span, message: String },
 
     #[error("Invalid field operator syntax: {message}")]
     InvalidFieldOperator { span: Span, message: String },
-
-    #[error("Invalid range syntax: expected '[value TO value]'")]
-    InvalidRangeSyntax { span: Span },
 
     #[error("Unexpected token '{token}'")]
     UnexpectedToken { span: Span, token: String },
@@ -88,17 +79,14 @@ pub enum LintError {
     #[error("{message}")]
     ProximityOperatorError { span: Span, message: String },
 
-    #[error("{message}")]
-    RangeValidationError { span: Span, message: String },
+    #[error("Invalid field range: {message}")]
+    InvalidFieldRange { span: Span, message: String },
 
     #[error("{message}")]
     OperatorMixingError { span: Span, message: String },
 
     #[error("{message}")]
     PureNegativeQueryError { span: Span, message: String },
-
-    #[error("{message}")]
-    InvalidFieldOperatorSpacing { span: Span, message: String },
 }
 
 impl LintError {
@@ -107,20 +95,16 @@ impl LintError {
             LintError::LexerError { span, .. }
             | LintError::ParserError { span, .. }
             | LintError::ValidationError { span, .. }
-            | LintError::InvalidBooleanCase { span, .. }
-            | LintError::UnbalancedParentheses { span }
-            | LintError::InvalidWildcardPlacement { span }
+            | LintError::InvalidWildcardPlacement { span, .. }
             | LintError::InvalidProximityOperator { span, .. }
             | LintError::InvalidFieldOperator { span, .. }
-            | LintError::InvalidRangeSyntax { span }
             | LintError::UnexpectedToken { span, .. }
             | LintError::ExpectedToken { span, .. }
             | LintError::FieldValidationError { span, .. }
             | LintError::ProximityOperatorError { span, .. }
-            | LintError::RangeValidationError { span, .. }
+            | LintError::InvalidFieldRange { span, .. }
             | LintError::OperatorMixingError { span, .. }
-            | LintError::PureNegativeQueryError { span, .. }
-            | LintError::InvalidFieldOperatorSpacing { span, .. } => span,
+            | LintError::PureNegativeQueryError { span, .. } => span,
         }
     }
 
@@ -129,20 +113,16 @@ impl LintError {
             LintError::LexerError { .. } => "E001",
             LintError::ParserError { .. } => "E002",
             LintError::ValidationError { .. } => "E003",
-            LintError::InvalidBooleanCase { .. } => "E004",
-            LintError::UnbalancedParentheses { .. } => "E005",
-            LintError::InvalidWildcardPlacement { .. } => "E006",
-            LintError::InvalidProximityOperator { .. } => "E007",
-            LintError::InvalidFieldOperator { .. } => "E008",
-            LintError::InvalidRangeSyntax { .. } => "E009",
-            LintError::UnexpectedToken { .. } => "E010",
-            LintError::ExpectedToken { .. } => "E011",
-            LintError::FieldValidationError { .. } => "E012",
-            LintError::ProximityOperatorError { .. } => "E013",
-            LintError::RangeValidationError { .. } => "E014",
-            LintError::OperatorMixingError { .. } => "E015",
-            LintError::PureNegativeQueryError { .. } => "E016",
-            LintError::InvalidFieldOperatorSpacing { .. } => "E017",
+            LintError::InvalidWildcardPlacement { .. } => "E004",
+            LintError::InvalidProximityOperator { .. } => "E005",
+            LintError::InvalidFieldOperator { .. } => "E006",
+            LintError::UnexpectedToken { .. } => "E007",
+            LintError::ExpectedToken { .. } => "E008",
+            LintError::FieldValidationError { .. } => "E009",
+            LintError::ProximityOperatorError { .. } => "E010",
+            LintError::InvalidFieldRange { .. } => "E011",
+            LintError::OperatorMixingError { .. } => "E012",
+            LintError::PureNegativeQueryError { .. } => "E013",
         }
     }
 

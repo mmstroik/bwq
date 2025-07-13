@@ -22,16 +22,17 @@ impl ValidationEngine {
                 Box::new(VerifiedTypeFieldRule),
                 Box::new(MinuteOfDayFieldRule),
                 Box::new(RangeFieldRule),
+                Box::new(FollowerCountFieldRule),
+                Box::new(GuidFieldRule),
                 // operator validation rules
                 Box::new(MixedAndOrRule),
                 Box::new(MixedNearRule),
                 Box::new(PureNegativeRule),
                 Box::new(BinaryOperatorRule),
                 Box::new(TildeUsageRule),
+                Box::new(WildcardPlacementRule),
                 // performance validation rules
-                Box::new(WildcardPerformanceRule),
                 Box::new(ShortTermRule),
-                Box::new(RangePerformanceRule),
             ],
         }
     }

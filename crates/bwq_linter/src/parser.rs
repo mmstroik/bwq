@@ -33,7 +33,7 @@ impl Parser {
                     comment_start_span = None;
                 }
                 TokenType::Eof if inside_comment => {
-                    return Err(LintError::ValidationError {
+                    return Err(LintError::ParserError {
                         span: comment_start_span.unwrap(),
                         message: "Please add a >>> mark to close this commented text.".to_string(),
                     });
@@ -119,15 +119,20 @@ impl Parser {
                 // warn on implicit AND (space-separated terms)
                 let right = self.parse_not_expression()?;
 
-                let span = Span::new(left.span().start.clone(), right.span().end.clone());
+                // Create span for the gap between terms (for the warning)
+                let gap_span = Span::new(left.span().end.clone(), right.span().start.clone());
+
+                // Create span for the full expression (for the AST node)
+                let full_span = Span::new(left.span().start.clone(), right.span().end.clone());
+
                 left = Expression::BooleanOp {
                     operator: BooleanOperator::And,
                     left: Box::new(left),
                     right: Some(Box::new(right)),
-                    span: span.clone(),
+                    span: full_span,
                 };
 
-                self.implicit_and_spans.push(span);
+                self.implicit_and_spans.push(gap_span);
             } else {
                 break;
             }
@@ -179,7 +184,7 @@ impl Parser {
             let distance;
 
             if left.span().end.offset != tilde_span.start.offset {
-                return Err(LintError::ValidationError {
+                return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator must be immediately attached to the preceding term (e.g., apple~5, not apple ~5).".to_string(),
                 });
@@ -192,7 +197,7 @@ impl Parser {
                     distance = num_str.parse::<u32>().ok();
                     self.advance();
                     if distance.is_none() {
-                        return Err(LintError::ValidationError {
+                        return Err(LintError::ParserError {
                             span: tilde_span,
                             message:
                                 "Invalid proximity distance. Distance must be a positive number."
@@ -200,13 +205,13 @@ impl Parser {
                         });
                     }
                 } else {
-                    return Err(LintError::ValidationError {
+                    return Err(LintError::ParserError {
                         span: tilde_span,
                         message: "The ~ operator requires a distance number immediately after it (e.g., ~5 for proximity within 5 words).".to_string(),
                     });
                 }
             } else {
-                return Err(LintError::ValidationError {
+                return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator requires a distance number (e.g., ~5 for proximity within 5 words).".to_string(),
                 });
@@ -217,7 +222,7 @@ impl Parser {
                 matches!(&left, Expression::Term { .. } | Expression::Group { .. });
 
             if !is_valid_tilde_context {
-                return Err(LintError::ValidationError {
+                return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator should be used after a search term, quoted phrase, or grouped expression. If this should be part of a search term, it must be quoted (or escaped using the \\ character).".to_string(),
                 });
@@ -505,12 +510,8 @@ impl Parser {
         match &token.token_type {
             TokenType::Word(word) => {
                 self.advance();
-                let term = if word.contains('*') {
+                let term = if word.contains('*') || word.contains('?') {
                     Term::Wildcard {
-                        value: word.clone(),
-                    }
-                } else if word.contains('?') {
-                    Term::Replacement {
                         value: word.clone(),
                     }
                 } else {

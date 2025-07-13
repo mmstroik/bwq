@@ -325,7 +325,7 @@ impl Lexer {
             ':' => {
                 // Check for a space before colon - always fail if there's a space before
                 if self.position > 0 && self.input[self.position - 1].is_whitespace() {
-                    return Err(LintError::InvalidFieldOperatorSpacing {
+                    return Err(LintError::LexerError {
                         span: Span::single_character(start_pos),
                         message: "Field operator colon must be directly attached to the field name. If the colon is a search term, you'll need to put it in quote marks".to_string(),
                     });
@@ -464,7 +464,10 @@ impl Lexer {
         }
 
         while !self.is_at_end()
-            && (self.current_char().is_ascii_digit() || self.current_char() == '.')
+            && (self.current_char().is_ascii_digit()
+                || self.current_char() == '.'
+                || self.current_char() == '_'
+                || self.current_char() == '-')
         {
             value.push(self.current_char());
             self.advance();
@@ -751,6 +754,20 @@ mod tests {
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "test"));
         assert!(matches!(tokens[1].token_type, TokenType::Colon));
         assert!(matches!(tokens[2].token_type, TokenType::Word(ref w) if w == "test"));
+        assert!(matches!(tokens[3].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_numbers_with_dashes_and_underscores() {
+        let mut lexer = Lexer::new("123-456 1_000-000.50 -42-195_000");
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 tokens + EOF
+
+        // numbers with dashes and underscores should be treated as single number tokens
+        assert!(matches!(tokens[0].token_type, TokenType::Number(ref n) if n == "123-456"));
+        assert!(matches!(tokens[1].token_type, TokenType::Number(ref n) if n == "1_000-000.50"));
+        assert!(matches!(tokens[2].token_type, TokenType::Number(ref n) if n == "-42-195_000"));
         assert!(matches!(tokens[3].token_type, TokenType::Eof));
     }
 }

@@ -95,7 +95,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.code() == "E015"));
+        assert!(report.errors.iter().any(|e| e.code() == "E012"));
     }
 
     #[test]
@@ -109,7 +109,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.code() == "E016"));
+        assert!(report.errors.iter().any(|e| e.code() == "E013"));
     }
 
     #[test]
@@ -123,7 +123,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.code() == "E012"));
+        assert!(report.errors.iter().any(|e| e.code() == "E009"));
     }
 
     #[test]
@@ -137,7 +137,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.code() == "E012"));
+        assert!(report.errors.iter().any(|e| e.code() == "E009"));
     }
 
     #[test]
@@ -151,7 +151,7 @@ mod tests {
         let report = validator.validate(&result.query);
 
         assert!(report.has_errors());
-        assert!(report.errors.iter().any(|e| e.code() == "E006"));
+        assert!(report.errors.iter().any(|e| e.code() == "E004"));
     }
 
     #[test]
