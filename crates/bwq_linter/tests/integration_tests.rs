@@ -609,3 +609,258 @@ fn test_fixture_files(file_path: &str, expected: FileTestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, file_path);
 }
+
+// ============================================================================
+// ERROR COLLECTION TESTS
+// Tests that verify multiple errors are collected in one pass
+// ============================================================================
+
+#[test_case("'test : value AND \"unterminated", &["E001", "E001", "E007"]; "space before colon and unterminated string with error token")]
+#[test_case(") AND rating:7", &["E007"]; "unexpected token prevents further parsing")]
+#[test_case("'unclosed AND apple banana OR cherry", &["E012", "W001"]; "parser succeeds with implicit AND warning and mixed operator error")]
+#[test_case("@", &["E003"]; "empty mention error")]
+#[test_case("rating:6 AND *invalid", &["E009", "E004"]; "validation error and wildcard placement error")]
+#[test_case("'unterminated AND rating:6", &["E009"]; "parser fails on unterminated string, only gets validation error")]
+#[test_case("apple :banana AND rating:8", &["E001", "E007"]; "lexer error with parser error from error token")]
+fn test_multiple_error_collection(query: &str, expected_codes: &[&str]) {
+    let mut test = QueryTest::new();
+    
+    match test.linter.lint(query) {
+        Ok(report) => {
+            // Collect all error and warning codes
+            let mut actual_codes: Vec<String> = report.errors.iter().map(|e| e.code().to_string()).collect();
+            actual_codes.extend(report.warnings.iter().map(|w| w.code().to_string()));
+            
+            // Convert expected codes to strings for comparison
+            let expected_codes: Vec<String> = expected_codes.iter().map(|&s| s.to_string()).collect();
+            
+            assert_eq!(
+                actual_codes.len(),
+                expected_codes.len(),
+                "Expected {} error/warning codes for query '{}', but got {}. Expected: {:?}, Got: {:?}",
+                expected_codes.len(),
+                query,
+                actual_codes.len(),
+                expected_codes,
+                actual_codes
+            );
+            
+            // Check that all expected codes are present (order may vary)
+            for expected_code in &expected_codes {
+                assert!(
+                    actual_codes.contains(expected_code),
+                    "Expected error/warning code '{}' not found for query '{}'. Got codes: {:?}",
+                    expected_code,
+                    query,
+                    actual_codes
+                );
+            }
+        }
+        Err(error) => {
+            panic!("Expected multiple errors to be collected in report, but got single error: {} for query: {}", error, query);
+        }
+    }
+}
+
+// ============================================================================
+// ERROR QUALITY INVESTIGATION TESTS
+// Tests to investigate potential issues with our error collection approach
+// ============================================================================
+
+#[test]
+fn test_semantic_confusion_error_tokens_as_search_terms() {
+    let mut test = QueryTest::new();
+    
+    // Test case where error tokens might be treated as search terms
+    let query = "test : value";
+    println!("Testing query: {}", query);
+    
+    match test.linter.lint(query) {
+        Ok(report) => {
+            println!("Errors: {:?}", report.errors.iter().map(|e| (e.code(), e.to_string())).collect::<Vec<_>>());
+            println!("Warnings: {:?}", report.warnings.iter().map(|w| (w.code(), w.to_string())).collect::<Vec<_>>());
+            
+            // Check if we're getting validation errors on the ":" character
+            let error_messages: Vec<String> = report.errors.iter().map(|e| e.to_string()).collect();
+            println!("Full error messages: {:?}", error_messages);
+        }
+        Err(e) => {
+            println!("Single error: {}", e);
+        }
+    }
+}
+
+#[test]
+fn test_false_positive_parsing_success() {
+    let mut test = QueryTest::new();
+    
+    // Fundamentally broken query that might "succeed" parsing
+    let query = "'broken AND @ AND rating :99";
+    println!("Testing fundamentally broken query: {}", query);
+    
+    match test.linter.lint(query) {
+        Ok(report) => {
+            println!("Query 'succeeded' parsing with {} errors and {} warnings", 
+                     report.errors.len(), report.warnings.len());
+            println!("Errors: {:?}", report.errors.iter().map(|e| e.code()).collect::<Vec<_>>());
+            
+            // This should probably fail fast instead of producing multiple confusing errors
+            if report.errors.len() > 3 {
+                println!("WARNING: Potentially too many cascading errors for a fundamentally broken query");
+            }
+        }
+        Err(e) => {
+            println!("Failed fast with: {}", e);
+        }
+    }
+}
+
+#[test]
+fn test_error_message_quality_comparison() {
+    let mut test = QueryTest::new();
+    
+    // Test cases where error quality might be degraded
+    let problematic_queries = vec![
+        "'unterminated string AND valid",
+        "test :field AND another :field", 
+        "@ AND # AND rating:999",
+        ") OR ( AND valid",
+    ];
+    
+    for query in problematic_queries {
+        println!("\n--- Testing query: {} ---", query);
+        match test.linter.lint(query) {
+            Ok(report) => {
+                println!("Errors ({}): {:?}", report.errors.len(), 
+                         report.errors.iter().map(|e| e.code()).collect::<Vec<_>>());
+                
+                // Check for potential noise - too many errors might confuse users
+                if report.errors.len() > 2 {
+                    println!("Potential noise: {} errors might be confusing", report.errors.len());
+                    for (i, error) in report.errors.iter().enumerate() {
+                        println!("  {}: {}", i+1, error);
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Single error: {}", e);
+            }
+        }
+    }
+}
+
+#[test] 
+fn test_validation_on_meaningless_constructs() {
+    let mut test = QueryTest::new();
+    
+    // Query where error recovery creates meaningless AST that still gets validated
+    let query = "rating :5 AND latitude :invalid";
+    println!("Testing validation on error-recovered AST: {}", query);
+    
+    match test.linter.lint(query) {
+        Ok(report) => {
+            println!("Errors: {:?}", report.errors.iter().map(|e| (e.code(), e.to_string())).collect::<Vec<_>>());
+            
+            // Are we running expensive validation on constructs that don't make sense?
+            let validation_errors = report.errors.iter().filter(|e| 
+                e.code().starts_with("E00") && !e.code().starts_with("E001") && !e.code().starts_with("E007")
+            ).count();
+            
+            if validation_errors > 0 {
+                println!("Running validation on {} potentially meaningless constructs", validation_errors);
+            }
+        }
+        Err(e) => {
+            println!("Failed with: {}", e);
+        }
+    }
+}
+
+#[test]
+fn test_understand_error_token_behavior() {
+    use bwq_linter::lexer::{Lexer, TokenType};
+    
+    // Test what the lexer actually produces for space before colon
+    let mut lexer = Lexer::new("test :field");
+    let lex_result = lexer.tokenize();
+    
+    println!("Lexer errors: {:?}", lex_result.errors.iter().map(|e| e.code()).collect::<Vec<_>>());
+    println!("Tokens produced:");
+    for (i, token) in lex_result.tokens.iter().enumerate() {
+        println!("  {}: {:?} at {:?}", i, token.token_type, token.span);
+    }
+    
+    // Test what parser does with these tokens
+    use bwq_linter::parser::Parser;
+    match Parser::new(lex_result.tokens) {
+        Ok(mut parser) => {
+            match parser.parse() {
+                Ok(parse_result) => {
+                    println!("Parser succeeded");
+                    println!("Parser warnings: {:?}", parse_result.warnings.iter().map(|w| w.code()).collect::<Vec<_>>());
+                }
+                Err(parse_error) => {
+                    println!("Parser failed: {} ({})", parse_error, parse_error.code());
+                }
+            }
+        }
+        Err(parser_creation_error) => {
+            println!("Parser creation failed: {}", parser_creation_error);
+        }
+    }
+}
+
+#[test]
+fn test_compare_before_and_after_error_collection() {
+    use bwq_linter::BrandwatchLinter;
+    
+    // Test some queries to see if our error collection changes introduce issues
+    let test_queries = vec![
+        "test :field",           // Space before colon
+        "test AND rating:6",     // Mix of valid and invalid
+        ")",                     // Just unexpected token
+        "test :field :another",  // Multiple lexer errors
+    ];
+    
+    let mut linter = BrandwatchLinter::new();
+    
+    for query in test_queries {
+        println!("\n--- Query: '{}' ---", query);
+        match linter.lint(query) {
+            Ok(report) => {
+                println!("Success: {} errors, {} warnings", report.errors.len(), report.warnings.len());
+                for (i, error) in report.errors.iter().enumerate() {
+                    println!("  Error {}: {} ({})", i+1, error.code(), error);
+                }
+            }
+            Err(error) => {
+                println!("Fail fast: {} ({})", error.code(), error);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_error_token_should_not_break_parsing() {
+    let mut test = QueryTest::new();
+    
+    // This query should parse successfully even with lexer errors
+    // "test" is valid, ":" creates ErrorToken, "field" is valid
+    // Should parse as: test AND : AND field (with lexer error + implicit AND warning)
+    let query = "test :field valid";
+    
+    match test.linter.lint(query) {
+        Ok(report) => {
+            println!("Query parsed successfully with {} errors", report.errors.len());
+            for error in &report.errors {
+                println!("  {}: {}", error.code(), error);
+            }
+            // Should have lexer error but not parser failure
+            assert!(report.errors.iter().any(|e| e.code() == "E001")); // lexer error
+            assert!(!report.errors.iter().any(|e| e.code() == "E007")); // should NOT have parser error
+        }
+        Err(e) => {
+            panic!("Query should parse successfully but got error: {}", e);
+        }
+    }
+}

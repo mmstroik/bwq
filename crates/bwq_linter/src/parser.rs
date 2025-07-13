@@ -561,6 +561,16 @@ impl Parser {
                     span: token.span,
                 })
             }
+            TokenType::ErrorToken { content } => {
+                // Treat error tokens as unknown terms so parsing can continue
+                self.advance();
+                Ok(Expression::Term {
+                    term: Term::Word {
+                        value: content.clone(),
+                    },
+                    span: token.span,
+                })
+            }
             _ => Err(LintError::UnexpectedToken {
                 span: token.span,
                 token: token.token_type.to_string(),
@@ -663,7 +673,9 @@ mod tests {
     #[test]
     fn test_basic_parsing() {
         let mut lexer = Lexer::new("apple AND juice");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
@@ -678,7 +690,9 @@ mod tests {
     #[test]
     fn test_quoted_phrase() {
         let mut lexer = Lexer::new("\"apple juice\"");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
@@ -696,7 +710,9 @@ mod tests {
     #[test]
     fn test_field_operation() {
         let mut lexer = Lexer::new("title:\"apple juice\"");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
@@ -711,7 +727,9 @@ mod tests {
     #[test]
     fn test_implicit_and() {
         let mut lexer = Lexer::new("apple banana");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
@@ -729,7 +747,9 @@ mod tests {
     fn test_colon_in_field_vs_non_field_terms() {
         // valid field operations are parsed as fields
         let mut lexer = Lexer::new("url:example.com");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
@@ -742,7 +762,9 @@ mod tests {
 
         // non-field colons get combined into a single term
         let mut lexer = Lexer::new("test:test");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 
@@ -758,7 +780,9 @@ mod tests {
 
         // quoted value after non-field colon
         let mut lexer = Lexer::new("protocol:\"https\"");
-        let tokens = lexer.tokenize().unwrap();
+        let lex_result = lexer.tokenize();
+        assert!(lex_result.errors.is_empty());
+        let tokens = lex_result.tokens;
         let mut parser = Parser::new(tokens).unwrap();
         let result = parser.parse().unwrap();
 

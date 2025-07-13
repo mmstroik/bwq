@@ -23,15 +23,49 @@ impl BrandwatchLinter {
 
     pub fn lint(&mut self, query: &str) -> LintResult<LintReport> {
         let mut lexer = Lexer::new(query);
-        let tokens = lexer.tokenize()?;
+        let lex_result = lexer.tokenize();
 
-        let mut parser = Parser::new(tokens)?;
-        let parse_result = parser.parse()?;
+        // Try to parse even if we have lexer errors
+        match Parser::new(lex_result.tokens) {
+            Ok(mut parser) => {
+                match parser.parse() {
+                    Ok(parse_result) => {
+                        // Successful parsing - combine all errors and warnings
+                        let mut report = self.validator.validate(&parse_result.query);
 
-        let mut report = self.validator.validate(&parse_result.query);
-        report.warnings.extend(parse_result.warnings);
+                        // Add lexer errors to the front
+                        let mut all_errors = lex_result.errors;
+                        all_errors.extend(report.errors);
+                        report.errors = all_errors;
 
-        Ok(report)
+                        // Combine warnings
+                        report.warnings.extend(parse_result.warnings);
+
+                        Ok(report)
+                    }
+                    Err(parse_error) => {
+                        // Parser failed - combine lexer errors + parser error
+                        let mut all_errors = lex_result.errors;
+                        all_errors.push(parse_error);
+
+                        Ok(LintReport {
+                            errors: all_errors,
+                            warnings: vec![],
+                        })
+                    }
+                }
+            }
+            Err(parser_creation_error) => {
+                // Parser creation failed - combine lexer errors + parser creation error
+                let mut all_errors = lex_result.errors;
+                all_errors.push(parser_creation_error);
+
+                Ok(LintReport {
+                    errors: all_errors,
+                    warnings: vec![],
+                })
+            }
+        }
     }
 
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {

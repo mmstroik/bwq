@@ -37,6 +37,9 @@ pub enum TokenType {
     Whitespace,
 
     Eof,
+
+    // Error recovery token for invalid input
+    ErrorToken { content: String },
 }
 
 impl fmt::Display for TokenType {
@@ -68,6 +71,7 @@ impl fmt::Display for TokenType {
             TokenType::Mention(m) => write!(f, "mention '{m}'"),
             TokenType::Whitespace => write!(f, "whitespace"),
             TokenType::Eof => write!(f, "end of file"),
+            TokenType::ErrorToken { content } => write!(f, "error token '{content}'"),
         }
     }
 }
@@ -90,6 +94,12 @@ impl Token {
     }
 }
 
+/// Result of lexing with collected errors
+pub struct LexResult {
+    pub tokens: Vec<Token>,
+    pub errors: Vec<LintError>,
+}
+
 /// lexer for tokenizing  queries
 pub struct Lexer {
     input: Vec<char>,
@@ -97,6 +107,7 @@ pub struct Lexer {
     line: usize,
     column: usize,
     inside_comment: bool,
+    errors: Vec<LintError>,
 }
 
 impl Lexer {
@@ -168,20 +179,25 @@ impl Lexer {
             line: 1,
             column: 1,
             inside_comment: false,
+            errors: Vec::new(),
         }
     }
 
-    pub fn tokenize(&mut self) -> LintResult<Vec<Token>> {
+    pub fn tokenize(&mut self) -> LexResult {
         let mut tokens = Vec::new();
 
         while !self.is_at_end() {
-            match self.next_token()? {
-                Some(token) => {
+            match self.next_token() {
+                Ok(Some(token)) => {
                     if !matches!(token.token_type, TokenType::Whitespace) {
                         tokens.push(token);
                     }
                 }
-                None => break,
+                Ok(None) => break,
+                Err(_) => {
+                    // Error already added to self.errors, continue tokenizing
+                    continue;
+                }
             }
         }
 
@@ -192,7 +208,14 @@ impl Lexer {
             String::new(),
         ));
 
-        Ok(tokens)
+        LexResult {
+            tokens,
+            errors: self.errors.clone(),
+        }
+    }
+
+    fn add_error(&mut self, error: LintError) {
+        self.errors.push(error);
     }
 
     fn next_token(&mut self) -> LintResult<Option<Token>> {
@@ -306,10 +329,33 @@ impl Lexer {
                         )
                         && !self.current_char().is_ascii_digit()
                     {
-                        return Err(LintError::LexerError {
-                            span: Span::single_character(start_pos),
+                        // Collect the error but continue tokenizing
+                        self.add_error(LintError::LexerError {
+                            span: Span::single_character(start_pos.clone()),
                             message: "Invalid characters after proximity operator. Tilde operator format should be ~5 (with proper word boundary).".to_string(),
                         });
+
+                        // Create error token for the invalid part and skip it
+                        let mut invalid_content = String::new();
+                        while !self.is_at_end()
+                            && !self.current_char().is_whitespace()
+                            && !matches!(
+                                self.current_char(),
+                                '(' | ')' | '[' | ']' | ':' | '~' | '"' | '#' | '@' | '<' | '>'
+                            )
+                        {
+                            invalid_content.push(self.current_char());
+                            self.advance();
+                            self.column += 1;
+                        }
+
+                        return Ok(Some(Token::new(
+                            TokenType::ErrorToken {
+                                content: invalid_content.clone(),
+                            },
+                            Span::new(self.current_position(), self.current_position()),
+                            invalid_content,
+                        )));
                     }
 
                     self.position -= self.current_position().offset - tilde_end.offset;
@@ -323,12 +369,23 @@ impl Lexer {
                 )))
             }
             ':' => {
-                // Check for a space before colon - always fail if there's a space before
+                // Check for a space before colon - collect error but continue
                 if self.position > 0 && self.input[self.position - 1].is_whitespace() {
-                    return Err(LintError::LexerError {
-                        span: Span::single_character(start_pos),
+                    self.add_error(LintError::LexerError {
+                        span: Span::single_character(start_pos.clone()),
                         message: "Field operator colon must be directly attached to the field name. If the colon is a search term, you'll need to put it in quote marks".to_string(),
                     });
+
+                    // Create error token for the spaced colon
+                    self.advance();
+                    self.column += 1;
+                    return Ok(Some(Token::new(
+                        TokenType::ErrorToken {
+                            content: ":".to_string(),
+                        },
+                        Span::new(start_pos, self.current_position()),
+                        ":".to_string(),
+                    )));
                 }
 
                 self.advance();
@@ -355,12 +412,21 @@ impl Lexer {
             _ if self.is_word_char(ch) => self.read_word_or_operator(),
 
             _ => {
+                // Collect error but continue by treating as single character term
+                self.add_error(LintError::LexerError {
+                    span: Span::single_character(start_pos.clone()),
+                    message: format!("Unexpected character '{ch}'"),
+                });
+
                 self.advance();
                 self.column += 1;
-                Err(LintError::LexerError {
-                    span: Span::single_character(start_pos),
-                    message: format!("Unexpected character '{ch}'"),
-                })
+                Ok(Some(Token::new(
+                    TokenType::ErrorToken {
+                        content: ch.to_string(),
+                    },
+                    Span::new(start_pos, self.current_position()),
+                    ch.to_string(),
+                )))
             }
         }
     }
@@ -390,10 +456,22 @@ impl Lexer {
         }
 
         if self.is_at_end() {
-            return Err(LintError::LexerError {
-                span: Span::single_character(start_pos),
+            // Collect error but continue with what we have
+            self.add_error(LintError::LexerError {
+                span: Span::single_character(start_pos.clone()),
                 message: "Unterminated quoted string".to_string(),
             });
+
+            // Return error token for the unterminated string
+            raw.push('"'); // Add closing quote for consistency
+            let end_pos = self.current_position();
+            return Ok(Some(Token::new(
+                TokenType::ErrorToken {
+                    content: value.clone(),
+                },
+                Span::new(start_pos, end_pos),
+                raw,
+            )));
         }
 
         raw.push(self.current_char());
@@ -634,7 +712,9 @@ mod tests {
     #[test]
     fn test_basic_tokenization() {
         let mut lexer = Lexer::new("apple AND juice");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 4);
         assert!(matches!(tokens[0].token_type, TokenType::Word(ref w) if w == "apple"));
@@ -646,7 +726,9 @@ mod tests {
     #[test]
     fn test_quoted_string() {
         let mut lexer = Lexer::new("\"apple juice\" \" phrase with spaces \"");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 3);
         assert!(
@@ -660,7 +742,9 @@ mod tests {
     #[test]
     fn test_proximity_operators() {
         let mut lexer = Lexer::new("NEAR/5 NEAR/3f");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 3);
         assert!(matches!(tokens[0].token_type, TokenType::Near(5)));
@@ -672,7 +756,9 @@ mod tests {
         let mut lexer = Lexer::new(
             "42 3.14 -5 0xcharlie 18Rahul;Joshi user123 $UBER U&BER uber$ 123$abc test+word word%test test=word word`test 5test|word test@word",
         );
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 17); // 16 tokens + EOF
 
@@ -706,7 +792,9 @@ mod tests {
     #[test]
     fn test_numeric_wildcards() {
         let mut lexer = Lexer::new("24* 12? 100*test");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 4); // 3 tokens + EOF
 
@@ -720,7 +808,9 @@ mod tests {
     #[test]
     fn test_emoji_keycaps() {
         let mut lexer = Lexer::new("1️⃣ OR 2️⃣");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 4); // 3 tokens + EOF
 
@@ -734,7 +824,9 @@ mod tests {
     #[test]
     fn test_semicolons_in_terms() {
         let mut lexer = Lexer::new("test;test;test");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 2); // 1 token + EOF
 
@@ -746,7 +838,9 @@ mod tests {
     #[test]
     fn test_colon_in_terms() {
         let mut lexer = Lexer::new("test:test");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 4); // 3 tokens + EOF
 
@@ -760,7 +854,9 @@ mod tests {
     #[test]
     fn test_numbers_with_dashes_and_underscores() {
         let mut lexer = Lexer::new("123-456 1_000-000.50 -42-195_000");
-        let tokens = lexer.tokenize().unwrap();
+        let result = lexer.tokenize();
+        assert!(result.errors.is_empty());
+        let tokens = result.tokens;
 
         assert_eq!(tokens.len(), 4); // 3 tokens + EOF
 
