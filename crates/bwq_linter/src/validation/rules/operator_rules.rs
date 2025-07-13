@@ -329,7 +329,7 @@ impl ValidationRule for TildeUsageRule {
                     } => {
                         return ValidationResult::with_warning(LintWarning::PotentialTypo {
                             span: span.clone(),
-                            suggestion: "Single term tilde may produce unexpected fuzzy matching results. Consider using quoted phrases for proximity: \"term1 term2\"~5".to_string(),
+                            message: "Single term tilde may produce unexpected fuzzy matching results. Consider using quoted phrases for proximity: \"term1 term2\"~5 or place the tilde in quotation marks to use as a search term".to_string(),
                         });
                     }
                     Expression::Term {
@@ -340,7 +340,7 @@ impl ValidationRule for TildeUsageRule {
                         if words.len() == 1 {
                             return ValidationResult::with_warning(LintWarning::PotentialTypo {
                                 span: span.clone(),
-                                suggestion: "Tilde operator on single quoted words has no effect. Use unquoted word or multi-word phrase.".to_string(),
+                                message: "Tilde operator on single quoted words has no effect. Use on a multi-word phrase or bracketed groups of terms".to_string(),
                             });
                         }
                     }

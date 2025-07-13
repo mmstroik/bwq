@@ -69,7 +69,7 @@ impl Parser {
         for span in &self.implicit_and_spans {
             warnings.push(LintWarning::PotentialTypo {
                 span: span.clone(),
-                suggestion: "Consider using explicit 'AND' operator for clarity".to_string(),
+                message: "Two or more terms without an operator between them are implicitly ANDed. Consider using explicit 'AND' operator for clarity".to_string(),
             });
         }
 

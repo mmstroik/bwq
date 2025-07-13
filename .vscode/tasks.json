@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "compile-extension",
+			"type": "shell",
+			"command": "pnpm",
+			"args": ["run", "compile"],
+			"options": {
+				"cwd": "${workspaceFolder}/vscode-extension"
+			},
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false,
+				"close": true
+			},
+			"problemMatcher": "$tsc"
+		}
+	]
+} 
