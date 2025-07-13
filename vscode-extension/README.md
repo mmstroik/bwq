@@ -38,15 +38,13 @@ special: `{case}`, `#hashtag`, `@mention`, `<<<comments>>>`
 - E006: invalid wildcard placement
 - E007: invalid proximity operator syntax
 - E008: invalid field operator syntax
-- E009: invalid range syntax
-- E010: unexpected token
-- E011: expected token but found something else
-- E012: field validation errors
-- E013: proximity operator errors
-- E014: range validation errors
-- E015: operator mixing errors
-- E016: pure negative query errors
-- E017: invalid field operator spacing
+- E009: unexpected token
+- E010: expected token but found something else
+- E011: field validation errors
+- E012: proximity operator errors
+- E013: range validation errors
+- E014: operator mixing errors
+- E015: pure negative query errors
 
 **warnings (W001-W002):**
 

@@ -70,9 +70,6 @@ pub enum LintError {
     #[error("Invalid field operator syntax: {message}")]
     InvalidFieldOperator { span: Span, message: String },
 
-    #[error("Invalid range syntax: expected '[value TO value]'")]
-    InvalidRangeSyntax { span: Span },
-
     #[error("Unexpected token '{token}'")]
     UnexpectedToken { span: Span, token: String },
 
@@ -110,7 +107,6 @@ impl LintError {
             | LintError::InvalidWildcardPlacement { span, .. }
             | LintError::InvalidProximityOperator { span, .. }
             | LintError::InvalidFieldOperator { span, .. }
-            | LintError::InvalidRangeSyntax { span }
             | LintError::UnexpectedToken { span, .. }
             | LintError::ExpectedToken { span, .. }
             | LintError::FieldValidationError { span, .. }
@@ -131,14 +127,13 @@ impl LintError {
             LintError::InvalidWildcardPlacement { .. } => "E006",
             LintError::InvalidProximityOperator { .. } => "E007",
             LintError::InvalidFieldOperator { .. } => "E008",
-            LintError::InvalidRangeSyntax { .. } => "E009",
-            LintError::UnexpectedToken { .. } => "E010",
-            LintError::ExpectedToken { .. } => "E011",
-            LintError::FieldValidationError { .. } => "E012",
-            LintError::ProximityOperatorError { .. } => "E013",
-            LintError::InvalidFieldRange { .. } => "E014",
-            LintError::OperatorMixingError { .. } => "E015",
-            LintError::PureNegativeQueryError { .. } => "E016",
+            LintError::UnexpectedToken { .. } => "E009",
+            LintError::ExpectedToken { .. } => "E010",
+            LintError::FieldValidationError { .. } => "E011",
+            LintError::ProximityOperatorError { .. } => "E012",
+            LintError::InvalidFieldRange { .. } => "E013",
+            LintError::OperatorMixingError { .. } => "E014",
+            LintError::PureNegativeQueryError { .. } => "E015",
         }
     }
 
