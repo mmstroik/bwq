@@ -325,7 +325,7 @@ impl Lexer {
             ':' => {
                 // Check for a space before colon - always fail if there's a space before
                 if self.position > 0 && self.input[self.position - 1].is_whitespace() {
-                    return Err(LintError::InvalidFieldOperatorSpacing {
+                    return Err(LintError::LexerError {
                         span: Span::single_character(start_pos),
                         message: "Field operator colon must be directly attached to the field name. If the colon is a search term, you'll need to put it in quote marks".to_string(),
                     });

@@ -97,9 +97,6 @@ pub enum LintError {
 
     #[error("{message}")]
     PureNegativeQueryError { span: Span, message: String },
-
-    #[error("{message}")]
-    InvalidFieldOperatorSpacing { span: Span, message: String },
 }
 
 impl LintError {
@@ -120,8 +117,7 @@ impl LintError {
             | LintError::ProximityOperatorError { span, .. }
             | LintError::InvalidFieldRange { span, .. }
             | LintError::OperatorMixingError { span, .. }
-            | LintError::PureNegativeQueryError { span, .. }
-            | LintError::InvalidFieldOperatorSpacing { span, .. } => span,
+            | LintError::PureNegativeQueryError { span, .. } => span,
         }
     }
 
@@ -143,7 +139,6 @@ impl LintError {
             LintError::InvalidFieldRange { .. } => "E014",
             LintError::OperatorMixingError { .. } => "E015",
             LintError::PureNegativeQueryError { .. } => "E016",
-            LintError::InvalidFieldOperatorSpacing { .. } => "E017",
         }
     }
 
