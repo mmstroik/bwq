@@ -485,6 +485,20 @@ fn test_guid_field_validation(query: &str, expected: TestExpectation) {
     expected.assert(&mut test, query);
 }
 
+#[test_case("entityId:29", TestExpectation::ValidNoWarnings; "valid entityId for Spain WikiData Q29")]
+#[test_case("entityId:5", TestExpectation::ValidNoWarnings; "valid single digit entityId")]
+#[test_case("entityId:123456", TestExpectation::ValidNoWarnings; "valid multi-digit entityId")]
+#[test_case("entityId:abc", TestExpectation::ErrorCode("E009"); "entityId should be digits only")]
+#[test_case("entityId:123abc", TestExpectation::ErrorCode("E009"); "entityId should not contain letters")]
+#[test_case("entityId:123-456", TestExpectation::ErrorCode("E009"); "entityId should not contain dashes")]
+#[test_case("entityId:123_456", TestExpectation::ErrorCode("E009"); "entityId should not contain underscores")]
+#[test_case("entityId:0", TestExpectation::ErrorCode("E009"); "entityId should not be 0")]
+#[test_case("entityId:0123", TestExpectation::ErrorCode("E009"); "entityId should not start with 0")]
+fn test_entity_id_field_validation(query: &str, expected: TestExpectation) {
+    let mut test = QueryTest::new();
+    expected.assert(&mut test, query);
+}
+
 // ============================================================================
 // MISC TESTS
 // Tests for misc validation

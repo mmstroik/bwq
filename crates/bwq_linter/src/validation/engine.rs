@@ -24,6 +24,7 @@ impl ValidationEngine {
                 Box::new(RangeFieldRule),
                 Box::new(FollowerCountFieldRule),
                 Box::new(GuidFieldRule),
+                Box::new(EntityIdFieldRule),
                 // operator validation rules
                 Box::new(MixedAndOrRule),
                 Box::new(MixedNearRule),

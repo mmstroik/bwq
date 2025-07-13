@@ -590,3 +590,53 @@ impl ValidationRule for GuidFieldRule {
         )
     }
 }
+
+pub struct EntityIdFieldRule;
+
+impl ValidationRule for EntityIdFieldRule {
+    fn name(&self) -> &'static str {
+        "entityid-field"
+    }
+
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
+        if let Expression::Field {
+            field: FieldType::EntityId,
+            value,
+            span,
+        } = expr
+        {
+            if let Expression::Term {
+                term: Term::Word { value: entity_id },
+                ..
+            } = value.as_ref()
+            {
+                // EntityId should be digits only (WikiData IDs)
+                if !entity_id.chars().all(|c| c.is_ascii_digit()) {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: "entityId must contain only digits (e.g., '29' for Spain's WikiData ID Q29)".to_string(),
+                    });
+                }
+
+                // Should not be empty or start with 0 (WikiData IDs don't start with 0)
+                if entity_id.is_empty() || entity_id.starts_with('0') {
+                    return ValidationResult::with_error(LintError::FieldValidationError {
+                        span: span.clone(),
+                        message: "entityId must be a valid positive number (WikiData IDs don't start with 0)".to_string(),
+                    });
+                }
+            }
+        }
+        ValidationResult::new()
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::Field {
+                field: FieldType::EntityId,
+                ..
+            }
+        )
+    }
+}
