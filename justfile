@@ -1,5 +1,7 @@
 set dotenv-load
 
+alias fmt := format
+
 build:
 	cargo build
 
