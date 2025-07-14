@@ -545,7 +545,7 @@ impl Server {
 
     fn lsp_position_to_byte_position(&self, text: &str, position: Position) -> usize {
         let line_offset = position.line as usize;
-        let char_offset = position.character as usize;
+        let utf16_char_offset = position.character as usize;
 
         let lines: Vec<&str> = text.lines().collect();
         if line_offset >= lines.len() {
@@ -553,23 +553,28 @@ impl Server {
         }
 
         let line = lines[line_offset];
-        if char_offset > line.len() {
-            let mut byte_position = 0;
-            for (i, line) in lines.iter().enumerate() {
-                if i == line_offset {
-                    byte_position += line.len();
+
+        // Convert UTF-16 character offset to UTF-8 byte offset within the line
+        let line_byte_offset = {
+            let mut utf16_count = 0;
+            let mut byte_offset = 0;
+
+            for ch in line.chars() {
+                if utf16_count >= utf16_char_offset {
                     break;
                 }
-                byte_position += line.len() + 1; // +1 for newline
+                byte_offset += ch.len_utf8();
+                utf16_count += ch.len_utf16();
             }
-            return byte_position;
-        }
 
-        // Calculate byte position in the document
+            // Clamp to line length if offset is beyond line end
+            byte_offset.min(line.len())
+        };
+
         let mut byte_position = 0;
         for (i, line) in lines.iter().enumerate() {
             if i == line_offset {
-                byte_position += char_offset;
+                byte_position += line_byte_offset;
                 break;
             }
             byte_position += line.len() + 1; // +1 for newline
