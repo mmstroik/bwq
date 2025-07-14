@@ -578,17 +578,20 @@ impl Server {
             }
         }
 
-        if line_offset >= line_start_positions.len() - 1 {
+        if line_offset >= line_start_positions.len() {
             return text.len();
         }
 
         let line_start = line_start_positions[line_offset];
         let line_end = if line_offset + 1 < line_start_positions.len() {
-            // Subtract line ending bytes to get the actual line content end
+            // Get the start of the next line and work backwards to find line content end
             let next_line_start = line_start_positions[line_offset + 1];
-            if next_line_start >= 2 && text_bytes.get(next_line_start - 2) == Some(&b'\r') {
+            if next_line_start >= 2
+                && text_bytes.get(next_line_start - 2) == Some(&b'\r')
+                && text_bytes.get(next_line_start - 1) == Some(&b'\n')
+            {
                 next_line_start - 2 // CRLF
-            } else if next_line_start >= 1 {
+            } else if next_line_start >= 1 && text_bytes.get(next_line_start - 1) == Some(&b'\n') {
                 next_line_start - 1 // LF
             } else {
                 next_line_start

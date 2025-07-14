@@ -212,6 +212,13 @@ impl WikiDataClient {
 
 impl Default for WikiDataClient {
     fn default() -> Self {
-        Self::new().expect("Failed to create WikiData client")
+        Self::new().unwrap_or_else(|_| {
+            // Fallback to a minimal client that will return errors for all operations
+            WikiDataClient {
+                client: Client::new(),
+                cache: HashMap::new(),
+                cache_ttl: Duration::from_secs(300),
+            }
+        })
     }
 }
