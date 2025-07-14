@@ -44,11 +44,13 @@ impl TaskExecutor {
         &self,
         uri: Uri,
         content: String,
+        document_version: Option<i32>,
         cancellation_token: Option<CancellationToken>,
     ) -> Result<()> {
         let task = BackgroundTask::Diagnostics {
             uri,
             content,
+            document_version,
             cancellation_token,
         };
 
@@ -58,7 +60,7 @@ impl TaskExecutor {
 
     /// Schedule a diagnostics task without cancellation token (for tests)
     pub fn schedule_diagnostics_simple(&self, uri: Uri, content: String) -> Result<()> {
-        self.schedule_diagnostics(uri, content, None)
+        self.schedule_diagnostics(uri, content, None, None)
     }
 
     /// Schedule an entity lookup task for background processing
@@ -93,6 +95,7 @@ enum BackgroundTask {
     Diagnostics {
         uri: Uri,
         content: String,
+        document_version: Option<i32>,
         cancellation_token: Option<CancellationToken>,
     },
     EntityLookup {
@@ -109,6 +112,7 @@ pub enum TaskResponse {
     Diagnostics {
         params: PublishDiagnosticsParams,
         ast: Option<Query>,
+        document_version: Option<i32>,
     },
     EntityInfo {
         request_id: lsp_server::RequestId,
@@ -137,6 +141,7 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
             BackgroundTask::Diagnostics {
                 uri,
                 content,
+                document_version,
                 cancellation_token,
             } => {
                 // Check if request was cancelled before processing
@@ -166,6 +171,7 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                                 version: None,
                             },
                             ast,
+                            document_version,
                         };
 
                         if sender.send(response).is_err() {
@@ -184,6 +190,7 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                                 version: None,
                             },
                             ast: None,
+                            document_version,
                         };
 
                         if sender.send(response).is_err() {

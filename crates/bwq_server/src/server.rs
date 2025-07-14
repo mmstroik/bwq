@@ -160,23 +160,29 @@ impl Server {
                 }
                 recv(self.task_response_receiver) -> response => {
                     match response {
-                        Ok(TaskResponse::Diagnostics { params, ast }) => {
-                            // Cache AST if available
+                        Ok(TaskResponse::Diagnostics { params, ast, document_version }) => {
+                            // Cache AST if available and document version is still current
                             if let Some(ast) = ast {
-                                // Check if this evicts an entry from the LRU cache
-                                let cache_size_before = self.ast_cache.len();
-                                self.ast_cache.put(params.uri.clone(), ast);
-                                let cache_size_after = self.ast_cache.len();
+                                // Check if document version is still current to prevent stale AST caching
+                                let current_version = self.documents.get(&params.uri).map(|doc| doc.version);
+                                if document_version == current_version {
+                                    // Check if this evicts an entry from the LRU cache
+                                    let cache_size_before = self.ast_cache.len();
+                                    self.ast_cache.put(params.uri.clone(), ast);
+                                    let cache_size_after = self.ast_cache.len();
 
-                                if cache_size_after <= cache_size_before && cache_size_before > 0 {
-                                    tracing::debug!("AST CACHE: LRU evicted entry - cache size: {}", cache_size_after);
+                                    if cache_size_after < cache_size_before {
+                                        tracing::debug!("AST CACHE: LRU evicted entry - cache size: {}", cache_size_after);
+                                    } else {
+                                        tracing::debug!("AST CACHE: Cached AST - size: {}/{}", cache_size_after, self.ast_cache.cap());
+                                    }
+
+                                    // Update document state to indicate AST is cached
+                                    if let Some(document) = self.documents.get_mut(&params.uri) {
+                                        document.ast_state = AstState::Cached;
+                                    }
                                 } else {
-                                    tracing::debug!("AST CACHE: Cached AST - size: {}/{}", cache_size_after, self.ast_cache.cap());
-                                }
-
-                                // Update document state to indicate AST is cached
-                                if let Some(document) = self.documents.get_mut(&params.uri) {
-                                    document.ast_state = AstState::Cached;
+                                    tracing::debug!("AST CACHE: Skipping cache for stale AST - document version changed from {:?} to {:?}", document_version, current_version);
                                 }
                             } else {
                                 tracing::debug!("Diagnostics completed: {:?} - no AST returned (likely parse error)", params.uri);
@@ -340,6 +346,8 @@ impl Server {
 
     /// Schedule diagnostics processing in the background
     fn schedule_diagnostics(&mut self, uri: &Uri, content: &str) -> Result<()> {
+        let document_version = self.documents.get(uri).map(|doc| doc.version);
+
         // Mark document as parsing
         if let Some(document) = self.documents.get_mut(uri) {
             document.ast_state = AstState::Parsing;
@@ -348,8 +356,12 @@ impl Server {
 
         // Notifications like didChange/didOpen don't have request IDs,
         // so they cannot be cancelled - pass None for cancellation token
-        self.task_executor
-            .schedule_diagnostics(uri.clone(), content.to_string(), None)?;
+        self.task_executor.schedule_diagnostics(
+            uri.clone(),
+            content.to_string(),
+            document_version,
+            None,
+        )?;
 
         Ok(())
     }
@@ -547,12 +559,46 @@ impl Server {
         let line_offset = position.line as usize;
         let utf16_char_offset = position.character as usize;
 
-        let lines: Vec<&str> = text.lines().collect();
-        if line_offset >= lines.len() {
+        // Find line boundaries by examining actual line endings in the text
+        let mut line_start_positions = vec![0];
+        let mut pos = 0;
+        let text_bytes = text.as_bytes();
+
+        while pos < text_bytes.len() {
+            if text_bytes[pos] == b'\n' {
+                line_start_positions.push(pos + 1);
+                pos += 1;
+            } else if text_bytes[pos] == b'\r'
+                && pos + 1 < text_bytes.len()
+                && text_bytes[pos + 1] == b'\n'
+            {
+                line_start_positions.push(pos + 2);
+                pos += 2;
+            } else {
+                pos += 1;
+            }
+        }
+
+        if line_offset >= line_start_positions.len() - 1 {
             return text.len();
         }
 
-        let line = lines[line_offset];
+        let line_start = line_start_positions[line_offset];
+        let line_end = if line_offset + 1 < line_start_positions.len() {
+            // Subtract line ending bytes to get the actual line content end
+            let next_line_start = line_start_positions[line_offset + 1];
+            if next_line_start >= 2 && text_bytes.get(next_line_start - 2) == Some(&b'\r') {
+                next_line_start - 2 // CRLF
+            } else if next_line_start >= 1 {
+                next_line_start - 1 // LF
+            } else {
+                next_line_start
+            }
+        } else {
+            text.len()
+        };
+
+        let line = &text[line_start..line_end];
 
         // Convert UTF-16 character offset to UTF-8 byte offset within the line
         let line_byte_offset = {
@@ -571,16 +617,7 @@ impl Server {
             byte_offset.min(line.len())
         };
 
-        let mut byte_position = 0;
-        for (i, line) in lines.iter().enumerate() {
-            if i == line_offset {
-                byte_position += line_byte_offset;
-                break;
-            }
-            byte_position += line.len() + 1; // +1 for newline
-        }
-
-        byte_position
+        line_start + line_byte_offset
     }
 
     fn find_entity_id_at_position(&self, ast: &Query, position: usize) -> Option<String> {
