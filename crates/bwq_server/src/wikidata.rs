@@ -145,19 +145,12 @@ impl WikiDataClient {
             }
         }
 
-        // Clean the entity ID - remove Q prefix if present, and validate it's numeric
-        let clean_id = if let Some(stripped) = entity_id.strip_prefix('Q') {
-            stripped
-        } else {
-            entity_id
-        };
-
-        if !clean_id.chars().all(|c| c.is_ascii_digit()) {
+        if !entity_id.chars().all(|c| c.is_ascii_digit()) {
             tracing::warn!("Invalid entity ID format: {}", entity_id);
             return Ok(None);
         }
 
-        let wikidata_id = format!("Q{clean_id}");
+        let wikidata_id = format!("Q{entity_id}");
 
         let url = format!(
             "https://www.wikidata.org/w/api.php?action=wbgetentities&ids={wikidata_id}&format=json&languages=en&origin=*"
