@@ -281,7 +281,7 @@ fn test_valid_query() {
 
     assert_eq!(exit_code, 0);
     assert!(stderr.is_empty());
-    assert!(stdout.is_empty() || stdout.trim().is_empty());
+    assert_eq!(stdout.trim(), "All checks passed!");
 }
 
 #[test]
@@ -299,7 +299,7 @@ fn test_no_warnings_flag() {
 
     assert_eq!(exit_code, 0);
     assert!(stderr.is_empty());
-    assert!(stdout.is_empty() || stdout.trim().is_empty()); // No warnings should be shown
+    assert_eq!(stdout.trim(), "All checks passed!");
 }
 
 #[test]

@@ -200,40 +200,123 @@ impl Printer {
     }
 
     fn print_text(&self, analysis: &AnalysisResult) {
-        if let Some(query) = &analysis.query {
-            if !analysis.errors.is_empty() {
-                for error in &analysis.errors {
-                    self.print_error_with_context(query, error, None);
-                    println!();
-                }
+        if !analysis.errors.is_empty() {
+            for error in &analysis.errors {
+                self.print_error_with_context(&analysis.query, error, None);
+                println!();
             }
+        }
 
-            if self.show_warnings && !analysis.warnings.is_empty() {
-                for warning in &analysis.warnings {
-                    self.print_warning_with_context(query, warning, None);
-                    println!();
-                }
+        if self.show_warnings && !analysis.warnings.is_empty() {
+            for warning in &analysis.warnings {
+                self.print_warning_with_context(&analysis.query, warning, None);
+                println!();
             }
+        }
+        let warning_count = if self.show_warnings { analysis.warnings.len() } else { 0 };
+        let error_count = analysis.errors.len();
+        if error_count == 0 && warning_count == 0 {
+            println!("All checks passed!");
         } else {
-            // Fallback to old format if no query
-            println!("{}", analysis.summary());
+            println!("Found {} diagnostics", error_count + warning_count);
+        }
+    }
+    
+    fn print_json(&self, analysis: &AnalysisResult) {
+        let errors: Vec<_> = analysis.errors.iter().map(|e| e.to_json()).collect();
+        let warnings: Vec<_> = if self.show_warnings {
+            analysis.warnings.iter().map(|w| w.to_json()).collect()
+        } else {
+            Vec::new()
+        };
 
-            if !analysis.errors.is_empty() {
-                println!("\nErrors:");
-                for (i, error) in analysis.errors.iter().enumerate() {
-                    println!("  {}. {}: {}", i + 1, error.code(), error);
+        let json_output = serde_json::json!({
+            "query": analysis.query,
+            "errors": errors,
+            "warnings": warnings
+        });
+
+        println!("{}", serde_json::to_string_pretty(&json_output).unwrap());
+    }
+
+    fn print_file_results_text(&self, results: &FileResults) {
+        for (file_path, analysis, query) in &results.successful {
+            if !analysis.is_valid || (self.show_warnings && !analysis.warnings.is_empty()) {
+                for error in &analysis.errors {
+                    self.print_error_with_context(query, error, Some(file_path));
+                    println!();
                 }
-            }
 
-            if self.show_warnings && !analysis.warnings.is_empty() {
-                println!("\nWarnings:");
-                for (i, warning) in analysis.warnings.iter().enumerate() {
-                    println!("  {}. {}: {}", i + 1, warning.code(), warning);
+                if self.show_warnings {
+                    for warning in &analysis.warnings {
+                        self.print_warning_with_context(query, warning, Some(file_path));
+                        println!();
+                    }
                 }
             }
         }
+
+        let valid_files = results.valid_files();
+        let total_files = results.total_files_processed();
+
+        if results.read_errors > 0 {
+            println!(
+                "Summary: {valid_files}/{total_files} files valid ({} files could not be read)",
+                results.read_errors
+            );
+        } else if total_files == valid_files {
+            println!("All checks passed!");
+        } else {
+            println!("Summary: {valid_files}/{total_files} files valid");
+        }
     }
 
+    fn print_file_results_json(&self, results: &FileResults) {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        // Add lint errors and warnings from successful files
+        for (file_path, analysis, _) in &results.successful {
+            for error in &analysis.errors {
+                let mut error_json = error.to_json();
+                if let Some(obj) = error_json.as_object_mut() {
+                    obj.insert(
+                        "filename".to_string(),
+                        serde_json::Value::String(file_path.display().to_string()),
+                    );
+                }
+                errors.push(error_json);
+            }
+
+            if self.show_warnings {
+                for warning in &analysis.warnings {
+                    let mut warning_json = warning.to_json();
+                    if let Some(obj) = warning_json.as_object_mut() {
+                        obj.insert(
+                            "filename".to_string(),
+                            serde_json::Value::String(file_path.display().to_string()),
+                        );
+                    }
+                    warnings.push(warning_json);
+                }
+            }
+        }
+
+        let valid_files = results.valid_files();
+        let total_files = results.total_files_processed();
+
+        let output = serde_json::json!({
+            "summary": {
+                "total_files": total_files,
+                "valid_files": valid_files,
+                "invalid_files": total_files - valid_files
+            },
+            "errors": errors,
+            "warnings": warnings
+        });
+
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    }
     fn print_error_with_context(
         &self,
         query: &str,
@@ -616,99 +699,5 @@ impl Printer {
                 style.pipe_indent, style.color_start, style.color_end
             );
         }
-    }
-
-    fn print_json(&self, analysis: &AnalysisResult) {
-        let errors: Vec<_> = analysis.errors.iter().map(|e| e.to_json()).collect();
-        let warnings: Vec<_> = if self.show_warnings {
-            analysis.warnings.iter().map(|w| w.to_json()).collect()
-        } else {
-            Vec::new()
-        };
-
-        let json_output = serde_json::json!({
-            "query": analysis.query,
-            "errors": errors,
-            "warnings": warnings
-        });
-
-        println!("{}", serde_json::to_string_pretty(&json_output).unwrap());
-    }
-
-    fn print_file_results_text(&self, results: &FileResults) {
-        for (file_path, analysis, query) in &results.successful {
-            if !analysis.is_valid || (self.show_warnings && !analysis.warnings.is_empty()) {
-                for error in &analysis.errors {
-                    self.print_error_with_context(query, error, Some(file_path));
-                    println!();
-                }
-
-                if self.show_warnings {
-                    for warning in &analysis.warnings {
-                        self.print_warning_with_context(query, warning, Some(file_path));
-                        println!();
-                    }
-                }
-            }
-        }
-
-        let valid_files = results.valid_files();
-        let total_files = results.total_files_processed();
-
-        if results.read_errors > 0 {
-            println!(
-                "Summary: {valid_files}/{total_files} files valid ({} files could not be read)",
-                results.read_errors
-            );
-        } else {
-            println!("Summary: {valid_files}/{total_files} files valid");
-        }
-    }
-
-    fn print_file_results_json(&self, results: &FileResults) {
-        let mut errors = Vec::new();
-        let mut warnings = Vec::new();
-
-        // Add lint errors and warnings from successful files
-        for (file_path, analysis, _) in &results.successful {
-            for error in &analysis.errors {
-                let mut error_json = error.to_json();
-                if let Some(obj) = error_json.as_object_mut() {
-                    obj.insert(
-                        "filename".to_string(),
-                        serde_json::Value::String(file_path.display().to_string()),
-                    );
-                }
-                errors.push(error_json);
-            }
-
-            if self.show_warnings {
-                for warning in &analysis.warnings {
-                    let mut warning_json = warning.to_json();
-                    if let Some(obj) = warning_json.as_object_mut() {
-                        obj.insert(
-                            "filename".to_string(),
-                            serde_json::Value::String(file_path.display().to_string()),
-                        );
-                    }
-                    warnings.push(warning_json);
-                }
-            }
-        }
-
-        let valid_files = results.valid_files();
-        let total_files = results.total_files_processed();
-
-        let output = serde_json::json!({
-            "summary": {
-                "total_files": total_files,
-                "valid_files": valid_files,
-                "invalid_files": total_files - valid_files
-            },
-            "errors": errors,
-            "warnings": warnings
-        });
-
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
     }
 }
