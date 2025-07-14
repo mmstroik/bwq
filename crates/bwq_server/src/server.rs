@@ -19,7 +19,26 @@ use lsp_types::{
 use crate::connection::{ConnectionInitializer, server_capabilities};
 use crate::request_queue::RequestQueue;
 use crate::task::{TaskExecutor, TaskResponse};
-use crate::wikidata::{EntityInfo, WikiDataClient};
+use crate::wikidata::{EntityInfo, EntitySearchResult};
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+struct EntitySearchParams {
+    query: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct EntitySearchResponse {
+    results: Vec<EntitySearchResult>,
+}
+
+#[allow(dead_code)] // used for trait implementation only
+struct EntitySearchRequest;
+
+impl RequestTrait for EntitySearchRequest {
+    type Params = EntitySearchParams;
+    type Result = EntitySearchResponse;
+    const METHOD: &'static str = "bwq/searchEntities";
+}
 
 #[derive(Debug, Clone)]
 enum AstState {
@@ -168,6 +187,9 @@ impl Server {
                         Ok(TaskResponse::EntityInfo { request_id, entity_info }) => {
                             self.send_entity_info_response(request_id, entity_info)?;
                         }
+                        Ok(TaskResponse::EntitySearchResults { request_id, results }) => {
+                            self.send_entity_search_response(request_id, results)?;
+                        }
                         Err(_) => {
                             tracing::info!("Task response channel closed - exiting");
                             break;
@@ -188,6 +210,9 @@ impl Server {
             <HoverRequest as RequestTrait>::METHOD => {
                 self.handle_hover_request(req)?;
             }
+            <EntitySearchRequest as RequestTrait>::METHOD => {
+                self.handle_entity_search_request(req)?;
+            }
             _ => {
                 let response = Response::new_err(
                     req.id,
@@ -197,6 +222,27 @@ impl Server {
                 self.connection.sender.send(Message::Response(response))?;
             }
         }
+        Ok(())
+    }
+
+    fn handle_entity_search_request(&mut self, req: Request) -> Result<()> {
+        let params: EntitySearchParams = match serde_json::from_value(req.params) {
+            Ok(params) => params,
+            Err(e) => {
+                let response = Response::new_err(
+                    req.id,
+                    lsp_server::ErrorCode::InvalidParams as i32,
+                    format!("Invalid entity search params: {e}"),
+                );
+                self.connection.sender.send(Message::Response(response))?;
+                return Ok(());
+            }
+        };
+
+        tracing::debug!("Entity search request for query: {}", params.query);
+
+        self.task_executor
+            .schedule_entity_search(req.id, params.query)?;
         Ok(())
     }
 
@@ -370,17 +416,51 @@ impl Server {
 
         let byte_position = self.lsp_position_to_byte_position(document_content, position);
 
-        // Try to get cached AST
+        // Try to get cached AST, wait for parsing if not available
         let entity_id = if let Some(ast) = self.ast_cache.get(&uri).cloned() {
-            tracing::info!(
-                "🎯 HOVER: Using cached AST for entity extraction (cache size: {}/{})",
+            tracing::debug!(
+                "HOVER: Using cached AST for entity extraction (cache size: {}/{})",
                 self.ast_cache.len(),
                 self.ast_cache.cap()
             );
             self.find_entity_id_at_position(&ast, byte_position)
         } else {
-            tracing::info!("⚠️  HOVER: AST cache miss - falling back to text-based extraction");
-            WikiDataClient::extract_entity_id_from_text(document_content, byte_position)
+            // Check document state to see if we should wait for parsing
+            let document_state = self
+                .documents
+                .get(&uri)
+                .map(|d| (d.ast_state.clone(), d.content.clone()));
+            if let Some((ast_state, content)) = document_state {
+                match ast_state {
+                    AstState::Parsing => {
+                        tracing::debug!("HOVER: AST parsing in progress, will retry when ready");
+                        // Return null for now, client can retry
+                        let response = Response::new_ok(req.id, serde_json::Value::Null);
+                        self.connection.sender.send(Message::Response(response))?;
+                        return Ok(());
+                    }
+                    AstState::NotParsed => {
+                        tracing::debug!(
+                            "HOVER: AST not parsed yet, triggering parse and returning null"
+                        );
+                        // Trigger parsing and return null for now
+                        self.schedule_diagnostics(&uri, &content)?;
+                        let response = Response::new_ok(req.id, serde_json::Value::Null);
+                        self.connection.sender.send(Message::Response(response))?;
+                        return Ok(());
+                    }
+                    AstState::Cached => {
+                        // This shouldn't happen since we just checked the cache
+                        tracing::debug!(
+                            "HOVER: AST state says cached but not in cache, returning null"
+                        );
+                        None
+                    }
+                }
+            } else {
+                tracing::debug!("HOVER: Document not found, returning null");
+                None
+            }
         };
 
         if let Some(entity_id) = entity_id {
@@ -438,6 +518,31 @@ impl Server {
         Ok(())
     }
 
+    fn send_entity_search_response(
+        &mut self,
+        request_id: lsp_server::RequestId,
+        results: Result<Vec<EntitySearchResult>, String>,
+    ) -> Result<()> {
+        let response = match results {
+            Ok(results) => {
+                tracing::debug!("Entity search found {} results", results.len());
+                let search_response = EntitySearchResponse { results };
+                Response::new_ok(request_id, serde_json::to_value(search_response)?)
+            }
+            Err(e) => {
+                tracing::error!("Entity search failed: {}", e);
+                Response::new_err(
+                    request_id,
+                    lsp_server::ErrorCode::InternalError as i32,
+                    format!("Entity search failed: {e}"),
+                )
+            }
+        };
+
+        self.connection.sender.send(Message::Response(response))?;
+        Ok(())
+    }
+
     fn lsp_position_to_byte_position(&self, text: &str, position: Position) -> usize {
         let line_offset = position.line as usize;
         let char_offset = position.character as usize;
@@ -473,7 +578,6 @@ impl Server {
         byte_position
     }
 
-    /// Find EntityId field in AST at the given byte position
     fn find_entity_id_at_position(&self, ast: &Query, position: usize) -> Option<String> {
         Self::find_entity_id_in_expression(&ast.expression, position)
     }
@@ -485,9 +589,7 @@ impl Server {
                 value,
                 span,
             } => {
-                // Check if position is within this entityId field's span
                 if position >= span.start.offset && position <= span.end.offset {
-                    // Extract the entity ID value from the value expression
                     if let Expression::Term { term, .. } = value.as_ref() {
                         match term {
                             bwq_linter::ast::Term::Word { value } => Some(value.clone()),
@@ -501,7 +603,7 @@ impl Server {
                 }
             }
             Expression::BooleanOp { left, right, .. } => {
-                // Recursively search in left and right operands
+                // recursively search in left and right operands
                 if let Some(entity_id) = Self::find_entity_id_in_expression(left, position) {
                     Some(entity_id)
                 } else if let Some(right) = right {
@@ -514,7 +616,7 @@ impl Server {
                 Self::find_entity_id_in_expression(expression, position)
             }
             Expression::Proximity { terms, .. } => {
-                // Search in all proximity terms
+                // search in all proximity terms
                 for term in terms {
                     if let Some(entity_id) = Self::find_entity_id_in_expression(term, position) {
                         return Some(entity_id);

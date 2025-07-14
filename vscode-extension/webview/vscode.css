@@ -1,0 +1,68 @@
+/* VSCode theme integration */
+:root {
+  --container-padding: 20px;
+  --input-padding-vertical: 6px;
+  --input-padding-horizontal: 4px;
+  --input-margin-vertical: 4px;
+  --input-margin-horizontal: 0;
+}
+
+body {
+  padding: 0 var(--container-padding);
+  background-color: var(--vscode-sideBar-background);
+  color: var(--vscode-sideBar-foreground);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Input styling */
+input {
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  color: var(--vscode-input-foreground);
+  border-radius: 2px;
+  padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+  margin: var(--input-margin-vertical) var(--input-margin-horizontal);
+  width: 100%;
+}
+
+input:focus {
+  border-color: var(--vscode-focusBorder);
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+/* Button styling */
+button {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-radius: 2px;
+  padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+  font-size: var(--vscode-font-size);
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+button:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+/* Secondary button styling */
+.secondary-button {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.secondary-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}

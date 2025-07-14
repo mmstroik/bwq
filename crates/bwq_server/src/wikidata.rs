@@ -53,29 +53,18 @@ struct WikiDataEntityResponse {
 
 #[derive(Debug, Deserialize)]
 struct WikiDataEntity {
-    id: String,
     labels: Option<HashMap<String, WikiDataLabel>>,
     descriptions: Option<HashMap<String, WikiDataDescription>>,
-    sitelinks: Option<HashMap<String, WikiDataSitelink>>,
 }
 
 #[derive(Debug, Deserialize)]
 struct WikiDataLabel {
-    language: String,
     value: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct WikiDataDescription {
-    language: String,
     value: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct WikiDataSitelink {
-    site: String,
-    title: String,
-    url: Option<String>,
 }
 
 impl WikiDataClient {
@@ -203,37 +192,6 @@ impl WikiDataClient {
         }
     }
 
-    /// Extract entity ID from entityId field pattern (e.g., "entityId:123" -> "123")
-    pub fn extract_entity_id_from_text(text: &str, position: usize) -> Option<String> {
-        // Look for entityId:NUMBER pattern around the cursor position
-        let start = position.saturating_sub(20);
-        let end = (position + 20).min(text.len());
-        let search_text = &text[start..end];
-
-        for (i, _) in search_text.match_indices("entityId:") {
-            let field_start = start + i;
-            let value_start = field_start + 9;
-
-            // Find the end of the entity ID (until whitespace or special chars)
-            let remaining = &text[value_start..];
-            let entity_id_end = remaining
-                .find(|c: char| !c.is_ascii_digit())
-                .unwrap_or(remaining.len());
-
-            let field_end = value_start + entity_id_end;
-
-            // Check if cursor is within this entityId field (including the field name and value)
-            if position >= field_start && position <= field_end {
-                let entity_id = &text[value_start..field_end];
-                if !entity_id.is_empty() && entity_id.chars().all(|c| c.is_ascii_digit()) {
-                    return Some(entity_id.to_string());
-                }
-            }
-        }
-
-        None
-    }
-
     pub fn cleanup_cache(&mut self) {
         let cache_size_before = self.cache.len();
         let now = Instant::now();
@@ -255,46 +213,5 @@ impl WikiDataClient {
 impl Default for WikiDataClient {
     fn default() -> Self {
         Self::new().expect("Failed to create WikiData client")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_entity_id_from_text() {
-        let text = "This is a query with entityId:29 in the middle";
-        let position = 32; // somewhere in the "29" (position of "9")
-
-        let result = WikiDataClient::extract_entity_id_from_text(text, position);
-        assert_eq!(result, Some("29".to_string()));
-    }
-
-    #[test]
-    fn test_extract_entity_id_at_start() {
-        let text = "entityId:123 AND something";
-        let position = 5; // in the field name
-
-        let result = WikiDataClient::extract_entity_id_from_text(text, position);
-        assert_eq!(result, Some("123".to_string()));
-    }
-
-    #[test]
-    fn test_extract_entity_id_no_match() {
-        let text = "This has no entity field";
-        let position = 10;
-
-        let result = WikiDataClient::extract_entity_id_from_text(text, position);
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_extract_entity_id_invalid_format() {
-        let text = "entityId:abc123";
-        let position = 10;
-
-        let result = WikiDataClient::extract_entity_id_from_text(text, position);
-        assert_eq!(result, None);
     }
 }

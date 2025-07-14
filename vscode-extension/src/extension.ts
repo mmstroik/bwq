@@ -4,31 +4,42 @@ import {
   LanguageClientOptions,
   Executable,
 } from "vscode-languageclient/node";
+import { EntitySearchViewProvider } from "./entitySearchView";
 
 let client: LanguageClient | undefined;
 let outputChannel: vscode.OutputChannel;
 let statusItem: vscode.LanguageStatusItem;
 let restartInProgress = false;
 
+let entitySearchProvider: EntitySearchViewProvider | undefined;
+
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
-  // Create output channel for server logs
-  outputChannel = vscode.window.createOutputChannel("BWQ Language Server");
+  outputChannel = vscode.window.createOutputChannel(
+    "Brandwatch Query Language Server"
+  );
   context.subscriptions.push(outputChannel);
 
-  // Create language status item
   statusItem = vscode.languages.createLanguageStatusItem("bwq-status", {
     language: "bwq",
     scheme: "*",
   });
-  statusItem.name = "BWQ";
-  statusItem.text = "BWQ";
+  statusItem.name = "Brandwatch Query";
+  statusItem.text = "Brandwatch Query";
   statusItem.command = {
     title: "Show Logs",
     command: "bwq.showLogs",
   };
   context.subscriptions.push(statusItem);
+
+  entitySearchProvider = new EntitySearchViewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      EntitySearchViewProvider.viewType,
+      entitySearchProvider
+    )
+  );
 
   const runServer = async () => {
     if (restartInProgress) {
@@ -63,13 +74,16 @@ export async function activate(
         ],
         outputChannel: outputChannel,
         initializationOptions: {
-          wikidataHoverEnabled: config.get<boolean>("wikidata.enableHover", true),
+          wikidataHoverEnabled: config.get<boolean>(
+            "wikidata.enableHover",
+            true
+          ),
         },
       };
 
       client = new LanguageClient(
         "bwq",
-        "BWQ Language Server",
+        "Brandwatch Query Language Server",
         serverOptions,
         clientOptions
       );
@@ -80,26 +94,29 @@ export async function activate(
 
       client.onDidChangeState((event) => {
         if (event.newState === 3) {
-          // Running
           updateStatus(
             "Ready",
             vscode.LanguageStatusSeverity.Information,
             false
           );
         } else if (event.newState === 1) {
-          // Starting
           updateStatus(
             "Starting...",
             vscode.LanguageStatusSeverity.Information,
             true
           );
         } else if (event.newState === 2) {
-          // Stopped
           updateStatus("Stopped", vscode.LanguageStatusSeverity.Warning, false);
         }
       });
 
       await client.start();
+
+      // Update the view provider with the language client
+      if (entitySearchProvider) {
+        entitySearchProvider.setLanguageClient(client);
+      }
+
       updateStatus("Ready", vscode.LanguageStatusSeverity.Information, false);
     } catch (error) {
       const errorMessage =
@@ -118,13 +135,16 @@ export async function activate(
     }
   };
 
-  // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand("bwq.restart", async () => {
       await runServer();
     }),
     vscode.commands.registerCommand("bwq.showLogs", () => {
       outputChannel.show();
+    }),
+    vscode.commands.registerCommand("bwq.searchEntities", () => {
+      // Focus the entity search view if it's already open
+      vscode.commands.executeCommand("bwq.entitySearch.focus");
     })
   );
 

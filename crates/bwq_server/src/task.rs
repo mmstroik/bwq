@@ -75,6 +75,18 @@ impl TaskExecutor {
         self.task_sender.send(task)?;
         Ok(())
     }
+
+    /// Schedule an entity search task for background processing
+    pub(crate) fn schedule_entity_search(
+        &self,
+        request_id: lsp_server::RequestId,
+        query: String,
+    ) -> Result<()> {
+        let task = BackgroundTask::EntitySearch { request_id, query };
+
+        self.task_sender.send(task)?;
+        Ok(())
+    }
 }
 
 enum BackgroundTask {
@@ -87,6 +99,10 @@ enum BackgroundTask {
         request_id: lsp_server::RequestId,
         entity_id: String,
     },
+    EntitySearch {
+        request_id: lsp_server::RequestId,
+        query: String,
+    },
 }
 
 pub enum TaskResponse {
@@ -97,6 +113,10 @@ pub enum TaskResponse {
     EntityInfo {
         request_id: lsp_server::RequestId,
         entity_info: Option<crate::wikidata::EntityInfo>,
+    },
+    EntitySearchResults {
+        request_id: lsp_server::RequestId,
+        results: Result<Vec<crate::wikidata::EntitySearchResult>, String>,
     },
 }
 
@@ -230,6 +250,26 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                             break;
                         }
                     }
+                }
+            }
+            BackgroundTask::EntitySearch { request_id, query } => {
+                tracing::debug!("Entity search started for query: {}", query);
+
+                let search_result = rt.block_on(async {
+                    wikidata_client
+                        .search_entities(&query)
+                        .await
+                        .map_err(|e| e.to_string())
+                });
+
+                let response = TaskResponse::EntitySearchResults {
+                    request_id,
+                    results: search_result,
+                };
+
+                if sender.send(response).is_err() {
+                    tracing::debug!("Failed to send entity search response (receiver dropped)");
+                    break;
                 }
             }
         }
