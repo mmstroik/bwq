@@ -59,6 +59,14 @@ impl Parser {
 
         // ensure we've consumed all tokens except EOF
         if !self.is_at_end() && !matches!(self.peek().token_type, TokenType::Eof) {
+            // Check for specific case of unmatched closing parenthesis
+            if matches!(self.peek().token_type, TokenType::RightParen) {
+                return Err(LintError::ParserError {
+                    span: self.peek().span.clone(),
+                    message: "Unmatched closing parenthesis".to_string(),
+                });
+            }
+
             return Err(LintError::UnexpectedToken {
                 span: self.peek().span.clone(),
                 token: self.peek().token_type.to_string(),
@@ -80,6 +88,20 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> LintResult<Expression> {
+        // check for leading operators
+        if matches!(
+            self.peek().token_type,
+            TokenType::And | TokenType::Or | TokenType::Near(_) | TokenType::NearForward(_)
+        ) {
+            return Err(LintError::ParserError {
+                span: self.peek().span.clone(),
+                message: format!(
+                    "'{}' operator requires a term before it",
+                    self.peek().token_type
+                ),
+            });
+        }
+
         let mut left = self.parse_and_expression()?;
 
         while self.match_token(&TokenType::Or) {
@@ -295,6 +317,17 @@ impl Parser {
 
     fn parse_grouped_expression(&mut self) -> LintResult<Expression> {
         let start_span = self.advance().span.clone(); // consume '('
+
+        // Check for empty parentheses
+        if matches!(self.peek().token_type, TokenType::RightParen) {
+            let end_span = self.peek().span.clone();
+            let span = Span::new(start_span.start, end_span.end);
+            return Err(LintError::ParserError {
+                span,
+                message: "Empty parentheses are not allowed".to_string(),
+            });
+        }
+
         let expr = self.parse_expression()?;
 
         if !self.match_token(&TokenType::RightParen) {
@@ -385,6 +418,14 @@ impl Parser {
 
         self.advance(); // consume field name
         self.advance(); // consume colon
+
+        // Check if we're at EOF or next token is not a valid value token
+        if self.is_at_end() || matches!(self.peek().token_type, TokenType::Eof) {
+            return Err(LintError::ParserError {
+                span: self.peek().span.clone(),
+                message: format!("Field '{word}' requires a value"),
+            });
+        }
 
         let value = Box::new(self.parse_primary()?);
 

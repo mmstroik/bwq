@@ -54,13 +54,13 @@ impl BrandwatchLinter {
                 is_valid: !report.has_errors(),
                 errors: report.errors,
                 warnings: report.warnings,
-                query: Some(query.to_string()),
+                query: query.to_string(),
             },
             Err(error) => AnalysisResult {
                 is_valid: false,
                 errors: vec![error],
                 warnings: vec![],
-                query: Some(query.to_string()),
+                query: query.to_string(),
             },
         }
     }
@@ -106,7 +106,7 @@ pub struct AnalysisResult {
     pub is_valid: bool,
     pub errors: Vec<LintError>,
     pub warnings: Vec<error::LintWarning>,
-    pub query: Option<String>,
+    pub query: String,
 }
 
 #[derive(Debug, Clone)]
@@ -116,61 +116,6 @@ pub struct AnalysisResultWithAst {
     pub warnings: Vec<error::LintWarning>,
     pub query: Option<String>,
     pub ast: Option<Query>,
-}
-
-impl AnalysisResult {
-    pub fn has_issues(&self) -> bool {
-        !self.errors.is_empty() || !self.warnings.is_empty()
-    }
-
-    pub fn summary(&self) -> String {
-        if self.is_valid && self.warnings.is_empty() {
-            "Query is valid with no issues".to_string()
-        } else {
-            let error_count = self.errors.len();
-            let warning_count = self.warnings.len();
-
-            match (error_count, warning_count) {
-                (0, 0) => "Query is valid with no issues".to_string(),
-                (0, w) => format!(
-                    "Query is valid with {} warning{}",
-                    w,
-                    if w == 1 { "" } else { "s" }
-                ),
-                (e, 0) => format!("Query has {} error{}", e, if e == 1 { "" } else { "s" }),
-                (e, w) => format!(
-                    "Query has {} error{} and {} warning{}",
-                    e,
-                    if e == 1 { "" } else { "s" },
-                    w,
-                    if w == 1 { "" } else { "s" }
-                ),
-            }
-        }
-    }
-
-    pub fn format_issues(&self) -> String {
-        let mut output = String::new();
-
-        if !self.errors.is_empty() {
-            output.push_str("Errors:\n");
-            for (i, error) in self.errors.iter().enumerate() {
-                output.push_str(&format!("  {}. {}\n", i + 1, error));
-            }
-        }
-
-        if !self.warnings.is_empty() {
-            if !output.is_empty() {
-                output.push('\n');
-            }
-            output.push_str("Warnings:\n");
-            for (i, warning) in self.warnings.iter().enumerate() {
-                output.push_str(&format!("  {}. {:?}\n", i + 1, warning));
-            }
-        }
-
-        output
-    }
 }
 
 pub fn analyze_query(query: &str) -> AnalysisResult {
