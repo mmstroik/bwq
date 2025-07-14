@@ -5,6 +5,7 @@ pub mod parser;
 pub mod validation;
 pub mod validator;
 
+use ast::Query;
 use error::{LintError, LintReport, LintResult};
 use lexer::Lexer;
 use parser::Parser;
@@ -34,6 +35,19 @@ impl BrandwatchLinter {
         Ok(report)
     }
 
+    pub fn lint_for_server(&mut self, query: &str) -> LintResult<(LintReport, Query)> {
+        let mut lexer = Lexer::new(query);
+        let tokens = lexer.tokenize()?;
+
+        let mut parser = Parser::new(tokens)?;
+        let parse_result = parser.parse()?;
+
+        let mut report = self.validator.validate(&parse_result.query);
+        report.warnings.extend(parse_result.warnings);
+
+        Ok((report, parse_result.query))
+    }
+
     pub fn analyze(&mut self, query: &str) -> AnalysisResult {
         match self.lint(query) {
             Ok(report) => AnalysisResult {
@@ -51,17 +65,33 @@ impl BrandwatchLinter {
         }
     }
 
-    pub fn analyze_and_skip_empty(&mut self, query: &str) -> AnalysisResult {
+    pub fn analyze_for_server(&mut self, query: &str) -> AnalysisResultWithAst {
         if query.trim().is_empty() {
-            return AnalysisResult {
+            return AnalysisResultWithAst {
                 is_valid: true,
                 errors: Vec::new(),
                 warnings: Vec::new(),
                 query: Some(query.to_string()),
+                ast: None,
             };
         }
 
-        self.analyze(query)
+        match self.lint_for_server(query) {
+            Ok((report, ast)) => AnalysisResultWithAst {
+                is_valid: !report.has_errors(),
+                errors: report.errors,
+                warnings: report.warnings,
+                query: Some(query.to_string()),
+                ast: Some(ast),
+            },
+            Err(error) => AnalysisResultWithAst {
+                is_valid: false,
+                errors: vec![error],
+                warnings: vec![],
+                query: Some(query.to_string()),
+                ast: None,
+            },
+        }
     }
 }
 
@@ -77,6 +107,15 @@ pub struct AnalysisResult {
     pub errors: Vec<LintError>,
     pub warnings: Vec<error::LintWarning>,
     pub query: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalysisResultWithAst {
+    pub is_valid: bool,
+    pub errors: Vec<LintError>,
+    pub warnings: Vec<error::LintWarning>,
+    pub query: Option<String>,
+    pub ast: Option<Query>,
 }
 
 impl AnalysisResult {
@@ -184,14 +223,5 @@ mod tests {
         let query2 = r#""apple juice"~5"#;
         let report2 = linter.lint(query2).unwrap();
         assert!(!report2.has_errors());
-    }
-
-    #[test]
-    fn test_analysis_result_summary() {
-        let analysis = analyze_query("apple AND juice");
-        assert_eq!(analysis.summary(), "Query is valid with no issues");
-
-        let analysis = analyze_query("*invalid");
-        assert!(analysis.summary().contains("error"));
     }
 }

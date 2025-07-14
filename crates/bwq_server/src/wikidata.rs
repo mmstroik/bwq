@@ -133,6 +133,11 @@ impl WikiDataClient {
 
     /// Get detailed information about a WikiData entity by ID (with caching)
     pub async fn get_entity_info(&mut self, entity_id: &str) -> Result<Option<EntityInfo>> {
+        // clean up expired cache entries
+        if self.cache.len() > 10 {
+            self.cleanup_cache();
+        }
+
         if let Some(cached) = self.cache.get(entity_id) {
             if cached.cached_at.elapsed() < self.cache_ttl {
                 tracing::debug!("Returning cached entity info for: {}", entity_id);
@@ -237,9 +242,20 @@ impl WikiDataClient {
     }
 
     pub fn cleanup_cache(&mut self) {
+        let cache_size_before = self.cache.len();
         let now = Instant::now();
         self.cache
             .retain(|_, cached| now.duration_since(cached.cached_at) < self.cache_ttl);
+        let cache_size_after = self.cache.len();
+
+        if cache_size_before > cache_size_after {
+            tracing::debug!(
+                "WIKIDATA CACHE: Cleaned {} expired entries (cache size: {} -> {})",
+                cache_size_before - cache_size_after,
+                cache_size_before,
+                cache_size_after
+            );
+        }
     }
 }
 

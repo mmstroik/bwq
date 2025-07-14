@@ -2,12 +2,13 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 use anyhow::Result;
+use bwq_linter::ast::{Expression, FieldType, Query};
 use crossbeam_channel::Receiver;
+use lru::LruCache;
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, Hover,
-    HoverContents, HoverParams, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams,
-    Range, Uri,
+    HoverContents, HoverParams, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams, Uri,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
         Notification as NotificationTrait, PublishDiagnostics,
@@ -20,18 +21,28 @@ use crate::request_queue::RequestQueue;
 use crate::task::{TaskExecutor, TaskResponse};
 use crate::wikidata::{EntityInfo, WikiDataClient};
 
+#[derive(Debug, Clone)]
+enum AstState {
+    NotParsed,
+    Parsing,
+    Cached,
+}
+
 pub struct Server {
     connection: Connection,
     documents: HashMap<Uri, DocumentState>,
+    ast_cache: LruCache<Uri, Query>,
     request_queue: RequestQueue,
     task_executor: TaskExecutor,
     task_response_receiver: Receiver<TaskResponse>,
     hover_enabled: bool,
 }
+
 #[derive(Debug, Clone)]
 struct DocumentState {
     content: String,
     version: i32,
+    ast_state: AstState,
 }
 impl Server {
     pub fn new(
@@ -63,6 +74,7 @@ impl Server {
         Ok(Self {
             connection,
             documents: HashMap::new(),
+            ast_cache: LruCache::new(NonZeroUsize::new(10).unwrap()),
             request_queue: RequestQueue::new(),
             task_executor,
             task_response_receiver,
@@ -129,7 +141,28 @@ impl Server {
                 }
                 recv(self.task_response_receiver) -> response => {
                     match response {
-                        Ok(TaskResponse::Diagnostics(params)) => {
+                        Ok(TaskResponse::Diagnostics { params, ast }) => {
+                            // Cache AST if available
+                            if let Some(ast) = ast {
+                                // Check if this evicts an entry from the LRU cache
+                                let cache_size_before = self.ast_cache.len();
+                                self.ast_cache.put(params.uri.clone(), ast);
+                                let cache_size_after = self.ast_cache.len();
+
+                                if cache_size_after <= cache_size_before && cache_size_before > 0 {
+                                    tracing::debug!("AST CACHE: LRU evicted entry - cache size: {}", cache_size_after);
+                                } else {
+                                    tracing::debug!("AST CACHE: Cached AST - size: {}/{}", cache_size_after, self.ast_cache.cap());
+                                }
+
+                                // Update document state to indicate AST is cached
+                                if let Some(document) = self.documents.get_mut(&params.uri) {
+                                    document.ast_state = AstState::Cached;
+                                }
+                            } else {
+                                tracing::debug!("Diagnostics completed: {:?} - no AST returned (likely parse error)", params.uri);
+                            }
+
                             self.send_diagnostics(params)?;
                         }
                         Ok(TaskResponse::EntityInfo { request_id, entity_info }) => {
@@ -197,12 +230,12 @@ impl Server {
         let document_state = DocumentState {
             content: doc.text.clone(),
             version: doc.version,
+            ast_state: AstState::NotParsed,
         };
 
         self.documents.insert(doc.uri.clone(), document_state);
+        tracing::debug!("Document opened: {:?} - AST state: NotParsed", doc.uri);
         self.schedule_diagnostics(&doc.uri, &doc.text)?;
-
-        tracing::debug!("Opened document: {:?}", doc.uri);
         Ok(())
     }
 
@@ -213,6 +246,15 @@ impl Server {
             if let Some(change) = params.content_changes.into_iter().next() {
                 document.content = change.text.clone();
                 document.version = params.text_document.version;
+                document.ast_state = AstState::NotParsed;
+
+                // Clear cached AST since content changed
+                let had_cached_ast = self.ast_cache.pop(&uri).is_some();
+                if had_cached_ast {
+                    tracing::debug!("Document changed: {:?} - AST cache invalidated", uri);
+                } else {
+                    tracing::debug!("Document changed: {:?} - no cached AST to invalidate", uri);
+                }
 
                 self.schedule_diagnostics(&uri, &change.text)?;
             }
@@ -224,6 +266,12 @@ impl Server {
     fn handle_did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<()> {
         let uri = params.text_document.uri;
         self.documents.remove(&uri);
+        let had_cached_ast = self.ast_cache.pop(&uri).is_some();
+        if had_cached_ast {
+            tracing::debug!("Document closed: {:?} - removed from AST cache", uri);
+        } else {
+            tracing::debug!("Document closed: {:?} - no cached AST to remove", uri);
+        }
 
         let diagnostics = PublishDiagnosticsParams {
             uri: uri.clone(),
@@ -246,6 +294,12 @@ impl Server {
 
     /// Schedule diagnostics processing in the background
     fn schedule_diagnostics(&mut self, uri: &Uri, content: &str) -> Result<()> {
+        // Mark document as parsing
+        if let Some(document) = self.documents.get_mut(uri) {
+            document.ast_state = AstState::Parsing;
+            tracing::debug!("Document parsing started: {:?} - AST state: Parsing", uri);
+        }
+
         // Notifications like didChange/didOpen don't have request IDs,
         // so they cannot be cancelled - pass None for cancellation token
         self.task_executor
@@ -316,12 +370,34 @@ impl Server {
 
         let byte_position = self.lsp_position_to_byte_position(document_content, position);
 
-        if let Some(entity_id) =
+        // Try to get cached AST
+        let entity_id = if let Some(ast) = self.ast_cache.get(&uri).cloned() {
+            tracing::info!(
+                "🎯 HOVER: Using cached AST for entity extraction (cache size: {}/{})",
+                self.ast_cache.len(),
+                self.ast_cache.cap()
+            );
+            self.find_entity_id_at_position(&ast, byte_position)
+        } else {
+            tracing::info!("⚠️  HOVER: AST cache miss - falling back to text-based extraction");
             WikiDataClient::extract_entity_id_from_text(document_content, byte_position)
-        {
+        };
+
+        if let Some(entity_id) = entity_id {
+            tracing::debug!(
+                "Hover request: {:?} - found entityId: {} at position {}",
+                uri,
+                entity_id,
+                byte_position
+            );
             self.task_executor
                 .schedule_entity_lookup(req.id, entity_id)?;
         } else {
+            tracing::debug!(
+                "Hover request: {:?} - no entityId found at position {}",
+                uri,
+                byte_position
+            );
             let response = Response::new_ok(req.id, serde_json::Value::Null);
             self.connection.sender.send(Message::Response(response))?;
         }
@@ -397,63 +473,56 @@ impl Server {
         byte_position
     }
 
-    fn calculate_entity_id_range(&self, text: &str, position: usize, entity_id: &str) -> Range {
-        // Find the entityId: field around the position
-        let start = position.saturating_sub(20);
-        let end = (position + 20).min(text.len());
-        let search_text = &text[start..end];
-
-        for (i, _) in search_text.match_indices("entityId:") {
-            let field_start = start + i;
-            let value_start = field_start + 9;
-            let value_end = value_start + entity_id.len();
-
-            if value_start <= position && position <= value_end {
-                // Convert byte positions back to line/character positions
-                let start_pos = self.byte_position_to_lsp_position(text, field_start);
-                let end_pos = self.byte_position_to_lsp_position(text, value_end);
-
-                return Range {
-                    start: start_pos,
-                    end: end_pos,
-                };
-            }
-        }
-
-        // Fallback to single character range
-        let pos = self.byte_position_to_lsp_position(text, position);
-        Range {
-            start: pos,
-            end: Position {
-                line: pos.line,
-                character: pos.character + 1,
-            },
-        }
+    /// Find EntityId field in AST at the given byte position
+    fn find_entity_id_at_position(&self, ast: &Query, position: usize) -> Option<String> {
+        Self::find_entity_id_in_expression(&ast.expression, position)
     }
 
-    fn byte_position_to_lsp_position(&self, text: &str, byte_position: usize) -> Position {
-        let mut line = 0;
-        let mut character = 0;
-        let mut current_byte = 0;
-
-        for ch in text.chars() {
-            if current_byte >= byte_position {
-                break;
+    fn find_entity_id_in_expression(expr: &Expression, position: usize) -> Option<String> {
+        match expr {
+            Expression::Field {
+                field: FieldType::EntityId,
+                value,
+                span,
+            } => {
+                // Check if position is within this entityId field's span
+                if position >= span.start.offset && position <= span.end.offset {
+                    // Extract the entity ID value from the value expression
+                    if let Expression::Term { term, .. } = value.as_ref() {
+                        match term {
+                            bwq_linter::ast::Term::Word { value } => Some(value.clone()),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             }
-
-            if ch == '\n' {
-                line += 1;
-                character = 0;
-            } else {
-                character += 1;
+            Expression::BooleanOp { left, right, .. } => {
+                // Recursively search in left and right operands
+                if let Some(entity_id) = Self::find_entity_id_in_expression(left, position) {
+                    Some(entity_id)
+                } else if let Some(right) = right {
+                    Self::find_entity_id_in_expression(right, position)
+                } else {
+                    None
+                }
             }
-
-            current_byte += ch.len_utf8();
-        }
-
-        Position {
-            line: line as u32,
-            character: character as u32,
+            Expression::Group { expression, .. } => {
+                Self::find_entity_id_in_expression(expression, position)
+            }
+            Expression::Proximity { terms, .. } => {
+                // Search in all proximity terms
+                for term in terms {
+                    if let Some(entity_id) = Self::find_entity_id_in_expression(term, position) {
+                        return Some(entity_id);
+                    }
+                }
+                None
+            }
+            _ => None,
         }
     }
 }

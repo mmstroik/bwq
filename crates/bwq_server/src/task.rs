@@ -1,4 +1,5 @@
 use anyhow::Result;
+use bwq_linter::ast::Query;
 use crossbeam_channel::{Receiver, Sender};
 use lsp_types::{PublishDiagnosticsParams, Uri};
 use std::num::NonZeroUsize;
@@ -89,7 +90,10 @@ enum BackgroundTask {
 }
 
 pub enum TaskResponse {
-    Diagnostics(PublishDiagnosticsParams),
+    Diagnostics {
+        params: PublishDiagnosticsParams,
+        ast: Option<Query>,
+    },
     EntityInfo {
         request_id: lsp_server::RequestId,
         entity_info: Option<crate::wikidata::EntityInfo>,
@@ -125,8 +129,8 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
 
                 tracing::trace!("Processing diagnostics for {:?}", uri);
 
-                match diagnostics_handler.analyze_content(&content, &mut linter) {
-                    Ok(diagnostics) => {
+                match diagnostics_handler.analyze_content_with_ast(&content, &mut linter) {
+                    Ok((diagnostics, ast)) => {
                         // Check cancellation again before sending result
                         if let Some(ref token) = cancellation_token {
                             if token.is_cancelled() {
@@ -135,11 +139,14 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                             }
                         }
 
-                        let response = TaskResponse::Diagnostics(PublishDiagnosticsParams {
-                            uri,
-                            diagnostics,
-                            version: None,
-                        });
+                        let response = TaskResponse::Diagnostics {
+                            params: PublishDiagnosticsParams {
+                                uri,
+                                diagnostics,
+                                version: None,
+                            },
+                            ast,
+                        };
 
                         if sender.send(response).is_err() {
                             tracing::debug!(
@@ -150,11 +157,14 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                     }
                     Err(e) => {
                         tracing::error!("Failed to analyze content for {:?}: {}", uri, e);
-                        let response = TaskResponse::Diagnostics(PublishDiagnosticsParams {
-                            uri,
-                            diagnostics: vec![],
-                            version: None,
-                        });
+                        let response = TaskResponse::Diagnostics {
+                            params: PublishDiagnosticsParams {
+                                uri,
+                                diagnostics: vec![],
+                                version: None,
+                            },
+                            ast: None,
+                        };
 
                         if sender.send(response).is_err() {
                             tracing::debug!("Failed to send error diagnostics response");
@@ -167,16 +177,34 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                 request_id,
                 entity_id,
             } => {
-                tracing::trace!("Processing entity lookup for ID: {}", entity_id);
+                tracing::debug!("WikiData lookup started for entityId: {}", entity_id);
 
                 let entity_info =
                     rt.block_on(async { wikidata_client.get_entity_info(&entity_id).await });
 
                 match entity_info {
-                    Ok(info) => {
+                    Ok(Some(info)) => {
+                        tracing::debug!("WIKIDATA: Found {} ({})", info.label, entity_id);
                         let response = TaskResponse::EntityInfo {
                             request_id,
-                            entity_info: info,
+                            entity_info: Some(info),
+                        };
+
+                        if sender.send(response).is_err() {
+                            tracing::debug!(
+                                "Failed to send entity info response (receiver dropped)"
+                            );
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        tracing::debug!(
+                            "WikiData lookup completed for entityId: {} - not found",
+                            entity_id
+                        );
+                        let response = TaskResponse::EntityInfo {
+                            request_id,
+                            entity_info: None,
                         };
 
                         if sender.send(response).is_err() {
@@ -187,7 +215,11 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                         }
                     }
                     Err(e) => {
-                        tracing::error!("Failed to fetch entity info for {}: {}", entity_id, e);
+                        tracing::error!(
+                            "WikiData lookup failed for entityId: {}: {}",
+                            entity_id,
+                            e
+                        );
                         let response = TaskResponse::EntityInfo {
                             request_id,
                             entity_info: None,
