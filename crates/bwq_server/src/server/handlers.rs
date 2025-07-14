@@ -48,12 +48,25 @@ pub fn handle_did_close(
 }
 
 pub fn handle_cancel_request(session: &mut Session, params: Value) -> Result<()> {
-    let cancel_params: CancelParams = serde_json::from_value(params)?;
+    let cancel_params: CancelParams = match serde_json::from_value(params) {
+        Ok(params) => params,
+        Err(e) => {
+            tracing::debug!("Invalid cancel request params: {}", e);
+            return Ok(()); // silently ignore malformed cancel requests
+        }
+    };
+
     let request_id = match cancel_params.id {
         lsp_types::NumberOrString::Number(n) => lsp_server::RequestId::from(n),
         lsp_types::NumberOrString::String(s) => lsp_server::RequestId::from(s),
     };
-    session.request_queue.cancel(&request_id);
+
+    if let Some(method) = session.request_queue.cancel(&request_id) {
+        tracing::debug!("Cancelled request: {} (id: {:?})", method, request_id);
+    } else {
+        tracing::debug!("Cancel request for unknown id: {:?}", request_id);
+    }
+
     Ok(())
 }
 
