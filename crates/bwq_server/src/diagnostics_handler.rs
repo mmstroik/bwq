@@ -4,6 +4,7 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString};
 use crate::utils::span_to_range;
 use bwq_linter::{
     BrandwatchLinter,
+    ast::Query,
     error::{LintError, LintWarning},
 };
 
@@ -14,14 +15,14 @@ impl DiagnosticsHandler {
         Self
     }
 
-    pub fn analyze_content(
+    pub fn analyze_content_with_ast(
         &self,
         content: &str,
         linter: &mut BrandwatchLinter,
-    ) -> Result<Vec<Diagnostic>> {
+    ) -> Result<(Vec<Diagnostic>, Option<Query>)> {
         let mut diagnostics = Vec::new();
 
-        let analysis = linter.analyze_and_skip_empty(content);
+        let analysis = linter.analyze_for_server(content);
 
         for error in &analysis.errors {
             diagnostics.push(self.error_to_diagnostic(error));
@@ -31,7 +32,7 @@ impl DiagnosticsHandler {
             diagnostics.push(self.warning_to_diagnostic(warning));
         }
 
-        Ok(diagnostics)
+        Ok((diagnostics, analysis.ast))
     }
 
     fn error_to_diagnostic(&self, error: &LintError) -> Diagnostic {
@@ -80,7 +81,9 @@ mod tests {
         let handler = DiagnosticsHandler::new();
 
         let content = "rating:6 AND *invalid";
-        let diagnostics = handler.analyze_content(content, &mut linter).unwrap();
+        let (diagnostics, _) = handler
+            .analyze_content_with_ast(content, &mut linter)
+            .unwrap();
 
         assert!(
             !diagnostics.is_empty(),
@@ -105,7 +108,9 @@ mod tests {
         let handler = DiagnosticsHandler::new();
 
         let content = "apple AND juice";
-        let diagnostics = handler.analyze_content(content, &mut linter).unwrap();
+        let (diagnostics, _) = handler
+            .analyze_content_with_ast(content, &mut linter)
+            .unwrap();
 
         let errors: Vec<_> = diagnostics
             .iter()

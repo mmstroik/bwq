@@ -46,6 +46,17 @@ pub enum Expression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Term {
+    Word { value: String },
+    Phrase { value: String },
+    Wildcard { value: String },
+    CaseSensitive { value: String },
+    Hashtag { value: String },
+    Mention { value: String },
+    Emoji { value: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BooleanOperator {
     And,
     Or,
@@ -234,15 +245,4 @@ impl FieldType {
             Self::EntityId => "entityId",
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Term {
-    Word { value: String },
-    Phrase { value: String },
-    Wildcard { value: String },
-    CaseSensitive { value: String },
-    Hashtag { value: String },
-    Mention { value: String },
-    Emoji { value: String },
 }

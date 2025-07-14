@@ -49,14 +49,38 @@
       {
         "command": "bwq.restart",
         "title": "Restart Language Server",
-        "category": "BWQ"
+        "category": "Brandwatch Query"
       },
       {
         "command": "bwq.showLogs",
         "title": "Show Language Server Logs",
-        "category": "BWQ"
+        "category": "Brandwatch Query"
+      },
+      {
+        "command": "bwq.searchEntities",
+        "title": "Search BW AI Entities",
+        "category": "Brandwatch Query"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bwq-sidebar",
+          "title": "Brandwatch Query",
+          "icon": "$(search)"
+        }
+      ]
+    },
+    "views": {
+      "bwq-sidebar": [
+        {
+          "id": "bwq.entitySearch",
+          "name": "BW AI Entity Search",
+          "when": "true",
+          "type": "webview"
+        }
+      ]
+    },
     "configuration": {
       "title": "Brandwatch Query Language",
       "properties": {
@@ -75,6 +99,11 @@
           ],
           "default": "off",
           "description": "Traces the communication between VS Code and the language server."
+        },
+        "bwq.wikidata.enableHover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable WikiData entity hover information for entityId fields"
         }
       }
     }

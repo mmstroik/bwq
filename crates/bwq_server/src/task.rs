@@ -1,4 +1,5 @@
 use anyhow::Result;
+use bwq_linter::ast::Query;
 use crossbeam_channel::{Receiver, Sender};
 use lsp_types::{PublishDiagnosticsParams, Uri};
 use std::num::NonZeroUsize;
@@ -43,11 +44,13 @@ impl TaskExecutor {
         &self,
         uri: Uri,
         content: String,
+        document_version: Option<i32>,
         cancellation_token: Option<CancellationToken>,
     ) -> Result<()> {
         let task = BackgroundTask::Diagnostics {
             uri,
             content,
+            document_version,
             cancellation_token,
         };
 
@@ -57,7 +60,34 @@ impl TaskExecutor {
 
     /// Schedule a diagnostics task without cancellation token (for tests)
     pub fn schedule_diagnostics_simple(&self, uri: Uri, content: String) -> Result<()> {
-        self.schedule_diagnostics(uri, content, None)
+        self.schedule_diagnostics(uri, content, None, None)
+    }
+
+    /// Schedule an entity lookup task for background processing
+    pub(crate) fn schedule_entity_lookup(
+        &self,
+        request_id: lsp_server::RequestId,
+        entity_id: String,
+    ) -> Result<()> {
+        let task = BackgroundTask::EntityLookup {
+            request_id,
+            entity_id,
+        };
+
+        self.task_sender.send(task)?;
+        Ok(())
+    }
+
+    /// Schedule an entity search task for background processing
+    pub(crate) fn schedule_entity_search(
+        &self,
+        request_id: lsp_server::RequestId,
+        query: String,
+    ) -> Result<()> {
+        let task = BackgroundTask::EntitySearch { request_id, query };
+
+        self.task_sender.send(task)?;
+        Ok(())
     }
 }
 
@@ -65,20 +95,44 @@ enum BackgroundTask {
     Diagnostics {
         uri: Uri,
         content: String,
+        document_version: Option<i32>,
         cancellation_token: Option<CancellationToken>,
+    },
+    EntityLookup {
+        request_id: lsp_server::RequestId,
+        entity_id: String,
+    },
+    EntitySearch {
+        request_id: lsp_server::RequestId,
+        query: String,
     },
 }
 
 pub enum TaskResponse {
-    Diagnostics(PublishDiagnosticsParams),
+    Diagnostics {
+        params: PublishDiagnosticsParams,
+        ast: Option<Query>,
+        document_version: Option<i32>,
+    },
+    EntityInfo {
+        request_id: lsp_server::RequestId,
+        entity_info: Option<crate::wikidata::EntityInfo>,
+    },
+    EntitySearchResults {
+        request_id: lsp_server::RequestId,
+        results: Result<Vec<crate::wikidata::EntitySearchResult>, String>,
+    },
 }
 
 fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>) {
     use crate::diagnostics_handler::DiagnosticsHandler;
+    use crate::wikidata::WikiDataClient;
     use bwq_linter::BrandwatchLinter;
 
     let mut linter = BrandwatchLinter::new();
     let diagnostics_handler = DiagnosticsHandler::new();
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+    let mut wikidata_client = WikiDataClient::new().expect("Failed to create WikiData client");
 
     tracing::debug!("Worker thread started");
 
@@ -87,6 +141,7 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
             BackgroundTask::Diagnostics {
                 uri,
                 content,
+                document_version,
                 cancellation_token,
             } => {
                 // Check if request was cancelled before processing
@@ -99,8 +154,8 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
 
                 tracing::trace!("Processing diagnostics for {:?}", uri);
 
-                match diagnostics_handler.analyze_content(&content, &mut linter) {
-                    Ok(diagnostics) => {
+                match diagnostics_handler.analyze_content_with_ast(&content, &mut linter) {
+                    Ok((diagnostics, ast)) => {
                         // Check cancellation again before sending result
                         if let Some(ref token) = cancellation_token {
                             if token.is_cancelled() {
@@ -109,11 +164,15 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                             }
                         }
 
-                        let response = TaskResponse::Diagnostics(PublishDiagnosticsParams {
-                            uri,
-                            diagnostics,
-                            version: None,
-                        });
+                        let response = TaskResponse::Diagnostics {
+                            params: PublishDiagnosticsParams {
+                                uri,
+                                diagnostics,
+                                version: None,
+                            },
+                            ast,
+                            document_version,
+                        };
 
                         if sender.send(response).is_err() {
                             tracing::debug!(
@@ -124,17 +183,100 @@ fn worker_loop(receiver: Receiver<BackgroundTask>, sender: Sender<TaskResponse>)
                     }
                     Err(e) => {
                         tracing::error!("Failed to analyze content for {:?}: {}", uri, e);
-                        let response = TaskResponse::Diagnostics(PublishDiagnosticsParams {
-                            uri,
-                            diagnostics: vec![],
-                            version: None,
-                        });
+                        let response = TaskResponse::Diagnostics {
+                            params: PublishDiagnosticsParams {
+                                uri,
+                                diagnostics: vec![],
+                                version: None,
+                            },
+                            ast: None,
+                            document_version,
+                        };
 
                         if sender.send(response).is_err() {
                             tracing::debug!("Failed to send error diagnostics response");
                             break;
                         }
                     }
+                }
+            }
+            BackgroundTask::EntityLookup {
+                request_id,
+                entity_id,
+            } => {
+                tracing::debug!("WikiData lookup started for entityId: {}", entity_id);
+
+                let entity_info =
+                    rt.block_on(async { wikidata_client.get_entity_info(&entity_id).await });
+
+                match entity_info {
+                    Ok(Some(info)) => {
+                        tracing::debug!("WIKIDATA: Found {} ({})", info.label, entity_id);
+                        let response = TaskResponse::EntityInfo {
+                            request_id,
+                            entity_info: Some(info),
+                        };
+
+                        if sender.send(response).is_err() {
+                            tracing::debug!(
+                                "Failed to send entity info response (receiver dropped)"
+                            );
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        tracing::debug!(
+                            "WikiData lookup completed for entityId: {} - not found",
+                            entity_id
+                        );
+                        let response = TaskResponse::EntityInfo {
+                            request_id,
+                            entity_info: None,
+                        };
+
+                        if sender.send(response).is_err() {
+                            tracing::debug!(
+                                "Failed to send entity info response (receiver dropped)"
+                            );
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "WikiData lookup failed for entityId: {}: {}",
+                            entity_id,
+                            e
+                        );
+                        let response = TaskResponse::EntityInfo {
+                            request_id,
+                            entity_info: None,
+                        };
+
+                        if sender.send(response).is_err() {
+                            tracing::debug!("Failed to send error entity info response");
+                            break;
+                        }
+                    }
+                }
+            }
+            BackgroundTask::EntitySearch { request_id, query } => {
+                tracing::debug!("Entity search started for query: {}", query);
+
+                let search_result = rt.block_on(async {
+                    wikidata_client
+                        .search_entities(&query)
+                        .await
+                        .map_err(|e| e.to_string())
+                });
+
+                let response = TaskResponse::EntitySearchResults {
+                    request_id,
+                    results: search_result,
+                };
+
+                if sender.send(response).is_err() {
+                    tracing::debug!("Failed to send entity search response (receiver dropped)");
+                    break;
                 }
             }
         }

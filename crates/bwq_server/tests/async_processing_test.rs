@@ -28,8 +28,16 @@ fn test_async_diagnostics_processing() -> Result<()> {
         select! {
             recv(response_receiver) -> result => {
                 match result {
-                    Ok(TaskResponse::Diagnostics(params)) => {
+                    Ok(TaskResponse::Diagnostics { params, .. }) => {
                         responses.push(params);
+                    }
+                    Ok(TaskResponse::EntityInfo { .. }) => {
+                        // This test only cares about diagnostics responses
+                        continue;
+                    }
+                    Ok(TaskResponse::EntitySearchResults { .. }) => {
+                        // This test only cares about diagnostics responses
+                        continue;
                     }
                     Err(e) => {
                         panic!("Failed to receive response: {e}");
@@ -140,8 +148,16 @@ fn test_concurrent_processing() -> Result<()> {
         select! {
             recv(response_receiver) -> result => {
                 match result {
-                    Ok(TaskResponse::Diagnostics(params)) => {
+                    Ok(TaskResponse::Diagnostics { params, .. }) => {
                         responses.push(params);
+                    }
+                    Ok(TaskResponse::EntityInfo { .. }) => {
+                        // This test only cares about diagnostics responses
+                        continue;
+                    }
+                    Ok(TaskResponse::EntitySearchResults { .. }) => {
+                        // This test only cares about diagnostics responses
+                        continue;
                     }
                     Err(e) => {
                         panic!("Failed to receive response: {e}");

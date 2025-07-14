@@ -4,6 +4,7 @@ mod request_queue;
 mod server;
 pub mod task;
 mod utils;
+mod wikidata;
 
 use crate::connection::ConnectionInitializer;
 use crate::server::Server;
@@ -13,6 +14,11 @@ use std::num::NonZeroUsize;
 pub(crate) type Result<T> = anyhow::Result<T>;
 
 pub fn run() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_max_level(tracing::Level::INFO)
+        .init();
+
     let four = NonZeroUsize::new(4).unwrap();
 
     // set number of threads to num_cpus with a maximum of 4
