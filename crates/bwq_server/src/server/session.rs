@@ -32,7 +32,7 @@ pub struct DiagnosticsRequest {
 pub struct Session {
     pub documents: HashMap<Uri, DocumentState>,
     pub ast_cache: LruCache<Uri, Query>,
-    pub request_queue: RequestQueue,
+    pub(crate) request_queue: RequestQueue,
     pub hover_enabled: bool,
 }
 

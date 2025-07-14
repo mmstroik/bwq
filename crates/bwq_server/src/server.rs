@@ -14,9 +14,9 @@ use crate::server::handlers::EntitySearchParams;
 use crate::task::{TaskExecutor, TaskResponse};
 use crate::wikidata::{EntityInfo, EntitySearchResult};
 
-mod client;
-mod handlers;
-mod session;
+pub mod client;
+pub mod handlers;
+pub mod session;
 mod utils;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -41,7 +41,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(
+    pub(crate) fn new(
         worker_threads: NonZeroUsize,
         connection_initializer: ConnectionInitializer,
     ) -> Result<Self> {

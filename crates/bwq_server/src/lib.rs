@@ -1,7 +1,7 @@
 mod connection;
 mod diagnostics_handler;
 mod request_queue;
-mod server;
+pub mod server;
 pub mod task;
 mod utils;
 mod wikidata;
