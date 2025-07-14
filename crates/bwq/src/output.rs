@@ -200,7 +200,7 @@ impl Printer {
     }
 
     fn print_text(&self, analysis: &AnalysisResult) {
-        if !analysis.errors.is_empty() {
+        if !analysis.is_valid {
             for error in &analysis.errors {
                 self.print_error_with_context(&analysis.query, error, None);
                 println!();
@@ -213,15 +213,12 @@ impl Printer {
                 println!();
             }
         }
-        let warning_count = if self.show_warnings { analysis.warnings.len() } else { 0 };
-        let error_count = analysis.errors.len();
-        if error_count == 0 && warning_count == 0 {
+
+        if analysis.is_valid && (!self.show_warnings || analysis.warnings.is_empty()) {
             println!("All checks passed!");
-        } else {
-            println!("Found {} diagnostics", error_count + warning_count);
         }
     }
-    
+
     fn print_json(&self, analysis: &AnalysisResult) {
         let errors: Vec<_> = analysis.errors.iter().map(|e| e.to_json()).collect();
         let warnings: Vec<_> = if self.show_warnings {
