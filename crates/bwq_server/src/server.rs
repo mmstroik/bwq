@@ -166,15 +166,14 @@ impl Server {
                                 // Check if document version is still current to prevent stale AST caching
                                 let current_version = self.documents.get(&params.uri).map(|doc| doc.version);
                                 if document_version == current_version {
-                                    // Check if this evicts an entry from the LRU cache
-                                    let cache_size_before = self.ast_cache.len();
+                                    // Check if this will evict an entry from the LRU cache
+                                    let will_evict = self.ast_cache.len() == self.ast_cache.cap().get() && !self.ast_cache.contains(&params.uri);
                                     self.ast_cache.put(params.uri.clone(), ast);
-                                    let cache_size_after = self.ast_cache.len();
 
-                                    if cache_size_after < cache_size_before {
-                                        tracing::debug!("AST CACHE: LRU evicted entry - cache size: {}", cache_size_after);
+                                    if will_evict {
+                                        tracing::debug!("AST CACHE: LRU evicted entry - cache size: {}", self.ast_cache.len());
                                     } else {
-                                        tracing::debug!("AST CACHE: Cached AST - size: {}/{}", cache_size_after, self.ast_cache.cap());
+                                        tracing::debug!("AST CACHE: Cached AST - size: {}/{}", self.ast_cache.len(), self.ast_cache.cap().get());
                                     }
 
                                     // Update document state to indicate AST is cached
@@ -433,7 +432,7 @@ impl Server {
             tracing::debug!(
                 "HOVER: Using cached AST for entity extraction (cache size: {}/{})",
                 self.ast_cache.len(),
-                self.ast_cache.cap()
+                self.ast_cache.cap().get()
             );
             self.find_entity_id_at_position(&ast, byte_position)
         } else {
