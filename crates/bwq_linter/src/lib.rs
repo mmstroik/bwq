@@ -71,7 +71,7 @@ impl BrandwatchLinter {
                 is_valid: true,
                 errors: Vec::new(),
                 warnings: Vec::new(),
-                query: Some(query.to_string()),
+                query: query.to_string(),
                 ast: None,
             };
         }
@@ -81,14 +81,14 @@ impl BrandwatchLinter {
                 is_valid: !report.has_errors(),
                 errors: report.errors,
                 warnings: report.warnings,
-                query: Some(query.to_string()),
+                query: query.to_string(),
                 ast: Some(ast),
             },
             Err(error) => AnalysisResultWithAst {
                 is_valid: false,
                 errors: vec![error],
                 warnings: vec![],
-                query: Some(query.to_string()),
+                query: query.to_string(),
                 ast: None,
             },
         }
@@ -114,7 +114,7 @@ pub struct AnalysisResultWithAst {
     pub is_valid: bool,
     pub errors: Vec<LintError>,
     pub warnings: Vec<error::LintWarning>,
-    pub query: Option<String>,
+    pub query: String,
     pub ast: Option<Query>,
 }
 
