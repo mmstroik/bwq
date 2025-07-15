@@ -198,14 +198,14 @@ impl Parser {
     }
 
     fn parse_proximity_expression(&mut self) -> LintResult<Expression> {
-        let left = self.parse_primary()?;
+        let mut current_expr = self.parse_primary()?;
 
-        // handle proximity operators
+        // handle tilde operator (no chaining)
         if self.match_token(&TokenType::Tilde) {
             let tilde_span = self.previous().span.clone();
             let distance;
 
-            if left.span().end.offset != tilde_span.start.offset {
+            if current_expr.span().end.offset != tilde_span.start.offset {
                 return Err(LintError::ParserError {
                     span: tilde_span,
                     message: "The ~ operator must be immediately attached to the preceding term (e.g., apple~5, not apple ~5).".to_string(),
@@ -240,8 +240,10 @@ impl Parser {
             }
 
             // tilde is valid after quoted phrases, grouped expressions, or single terms
-            let is_valid_tilde_context =
-                matches!(&left, Expression::Term { .. } | Expression::Group { .. });
+            let is_valid_tilde_context = matches!(
+                &current_expr,
+                Expression::Term { .. } | Expression::Group { .. }
+            );
 
             if !is_valid_tilde_context {
                 return Err(LintError::ParserError {
@@ -250,7 +252,7 @@ impl Parser {
                 });
             }
 
-            let terms = vec![left];
+            let terms = vec![current_expr];
             let end_span = tilde_span.end.clone();
             let span = Span::new(terms[0].span().start.clone(), end_span);
 
@@ -263,36 +265,38 @@ impl Parser {
             });
         }
 
-        // handle NEAR/x and NEAR/xf
-        if let TokenType::Near(distance) = &self.peek().token_type {
-            let distance = *distance;
-            self.advance();
-            let _operator_span = self.previous().span.clone();
-            let right = self.parse_primary()?;
+        // handle NEAR/x and NEAR/xf chaining
+        loop {
+            if let TokenType::Near(distance) = &self.peek().token_type {
+                let distance = *distance;
+                self.advance();
+                let _operator_span = self.previous().span.clone();
+                let right = self.parse_primary()?;
 
-            let span = Span::new(left.span().start.clone(), right.span().end.clone());
-            return Ok(Expression::Proximity {
-                operator: ProximityOperator::Near { distance },
-                terms: vec![left, right],
-                span,
-            });
+                let span = Span::new(current_expr.span().start.clone(), right.span().end.clone());
+                current_expr = Expression::Proximity {
+                    operator: ProximityOperator::Near { distance },
+                    terms: vec![current_expr, right],
+                    span,
+                };
+            } else if let TokenType::NearForward(distance) = &self.peek().token_type {
+                let distance = *distance;
+                self.advance();
+                let _operator_span = self.previous().span.clone();
+                let right = self.parse_primary()?;
+
+                let span = Span::new(current_expr.span().start.clone(), right.span().end.clone());
+                current_expr = Expression::Proximity {
+                    operator: ProximityOperator::NearForward { distance },
+                    terms: vec![current_expr, right],
+                    span,
+                };
+            } else {
+                break;
+            }
         }
 
-        if let TokenType::NearForward(distance) = &self.peek().token_type {
-            let distance = *distance;
-            self.advance();
-            let _operator_span = self.previous().span.clone();
-            let right = self.parse_primary()?;
-
-            let span = Span::new(left.span().start.clone(), right.span().end.clone());
-            return Ok(Expression::Proximity {
-                operator: ProximityOperator::NearForward { distance },
-                terms: vec![left, right],
-                span,
-            });
-        }
-
-        Ok(left)
+        Ok(current_expr)
     }
 
     fn parse_primary(&mut self) -> LintResult<Expression> {

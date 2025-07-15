@@ -113,7 +113,7 @@ impl ValidationRule for MixedNearRule {
                         {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
-                                message: "You can only use the OR and NEAR operators with another NEAR operator if they're separated with brackets. Please use parentheses for disambiguation - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                                message: "You can only use the OR operator with a NEAR operator if they're separated with brackets. Please use parentheses for disambiguation - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream OR cake)".to_string(),
                             });
                         }
                     }
@@ -132,16 +132,23 @@ impl ValidationRule for MixedNearRule {
                     ProximityOperator::Near { .. } | ProximityOperator::NearForward { .. }
                 ) {
                     for term in terms {
+                        // Check for consecutive NEAR mixing
+                        if self.contains_near_at_top_level(term) {
+                            return ValidationResult::with_error(LintError::ProximityOperatorError {
+                                span: span.clone(),
+                                message: "Please use parentheses for disambiguation when using the NEAR operator with another NEAR operator - e.g. (test NEAR/5 test) NEAR/3 test.".to_string(),
+                            });
+                        }
                         if self.contains_or_at_top_level(term) {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
-                                message: "Please use parentheses for disambiguation when using the OR operator with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                                message: "Please use parentheses for disambiguation when using the OR operator with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 ice-cream".to_string(),
                             });
                         }
                         if self.contains_and_recursively(term) {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
-                                message: "The AND operator cannot be used within the NEAR operator. Either remove this operator or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
+                                message: "The AND operator cannot be used *within* the NEAR operator. Either remove this operator, replace it with a NEAR, or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
                             });
                         }
                     }

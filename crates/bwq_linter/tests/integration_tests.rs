@@ -588,6 +588,11 @@ fn test_near_operator_interaction_validation() {
     let mixed_near_boolean_cases = vec![
         "(apple OR orange) NEAR/5 (juice OR drink) AND fresh",
         "(apple OR orange) NEAR/5 (juice OR drink) OR fresh",
+        "(apple NEAR/5 orange OR juice)",
+        "(apple* NOT (apple NEAR/2 podcast* OR TV))",
+        "(test NEAR/5 testing) NEAR/5 (test NEAR/5 test) OR test",
+        "(test NEAR/5 testing) NEAR/5 (test NEAR/5 test) NEAR/5 test",
+        "test NEAR/5 test NEAR/5 test",
     ];
 
     for query in mixed_near_boolean_cases {
@@ -610,9 +615,19 @@ fn test_near_operator_interaction_validation() {
 
     // proper parentheses
     let valid_near_cases = vec![
-        "((apple OR orange) NEAR/5 (juice OR drink)) AND fresh",
+        "(((apple OR orange) NEAR/5 (juice OR drink)) AND fresh)",
         "(apple NEAR/3 banana) OR (juice NEAR/2 smoothie)",
         "(apple NEAR/5 juice) AND (banana NEAR/3 smoothie)",
+        "((apple NEAR/5 orange) OR juice)",
+        "test OR \"test test\"~5 OR test",
+        "test AND \"test test\"~5 AND test",
+        "((test NEAR/5 testing) NEAR/5 (test NEAR/5 test)) OR test",
+        "(test NEAR/5 testing) NEAR/5 (test NEAR/5 test)",
+        "(test NEAR/5 testing) NEAR/5 test",
+        "((test NEAR/5 testing) NEAR/5 test)",
+        "((test NEAR/5 testing) NEAR/5 test) NEAR/5 test",
+        "((test NEAR/5 testing) NEAR/5 test) AND test",
+        "((test NEAR/5 testing) NEAR/5 test) OR test",
     ];
 
     for query in valid_near_cases {
