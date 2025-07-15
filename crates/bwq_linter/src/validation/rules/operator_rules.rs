@@ -86,7 +86,7 @@ impl ValidationRule for MixedNearRule {
         "mixed-near"
     }
 
-    fn validate(&self, expr: &Expression, ctx: &ValidationContext) -> ValidationResult {
+    fn validate(&self, expr: &Expression, _ctx: &ValidationContext) -> ValidationResult {
         match expr {
             Expression::BooleanOp {
                 operator,
@@ -96,22 +96,24 @@ impl ValidationRule for MixedNearRule {
             } => {
                 if matches!(operator, BooleanOperator::And) {
                     if let Some(right_expr) = right {
-                        if self.is_unparenthesized_near_and_mix(left, right_expr) {
+                        if self.contains_near_at_top_level(left)
+                            || self.contains_near_at_top_level(right_expr)
+                        {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
-                                message: "The AND operator cannot be used within the NEAR operator. Either remove this operator or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
+                                message: "Please use parentheses for disambiguation when using the AND operator with a NEAR operator - e.g. (vanilla NEAR/5 chocolate) AND (ice-cream NEAR/5 cake).".to_string(),
                             });
                         }
                     }
                 }
-                if !ctx.inside_group && matches!(operator, BooleanOperator::Or) {
+                if matches!(operator, BooleanOperator::Or) {
                     if let Some(right_expr) = right {
                         if self.contains_near_at_top_level(right_expr)
                             || self.contains_near_at_top_level(left)
                         {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
-                                message: "Please use parentheses for disambiguation when using the OR or NEAR operators with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                                message: "You can only use the OR and NEAR operators with another NEAR operator if they're separated with brackets. Please use parentheses for disambiguation - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
                             });
                         }
                     }
@@ -130,12 +132,16 @@ impl ValidationRule for MixedNearRule {
                     ProximityOperator::Near { .. } | ProximityOperator::NearForward { .. }
                 ) {
                     for term in terms {
-                        if self.contains_or_at_top_level(term)
-                            || self.contains_and_recursively(term)
-                        {
+                        if self.contains_or_at_top_level(term) {
                             return ValidationResult::with_error(LintError::ProximityOperatorError {
                                 span: span.clone(),
-                                message: "Please use parentheses for disambiguation when using the OR or NEAR operators with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                                message: "Please use parentheses for disambiguation when using the OR operator with another NEAR operator - e.g. (vanilla OR chocolate) NEAR/5 (ice-cream NEAR/5 cake).".to_string(),
+                            });
+                        }
+                        if self.contains_and_recursively(term) {
+                            return ValidationResult::with_error(LintError::ProximityOperatorError {
+                                span: span.clone(),
+                                message: "The AND operator cannot be used within the NEAR operator. Either remove this operator or disambiguate with parenthesis, e.g. (vanilla NEAR/5 ice-cream) AND cake.".to_string(),
                             });
                         }
                     }
@@ -207,22 +213,7 @@ impl MixedNearRule {
 
     fn contains_near_at_top_level(&self, expr: &Expression) -> bool {
         match expr {
-            Expression::Proximity { .. } => true,
-            Expression::Group { .. } => false,
-            _ => false,
-        }
-    }
-
-    fn is_unparenthesized_near_and_mix(&self, left: &Expression, right: &Expression) -> bool {
-        // check if left side contains NEAR/x operators (not tilde) at top level
-        self.contains_binary_near_at_top_level(left)
-            || self.contains_binary_near_at_top_level(right)
-    }
-
-    fn contains_binary_near_at_top_level(&self, expr: &Expression) -> bool {
-        match expr {
             Expression::Proximity { operator, .. } => {
-                // allow tilde proximity (single operand) but reject NEAR/x (binary)
                 matches!(
                     operator,
                     ProximityOperator::Near { .. } | ProximityOperator::NearForward { .. }
