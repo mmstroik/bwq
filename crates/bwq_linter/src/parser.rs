@@ -123,6 +123,7 @@ impl Parser {
 
     fn parse_and_expression(&mut self) -> LintResult<Expression> {
         let mut left = self.parse_not_expression()?;
+        let mut last_right_span: Option<Span> = None;
 
         loop {
             if self.match_token(&TokenType::And) {
@@ -131,6 +132,7 @@ impl Parser {
                 let right = self.parse_not_expression()?;
 
                 let span = Span::new(left.span().start.clone(), right.span().end.clone());
+                last_right_span = Some(right.span().clone());
                 left = Expression::BooleanOp {
                     operator,
                     left: Box::new(left),
@@ -141,12 +143,18 @@ impl Parser {
                 // warn on implicit AND (space-separated terms)
                 let right = self.parse_not_expression()?;
 
-                // Create span for the gap between terms (for the warning)
-                let gap_span = Span::new(left.span().end.clone(), right.span().start.clone());
+                // create warning span: if this is the first implicit AND, use left + right
+                // if there was a previous right operand, use previous_right + current_right
+                let warning_span = if let Some(prev_right_span) = &last_right_span {
+                    Span::new(prev_right_span.start.clone(), right.span().end.clone())
+                } else {
+                    Span::new(left.span().start.clone(), right.span().end.clone())
+                };
 
                 // Create span for the full expression (for the AST node)
                 let full_span = Span::new(left.span().start.clone(), right.span().end.clone());
 
+                last_right_span = Some(right.span().clone());
                 left = Expression::BooleanOp {
                     operator: BooleanOperator::And,
                     left: Box::new(left),
@@ -154,7 +162,7 @@ impl Parser {
                     span: full_span,
                 };
 
-                self.implicit_and_spans.push(gap_span);
+                self.implicit_and_spans.push(warning_span);
             } else {
                 break;
             }

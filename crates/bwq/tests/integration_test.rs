@@ -125,10 +125,45 @@ success: true
 exit_code: 0
 ----- stdout -----
 warning[W001]: Potential typo: Two or more terms without an operator between them are implicitly ANDed. Consider using explicit 'AND' operator for clarity
-  --> 1:6
+  --> 1:1
   |
 1 | apple this
-  |      ^
+  | ^^^^^^^^^^
+  |
+----- stderr -----
+",
+    );
+}
+
+#[test]
+fn test_multiple_warning_spans() {
+    let cmd_result = check_query("(test OR (test test)) test (test OR test)");
+
+    assert_cmd_output(
+        cmd_result,
+        r"
+success: true
+exit_code: 0
+----- stdout -----
+warning[W001]: Potential typo: Two or more terms without an operator between them are implicitly ANDed. Consider using explicit 'AND' operator for clarity
+  --> 1:11
+  |
+1 | (test OR (test test)) test (test OR test)
+  |           ^^^^^^^^^
+  |
+
+warning[W001]: Potential typo: Two or more terms without an operator between them are implicitly ANDed. Consider using explicit 'AND' operator for clarity
+  --> 1:1
+  |
+1 | (test OR (test test)) test (test OR test)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+
+warning[W001]: Potential typo: Two or more terms without an operator between them are implicitly ANDed. Consider using explicit 'AND' operator for clarity
+  --> 1:23
+  |
+1 | (test OR (test test)) test (test OR test)
+  |                       ^^^^^^^^^^^^^^^^^^^
   |
 ----- stderr -----
 ",
@@ -268,7 +303,7 @@ fn test_multiple_files() -> Result<(), Box<dyn std::error::Error>> {
 
     // Should contain warning from file2
     assert!(stdout.contains("warning[W001]:"));
-    assert!(stdout.contains(&format!("  --> {}:1:6", file2.display())));
+    assert!(stdout.contains(&format!("  --> {}:1:1", file2.display())));
 
     assert!(stdout.contains("Summary: "));
 
