@@ -447,3 +447,133 @@ impl ValidationRule for WildcardPlacementRule {
         }
     }
 }
+
+pub struct OrNotInteractionRule;
+
+impl ValidationRule for OrNotInteractionRule {
+    fn name(&self) -> &'static str {
+        "or-not-interaction"
+    }
+
+    fn validate(&self, expr: &Expression, ctx: &ValidationContext) -> ValidationResult {
+        match expr {
+            Expression::BooleanOp {
+                operator: BooleanOperator::Or,
+                left,
+                right,
+                span,
+            } => {
+                // Only apply this rule if we're not inside a group that contains additional terms
+                // This prevents flagging inner OR operations like in "test OR (NOT test OR test)"
+                if ctx.inside_group {
+                    return ValidationResult::new();
+                }
+                
+                if let Some(right_expr) = right {
+                    // Check for direct OR NOT pattern: "test OR NOT test"
+                    if self.is_direct_not_operation(right_expr) {
+                        return ValidationResult::with_error(LintError::OperatorMixingError {
+                            span: span.clone(),
+                            message: "The NOT operator cannot be used next to OR. Include a search term between them or remove one.".to_string(),
+                        });
+                    }
+                    
+                    // Check for grouped NOT pattern: "test OR (NOT test)"
+                    if self.is_grouped_not_only(right_expr) {
+                        return ValidationResult::with_error(LintError::OperatorMixingError {
+                            span: span.clone(),
+                            message: "You cannot use NOT alone as options when using OR. Include a search term between them or remove one.".to_string(),
+                        });
+                    }
+                }
+                
+                // Check left side for grouped NOT pattern: "(NOT test) OR test"
+                if self.is_grouped_not_only(left) {
+                    return ValidationResult::with_error(LintError::OperatorMixingError {
+                        span: span.clone(),
+                        message: "You cannot use NOT alone as options when using OR. Include a search term between them or remove one.".to_string(),
+                    });
+                }
+
+                // Check left side for direct NOT pattern: "NOT test OR test"
+                if self.is_direct_not_operation(left) {
+                    return ValidationResult::with_error(LintError::OperatorMixingError {
+                        span: span.clone(),
+                        message: "You cannot use NOT alone as options when using OR. Include a search term between them or remove one.".to_string(),
+                    });
+                }
+                
+                ValidationResult::new()
+            }
+            _ => ValidationResult::new(),
+        }
+    }
+
+    fn can_validate(&self, expr: &Expression) -> bool {
+        matches!(
+            expr,
+            Expression::BooleanOp {
+                operator: BooleanOperator::Or,
+                ..
+            }
+        )
+    }
+}
+
+impl OrNotInteractionRule {
+    /// Check if expression is a direct NOT operation (e.g., "NOT test")
+    /// This should only flag simple NOT operations, not complex expressions containing NOT
+    fn is_direct_not_operation(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::BooleanOp {
+                operator: BooleanOperator::Not,
+                left,
+                right,
+                ..
+            } => {
+                // Only flag unary NOT operations, not binary NOT operations
+                match (left.as_ref(), right.as_ref()) {
+                    // Unary NOT with just a term: "NOT term" - this is problematic with OR
+                    (Expression::Term { .. }, None) => true,
+                    // Binary NOT with terms: "term1 NOT term2" - this is fine with OR
+                    (Expression::Term { .. }, Some(_)) => false,
+                    // Allow complex NOT structures
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if expression is a group containing only a NOT operation (e.g., "(NOT test)")
+    /// This should only flag groups that contain ONLY a NOT operation, not complex expressions
+    /// that happen to contain NOT as part of a larger structure.
+    fn is_grouped_not_only(&self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Group { expression, .. } => {
+                // Only flag if the group contains exactly a unary NOT operation and nothing else
+                match expression.as_ref() {
+                    Expression::BooleanOp {
+                        operator: BooleanOperator::Not,
+                        left,
+                        right,
+                        ..
+                    } => {
+                        // Only flag unary NOT operations: "NOT term"
+                        // Do not flag binary NOT operations: "term1 NOT term2"
+                        // Do not flag if this is part of a larger structure
+                        match (left.as_ref(), right.as_ref()) {
+                            // Unary NOT with just a term: "(NOT term)" - this is problematic with OR
+                            (Expression::Term { .. }, None) => true,
+                            // Binary NOT or complex structures are fine
+                            _ => false,
+                        }
+                    }
+                    // If the group contains anything other than a NOT operation, it's fine
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+}

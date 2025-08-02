@@ -127,18 +127,36 @@ impl Parser {
 
         loop {
             if self.match_token(&TokenType::And) {
-                let operator = BooleanOperator::And;
                 let _operator_span = self.previous().span.clone();
                 let right = self.parse_not_expression()?;
 
                 let span = Span::new(left.span().start.clone(), right.span().end.clone());
                 last_right_span = Some(right.span().clone());
-                left = Expression::BooleanOp {
-                    operator,
-                    left: Box::new(left),
-                    right: Some(Box::new(right)),
-                    span,
-                };
+                
+                // Check if right operand is a unary NOT operation
+                // If so, convert "left AND NOT term" to "left NOT term"
+                if let Expression::BooleanOp {
+                    operator: BooleanOperator::Not,
+                    left: not_operand,
+                    right: None,
+                    ..
+                } = right {
+                    // This is a unary NOT, so convert AND NOT to binary NOT
+                    left = Expression::BooleanOp {
+                        operator: BooleanOperator::Not,
+                        left: Box::new(left),
+                        right: Some(not_operand),
+                        span,
+                    };
+                } else {
+                    // Regular AND operation
+                    left = Expression::BooleanOp {
+                        operator: BooleanOperator::And,
+                        left: Box::new(left),
+                        right: Some(Box::new(right)),
+                        span,
+                    };
+                }
             } else if self.is_implicit_and_candidate() {
                 // warn on implicit AND (space-separated terms)
                 let right = self.parse_not_expression()?;

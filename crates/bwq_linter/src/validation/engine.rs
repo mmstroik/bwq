@@ -32,6 +32,7 @@ impl ValidationEngine {
                 Box::new(BinaryOperatorRule),
                 Box::new(TildeUsageRule),
                 Box::new(WildcardPlacementRule),
+                Box::new(OrNotInteractionRule),
                 // performance validation rules
                 Box::new(ShortTermRule),
             ],

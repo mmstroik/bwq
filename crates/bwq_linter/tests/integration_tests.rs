@@ -653,3 +653,29 @@ fn test_fixture_files(file_path: &str, expected: FileTestExpectation) {
     let mut test = QueryTest::new();
     expected.assert(&mut test, file_path);
 }
+
+// ============================================================================
+// OR/NOT INTERACTION TESTS
+// Tests for specific interactions between OR and NOT operators
+// ============================================================================
+
+#[test]
+fn test_or_not_interaction() {
+    let mut test = QueryTest::new();
+
+    // Valid cases - NOT can be used with AND and in groups
+    test.assert_valid("test (NOT test)"); // This has implicit AND warning, which is correct
+    test.assert_warning_code("test (NOT test)", "W001"); // Implicit AND warning
+    test.assert_valid_no_warnings("test NOT test");
+    test.assert_valid_no_warnings("(NOT test) AND test");
+    test.assert_valid_no_warnings("(test AND NOT test) OR test");
+    test.assert_valid_no_warnings("test OR (NOT test OR test)");
+    test.assert_valid_no_warnings("test NOT test OR test");
+
+    // Invalid cases - NOT cannot be used directly with OR
+    test.assert_error_code("test OR NOT test", "E012"); // The NOT operator cannot be used next to OR. Include a search term between them or remove one.
+    test.assert_error_code("test OR (NOT test)", "E012"); // You cannot use NOT alone as options when using OR. Include a search term between them or remove one.
+    test.assert_error_code("test OR (NOT test) OR test", "E012"); // same as above
+    test.assert_error_code("(NOT test) OR test", "E012"); // You cannot use NOT alone as options when using OR. Include a search term between them or remove one.
+    test.assert_error_code("NOT test OR test", "E012"); // similar to PureNegativeQuery rule - starting with NOT then OR doesn't work logically
+}
